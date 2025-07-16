@@ -10,6 +10,13 @@ import Dashboard from "@/pages/dashboard";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import AuthPage from "@/pages/auth";
+import About from "@/pages/about";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
+import Contact from "@/pages/contact";
+import Help from "@/pages/help";
+import Status from "@/pages/status";
+import Product from "@/pages/product";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -33,6 +40,13 @@ function Router() {
         <>
           <Route path="/" component={Landing} />
           <Route path="/auth" component={AuthPage} />
+          <Route path="/about" component={About} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/help" component={Help} />
+          <Route path="/status" component={Status} />
+          <Route path="/product" component={Product} />
         </>
       ) : (
         <>
@@ -40,6 +54,13 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />
+          <Route path="/about" component={About} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/help" component={Help} />
+          <Route path="/status" component={Status} />
+          <Route path="/product" component={Product} />
         </>
       )}
       <Route component={NotFound} />
