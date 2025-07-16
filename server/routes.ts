@@ -1,30 +1,38 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertPropertySchema, insertRentPaymentSchema, insertBankConnectionSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
-  await setupAuth(app);
+  setupAuth(app);
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  // Middleware to check authentication
+  const requireAuth = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    next();
+  };
+
+  // Dashboard stats
+  app.get('/api/dashboard/stats', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const userId = req.user.id;
+      const stats = await storage.getUserStats(userId);
+      res.json(stats);
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      console.error('Error fetching dashboard stats:', error);
+      res.status(500).json({ message: 'Failed to fetch dashboard stats' });
     }
   });
 
   // User profile routes
-  app.patch('/api/user/profile', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const updateData = req.body;
       
       const user = await storage.upsertUser({
@@ -41,9 +49,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Property routes
-  app.get('/api/properties', isAuthenticated, async (req: any, res) => {
+  app.get('/api/properties', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const properties = await storage.getUserProperties(userId);
       res.json(properties);
     } catch (error) {
@@ -52,9 +60,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/properties', isAuthenticated, async (req: any, res) => {
+  app.post('/api/properties', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const propertyData = insertPropertySchema.parse({ ...req.body, userId });
       
       const property = await storage.createProperty(propertyData);
@@ -65,7 +73,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/properties/:id', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/properties/:id', requireAuth, async (req: any, res) => {
     try {
       const propertyId = parseInt(req.params.id);
       const updateData = req.body;
@@ -78,7 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/properties/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/properties/:id', requireAuth, async (req: any, res) => {
     try {
       const propertyId = parseInt(req.params.id);
       await storage.deleteProperty(propertyId);
@@ -90,9 +98,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Rent payment routes
-  app.get('/api/payments', isAuthenticated, async (req: any, res) => {
+  app.get('/api/payments', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const payments = await storage.getUserRentPayments(userId);
       res.json(payments);
     } catch (error) {
@@ -101,9 +109,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/payments', isAuthenticated, async (req: any, res) => {
+  app.post('/api/payments', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const paymentData = insertRentPaymentSchema.parse({ ...req.body, userId });
       
       const payment = await storage.createRentPayment(paymentData);
@@ -114,7 +122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/payments/:id', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/payments/:id', requireAuth, async (req: any, res) => {
     try {
       const paymentId = parseInt(req.params.id);
       const updateData = req.body;
@@ -128,9 +136,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bank connection routes
-  app.get('/api/bank-connections', isAuthenticated, async (req: any, res) => {
+  app.get('/api/bank-connections', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const connections = await storage.getUserBankConnections(userId);
       res.json(connections);
     } catch (error) {
@@ -139,9 +147,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/bank-connections', isAuthenticated, async (req: any, res) => {
+  app.post('/api/bank-connections', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const connectionData = insertBankConnectionSchema.parse({ ...req.body, userId });
       
       const connection = await storage.createBankConnection(connectionData);
@@ -152,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/bank-connections/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/bank-connections/:id', requireAuth, async (req: any, res) => {
     try {
       const connectionId = parseInt(req.params.id);
       await storage.deleteBankConnection(connectionId);
@@ -164,9 +172,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard stats
-  app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/dashboard/stats', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const stats = await storage.getUserStats(userId);
       res.json(stats);
     } catch (error) {
@@ -176,9 +184,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Credit report routes
-  app.get('/api/reports', isAuthenticated, async (req: any, res) => {
+  app.get('/api/reports', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const reports = await storage.getUserCreditReports(userId);
       res.json(reports);
     } catch (error) {
@@ -187,9 +195,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/reports/generate', isAuthenticated, async (req: any, res) => {
+  app.post('/api/reports/generate', requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { propertyId } = req.body;
       
       // Get user data
@@ -240,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/reports/:id/share', isAuthenticated, async (req: any, res) => {
+  app.post('/api/reports/:id/share', requireAuth, async (req: any, res) => {
     try {
       const reportId = parseInt(req.params.id);
       const { recipientEmail, recipientType } = req.body;

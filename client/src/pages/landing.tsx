@@ -1,22 +1,20 @@
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { GradientButton } from "@/components/ui/gradient-button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/logo";
-import { CheckCircle, BarChart3, Share2, Menu, X, Star } from "lucide-react";
+import { GradientButton } from "@/components/ui/gradient-button";
+import { CheckCircle, BarChart3, Share2, Menu, X, Star, Shield, Clock, Users, Award, TrendingUp, Check, FileText, CreditCard, Building, MapPin, Calendar } from "lucide-react";
 
 export default function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleGetStarted = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/auth";
   };
 
   const handleSignIn = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/auth";
   };
 
   return (
@@ -30,10 +28,11 @@ export default function Landing() {
             </div>
             <div className="hidden md:block">
               <div className="ml-10 flex items-baseline space-x-8">
-                <a href="#home" className="text-gray-900 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">Home</a>
+                <a href="#product" className="text-gray-900 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">Product</a>
                 <a href="#features" className="text-gray-500 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">Features</a>
-                <a href="#about" className="text-gray-500 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">About</a>
-                <a href="#contact" className="text-gray-500 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">Contact</a>
+                <a href="#pricing" className="text-gray-500 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">Pricing</a>
+                <a href="#security" className="text-gray-500 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">Security</a>
+                <a href="#support" className="text-gray-500 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">Support</a>
               </div>
             </div>
             <div className="hidden md:block">
@@ -65,15 +64,16 @@ export default function Landing() {
               </Button>
             </div>
             <div className="space-y-4">
-              <a href="#home" className="block text-gray-900 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Home</a>
+              <a href="#product" className="block text-gray-900 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Product</a>
               <a href="#features" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Features</a>
-              <a href="#about" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">About</a>
-              <a href="#contact" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Contact</a>
+              <a href="#pricing" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Pricing</a>
+              <a href="#security" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Security</a>
+              <a href="#support" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Support</a>
               <hr className="my-4" />
               <Button variant="ghost" onClick={handleSignIn} className="block w-full text-left text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">
                 Sign In
               </Button>
-              <GradientButton onClick={handleGetStarted} className="block w-full">
+              <GradientButton onClick={handleGetStarted} className="w-full">
                 Get Started
               </GradientButton>
             </div>
@@ -81,200 +81,411 @@ export default function Landing() {
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="pt-16">
-        {/* Hero Section */}
-        <section id="home" className="relative gradient-primary min-h-screen flex items-center">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <div className="animate-slide-up">
-              <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-                Build Your <br />
-                <span className="text-yellow-300">Rental Credit</span> Portfolio
-              </h1>
-              <p className="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto">
-                Automatically track on-time rent payments and create a comprehensive credit portfolio to share with landlords, lenders, and credit agencies.
-              </p>
-              <div className="space-y-4 sm:space-y-0 sm:space-x-4 sm:flex sm:justify-center">
-                <Button 
-                  onClick={handleGetStarted}
-                  className="w-full sm:w-auto bg-white text-primary px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-100 transform hover:scale-105 transition-all duration-200 shadow-lg"
-                >
-                  Get Started Free
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="w-full sm:w-auto border-2 border-white text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-white hover:text-primary transform hover:scale-105 transition-all duration-200"
-                >
-                  Learn More
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section id="features" className="py-20 bg-light-gray">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why Choose Enoíkio?</h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">Transform your rental history into a powerful financial tool</p>
-            </div>
-            <div className="grid md:grid-cols-3 gap-8">
-              <Card className="p-8 hover:shadow-xl transition-shadow duration-300">
-                <CardContent className="p-0">
-                  <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center mb-6">
-                    <CheckCircle className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-4">Automated Tracking</h3>
-                  <p className="text-gray-600">Connect your bank account and let us automatically track your rent payments, building a comprehensive payment history.</p>
-                </CardContent>
-              </Card>
-              <Card className="p-8 hover:shadow-xl transition-shadow duration-300">
-                <CardContent className="p-0">
-                  <div className="w-12 h-12 gradient-accent rounded-xl flex items-center justify-center mb-6">
-                    <BarChart3 className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-4">Credit Building</h3>
-                  <p className="text-gray-600">Generate professional reports showcasing your rental reliability to improve your credit profile and rental applications.</p>
-                </CardContent>
-              </Card>
-              <Card className="p-8 hover:shadow-xl transition-shadow duration-300">
-                <CardContent className="p-0">
-                  <div className="w-12 h-12 gradient-success rounded-xl flex items-center justify-center mb-6">
-                    <Share2 className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-semibold mb-4">Easy Sharing</h3>
-                  <p className="text-gray-600">Share your rental portfolio with landlords, lenders, and credit agencies through secure, verified links.</p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* Testimonials Section */}
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">What Our Users Say</h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">Join thousands of renters building their credit</p>
-            </div>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <Card className="p-6">
-                <CardContent className="p-0">
-                  <div className="flex items-center mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-gray-600 mb-4">"Enoíkio helped me secure my dream apartment with my strong payment history. The landlord was impressed with my credit report!"</p>
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center mr-3">
-                      <span className="text-white font-bold">S</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold">Sarah Johnson</p>
-                      <p className="text-sm text-gray-500">London</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="p-6">
-                <CardContent className="p-0">
-                  <div className="flex items-center mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-gray-600 mb-4">"Finally, a way to prove my rental reliability! My credit score improved significantly after using Enoíkio for 6 months."</p>
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gradient-to-r from-secondary to-accent rounded-full flex items-center justify-center mr-3">
-                      <span className="text-white font-bold">M</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold">Michael Chen</p>
-                      <p className="text-sm text-gray-500">Manchester</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="p-6">
-                <CardContent className="p-0">
-                  <div className="flex items-center mb-4">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-gray-600 mb-4">"The automated tracking is brilliant! I don't have to worry about keeping records anymore. Everything is done for me."</p>
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gradient-to-r from-accent to-primary rounded-full flex items-center justify-center mr-3">
-                      <span className="text-white font-bold">A</span>
-                    </div>
-                    <div>
-                      <p className="font-semibold">Alice Brown</p>
-                      <p className="text-sm text-gray-500">Birmingham</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="py-20 gradient-primary">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
-              Ready to Build Your Credit?
-            </h2>
-            <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
-              Join thousands of renters who are already building their credit with Enoíkio
+      {/* Hero Section */}
+      <section className="pt-20 pb-16 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+              Transform Your Rent Into{" "}
+              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                Credit History
+              </span>
+            </h1>
+            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+              Enoíkio automatically tracks your on-time rent payments and builds a comprehensive credit portfolio. 
+              Turn your rental history into a powerful financial asset.
             </p>
-            <GradientButton 
-              onClick={handleGetStarted}
-              className="bg-white text-primary hover:bg-gray-100 px-8 py-4 text-lg"
-            >
-              Get Started Today
-            </GradientButton>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <GradientButton onClick={handleGetStarted} className="text-lg px-8 py-3">
+                Get Started Free
+              </GradientButton>
+              <Button variant="outline" size="lg" className="text-lg px-8 py-3">
+                Watch Demo
+              </Button>
+            </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      {/* Product Section */}
+      <section id="product" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Complete Credit Building Solution
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Everything you need to build credit through your rental payments
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Building className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-2xl">Automatic Tracking</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Connect your bank account and we'll automatically track your rent payments, 
+                  building your credit history with every on-time payment.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FileText className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-2xl">Credit Reports</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Generate professional credit reports showcasing your payment history, 
+                  perfect for landlords, lenders, and mortgage applications.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
+                <CardTitle className="text-2xl">Secure & Verified</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 text-center">
+                  Bank-level security with landlord verification ensures your payment history 
+                  is accurate and trusted by financial institutions.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Powerful Features
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Built for tenants, trusted by landlords and lenders
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              {
+                icon: <TrendingUp className="h-8 w-8 text-primary" />,
+                title: "Payment Streak Tracking",
+                description: "Monitor your consecutive on-time payments to build a strong credit foundation."
+              },
+              {
+                icon: <Clock className="h-8 w-8 text-primary" />,
+                title: "On-Time Rate Analytics",
+                description: "Track your payment punctuality with detailed analytics and insights."
+              },
+              {
+                icon: <Share2 className="h-8 w-8 text-primary" />,
+                title: "Easy Report Sharing",
+                description: "Share your credit reports instantly with landlords, lenders, or agencies."
+              },
+              {
+                icon: <Users className="h-8 w-8 text-primary" />,
+                title: "Landlord Verification",
+                description: "Verified payment history adds credibility to your credit profile."
+              },
+              {
+                icon: <Award className="h-8 w-8 text-primary" />,
+                title: "Credit Score Impact",
+                description: "See how your rent payments positively impact your overall credit score."
+              },
+              {
+                icon: <Calendar className="h-8 w-8 text-primary" />,
+                title: "Payment Reminders",
+                description: "Never miss a payment with smart reminders and notifications."
+              }
+            ].map((feature, index) => (
+              <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-all duration-300">
+                <CardHeader>
+                  <div className="mb-4">
+                    {feature.icon}
+                  </div>
+                  <CardTitle className="text-xl">{feature.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-600">{feature.description}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Choose the plan that works for you
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">Free</CardTitle>
+                <div className="text-4xl font-bold text-gray-900 mb-2">£0</div>
+                <p className="text-gray-600">per month</p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Basic payment tracking</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Monthly credit reports</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Email support</span>
+                  </li>
+                </ul>
+                <Button variant="outline" className="w-full mt-6">
+                  Get Started
+                </Button>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 relative">
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <Badge className="bg-gradient-to-r from-primary to-secondary text-white">
+                  Most Popular
+                </Badge>
+              </div>
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">Professional</CardTitle>
+                <div className="text-4xl font-bold text-gray-900 mb-2">£9.99</div>
+                <p className="text-gray-600">per month</p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Advanced analytics</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Unlimited reports</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Priority support</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Landlord verification</span>
+                  </li>
+                </ul>
+                <GradientButton className="w-full mt-6">
+                  Start Free Trial
+                </GradientButton>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">Enterprise</CardTitle>
+                <div className="text-4xl font-bold text-gray-900 mb-2">£29.99</div>
+                <p className="text-gray-600">per month</p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Multi-property support</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>API access</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Dedicated support</span>
+                  </li>
+                  <li className="flex items-center">
+                    <Check className="h-5 w-5 text-green-500 mr-2" />
+                    <span>Custom integrations</span>
+                  </li>
+                </ul>
+                <Button variant="outline" className="w-full mt-6">
+                  Contact Sales
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Security Section */}
+      <section id="security" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Bank-Level Security
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Your financial data is protected with the highest standards
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              {
+                icon: <Shield className="h-12 w-12 text-primary" />,
+                title: "256-bit SSL Encryption",
+                description: "All data transmission is encrypted with industry-standard SSL"
+              },
+              {
+                icon: <Building className="h-12 w-12 text-primary" />,
+                title: "Bank-Grade Security",
+                description: "Same security standards used by major financial institutions"
+              },
+              {
+                icon: <Users className="h-12 w-12 text-primary" />,
+                title: "Privacy Protected",
+                description: "We never sell or share your personal information"
+              },
+              {
+                icon: <Award className="h-12 w-12 text-primary" />,
+                title: "Compliance Ready",
+                description: "Fully compliant with UK data protection regulations"
+              }
+            ].map((item, index) => (
+              <div key={index} className="text-center">
+                <div className="flex justify-center mb-4">
+                  {item.icon}
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.title}</h3>
+                <p className="text-gray-600">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Support Section */}
+      <section id="support" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              We're Here to Help
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Get the support you need when you need it
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">Help Center</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 mb-4">
+                  Find answers to common questions and detailed guides
+                </p>
+                <Button variant="outline">
+                  Visit Help Center
+                </Button>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">Contact Support</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 mb-4">
+                  Get direct help from our support team
+                </p>
+                <Button variant="outline">
+                  Contact Us
+                </Button>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">System Status</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 mb-4">
+                  Check the current status of our services
+                </p>
+                <Button variant="outline">
+                  View Status
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <Logo className="text-white mb-4" />
-              <p className="text-gray-400">Building credit through rental payments</p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
+              <h3 className="text-xl font-semibold mb-4">Company</h3>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-gray-400 hover:text-white">About</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white">Privacy</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white">Terms</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Support</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Status</a></li>
+              <h3 className="text-xl font-semibold mb-4">Product</h3>
+              <ul className="space-y-2">
+                <li><a href="#product" className="text-gray-400 hover:text-white">Features</a></li>
+                <li><a href="#pricing" className="text-gray-400 hover:text-white">Pricing</a></li>
+                <li><a href="#security" className="text-gray-400 hover:text-white">Security</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms</a></li>
+              <h3 className="text-xl font-semibold mb-4">Support</h3>
+              <ul className="space-y-2">
+                <li><a href="#" className="text-gray-400 hover:text-white">Help Center</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white">Contact</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white">Status</a></li>
               </ul>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold mb-4">Enoíkio</h3>
+              <p className="text-gray-400">
+                Building credit through rent payments, one payment at a time.
+              </p>
             </div>
           </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Enoíkio. All rights reserved.</p>
+          <hr className="my-8 border-gray-800" />
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400">&copy; 2024 Enoíkio. All rights reserved.</p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <a href="#" className="text-gray-400 hover:text-white">Privacy Policy</a>
+              <a href="#" className="text-gray-400 hover:text-white">Terms of Service</a>
+            </div>
           </div>
         </div>
       </footer>
