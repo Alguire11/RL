@@ -130,13 +130,77 @@ export const landlordVerifications = pgTable("landlord_verifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Notifications table
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  type: varchar("type", { enum: ["payment_reminder", "report_generated", "landlord_verified", "system"] }).notNull(),
+  title: varchar("title").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  scheduledFor: timestamp("scheduled_for"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User preferences table
+export const userPreferences = pgTable("user_preferences", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  paymentReminders: boolean("payment_reminders").default(true),
+  emailNotifications: boolean("email_notifications").default(true),
+  smsNotifications: boolean("sms_notifications").default(false),
+  reminderDays: integer("reminder_days").default(3),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Security log table
+export const securityLogs = pgTable("security_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  action: varchar("action").notNull(),
+  ipAddress: varchar("ip_address"),
+  userAgent: varchar("user_agent"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Admin users table
+export const adminUsers = pgTable("admin_users", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  role: varchar("role", { enum: ["admin", "moderator", "viewer"] }).default("viewer"),
+  permissions: text("permissions").array(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Data export requests table
+export const dataExportRequests = pgTable("data_export_requests", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  status: varchar("status", { enum: ["pending", "processing", "completed", "failed"] }).default("pending"),
+  dataType: varchar("data_type", { enum: ["all", "payments", "reports", "profile"] }).default("all"),
+  downloadUrl: varchar("download_url"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   properties: many(properties),
   rentPayments: many(rentPayments),
   bankConnections: many(bankConnections),
   creditReports: many(creditReports),
   landlordVerifications: many(landlordVerifications),
+  notifications: many(notifications),
+  preferences: one(userPreferences),
+  securityLogs: many(securityLogs),
+  adminUser: one(adminUsers),
+  dataExportRequests: many(dataExportRequests),
 }));
 
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
@@ -170,6 +234,26 @@ export const landlordVerificationsRelations = relations(landlordVerifications, (
   property: one(properties, { fields: [landlordVerifications.propertyId], references: [properties.id] }),
 }));
 
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
+  user: one(users, { fields: [userPreferences.userId], references: [users.id] }),
+}));
+
+export const securityLogsRelations = relations(securityLogs, ({ one }) => ({
+  user: one(users, { fields: [securityLogs.userId], references: [users.id] }),
+}));
+
+export const adminUsersRelations = relations(adminUsers, ({ one }) => ({
+  user: one(users, { fields: [adminUsers.userId], references: [users.id] }),
+}));
+
+export const dataExportRequestsRelations = relations(dataExportRequests, ({ one }) => ({
+  user: one(users, { fields: [dataExportRequests.userId], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertPropertySchema = createInsertSchema(properties);
@@ -178,6 +262,11 @@ export const insertBankConnectionSchema = createInsertSchema(bankConnections);
 export const insertCreditReportSchema = createInsertSchema(creditReports);
 export const insertReportShareSchema = createInsertSchema(reportShares);
 export const insertLandlordVerificationSchema = createInsertSchema(landlordVerifications);
+export const insertNotificationSchema = createInsertSchema(notifications);
+export const insertUserPreferencesSchema = createInsertSchema(userPreferences);
+export const insertSecurityLogSchema = createInsertSchema(securityLogs);
+export const insertAdminUserSchema = createInsertSchema(adminUsers);
+export const insertDataExportRequestSchema = createInsertSchema(dataExportRequests);
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
@@ -195,3 +284,13 @@ export type ReportShare = typeof reportShares.$inferSelect;
 export type InsertReportShare = typeof reportShares.$inferInsert;
 export type LandlordVerification = typeof landlordVerifications.$inferSelect;
 export type InsertLandlordVerification = typeof landlordVerifications.$inferInsert;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+export type UserPreferences = typeof userPreferences.$inferSelect;
+export type InsertUserPreferences = typeof userPreferences.$inferInsert;
+export type SecurityLog = typeof securityLogs.$inferSelect;
+export type InsertSecurityLog = typeof securityLogs.$inferInsert;
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = typeof adminUsers.$inferInsert;
+export type DataExportRequest = typeof dataExportRequests.$inferSelect;
+export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;

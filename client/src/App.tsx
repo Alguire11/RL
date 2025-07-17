@@ -17,6 +17,8 @@ import Contact from "@/pages/contact";
 import Help from "@/pages/help";
 import Status from "@/pages/status";
 import Product from "@/pages/product";
+import AdminDashboard from "@/pages/admin";
+import LandlordVerify from "@/pages/landlord-verify";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,6 +38,9 @@ function Router() {
 
   return (
     <Switch>
+      {/* Public landlord verification route */}
+      <Route path="/landlord/verify/:token" component={LandlordVerify} />
+      
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
@@ -54,6 +59,7 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />
+          <Route path="/admin" component={AdminDashboard} />
           <Route path="/about" component={About} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/terms" component={Terms} />

@@ -12,17 +12,29 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, FileText, Settings, LogOut, User } from "lucide-react";
+import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { useQuery } from "@tanstack/react-query";
 
 export function Navigation() {
   const [location] = useLocation();
   const { user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Check if user is admin
+  const { data: adminUser } = useQuery({
+    queryKey: ["/api/admin/stats"],
+    retry: false,
+    enabled: !!user,
+  });
+
+  const isAdmin = !!adminUser;
+
   const navItems = [
     { path: "/", label: "Dashboard", icon: BarChart3 },
     { path: "/reports", label: "Reports", icon: FileText },
     { path: "/settings", label: "Settings", icon: Settings },
+    ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: Shield }] : []),
   ];
 
   const isActive = (path: string) => {
@@ -74,7 +86,8 @@ export function Navigation() {
           </div>
 
           {/* User Menu */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex items-center space-x-3">
+            <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -110,6 +123,14 @@ export function Navigation() {
                     <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin">
+                      <Shield className="mr-2 h-4 w-4" />
+                      <span>Admin Panel</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />

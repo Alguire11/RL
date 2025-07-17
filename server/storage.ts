@@ -6,6 +6,11 @@ import {
   creditReports,
   reportShares,
   landlordVerifications,
+  notifications,
+  userPreferences,
+  securityLogs,
+  adminUsers,
+  dataExportRequests,
   type User,
   type UpsertUser,
   type Property,
@@ -20,6 +25,16 @@ import {
   type InsertReportShare,
   type LandlordVerification,
   type InsertLandlordVerification,
+  type Notification,
+  type InsertNotification,
+  type UserPreferences,
+  type InsertUserPreferences,
+  type SecurityLog,
+  type InsertSecurityLog,
+  type AdminUser,
+  type InsertAdminUser,
+  type DataExportRequest,
+  type InsertDataExportRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
@@ -72,6 +87,41 @@ export interface IStorage {
     totalPaid: number;
     onTimePercentage: number;
     nextPaymentDue: string | null;
+  }>;
+
+  // Notification operations
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getUserNotifications(userId: string): Promise<Notification[]>;
+  markNotificationAsRead(notificationId: number): Promise<void>;
+  deleteNotification(notificationId: number): Promise<void>;
+
+  // User preferences operations
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  upsertUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
+
+  // Security log operations
+  createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog>;
+  getUserSecurityLogs(userId: string): Promise<SecurityLog[]>;
+
+  // Admin operations
+  createAdminUser(adminUser: InsertAdminUser): Promise<AdminUser>;
+  getAdminUser(userId: string): Promise<AdminUser | undefined>;
+  updateAdminUser(userId: string, updates: Partial<InsertAdminUser>): Promise<AdminUser>;
+  deleteAdminUser(userId: string): Promise<void>;
+
+  // Data export operations
+  createDataExportRequest(request: InsertDataExportRequest): Promise<DataExportRequest>;
+  getUserDataExportRequests(userId: string): Promise<DataExportRequest[]>;
+  updateDataExportRequest(id: number, updates: Partial<InsertDataExportRequest>): Promise<DataExportRequest>;
+
+  // Admin dashboard operations
+  getSystemStats(): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    totalPayments: number;
+    totalReports: number;
+    recentUsers: User[];
+    recentPayments: RentPayment[];
   }>;
 }
 
@@ -345,6 +395,182 @@ export class DatabaseStorage implements IStorage {
       totalPaid,
       onTimePercentage,
       nextPaymentDue,
+    };
+  }
+
+  // Notification operations
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db
+      .insert(notifications)
+      .values(notification)
+      .returning();
+    return newNotification;
+  }
+
+  async getUserNotifications(userId: string): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async markNotificationAsRead(notificationId: number): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, notificationId));
+  }
+
+  async deleteNotification(notificationId: number): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.id, notificationId));
+  }
+
+  // User preferences operations
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [preferences] = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+    return preferences;
+  }
+
+  async upsertUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    const [upsertedPreferences] = await db
+      .insert(userPreferences)
+      .values(preferences)
+      .onConflictDoUpdate({
+        target: userPreferences.userId,
+        set: {
+          ...preferences,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return upsertedPreferences;
+  }
+
+  // Security log operations
+  async createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog> {
+    const [newLog] = await db
+      .insert(securityLogs)
+      .values(log)
+      .returning();
+    return newLog;
+  }
+
+  async getUserSecurityLogs(userId: string): Promise<SecurityLog[]> {
+    return await db
+      .select()
+      .from(securityLogs)
+      .where(eq(securityLogs.userId, userId))
+      .orderBy(desc(securityLogs.createdAt));
+  }
+
+  // Admin operations
+  async createAdminUser(adminUser: InsertAdminUser): Promise<AdminUser> {
+    const [newAdminUser] = await db
+      .insert(adminUsers)
+      .values(adminUser)
+      .returning();
+    return newAdminUser;
+  }
+
+  async getAdminUser(userId: string): Promise<AdminUser | undefined> {
+    const [adminUser] = await db
+      .select()
+      .from(adminUsers)
+      .where(and(eq(adminUsers.userId, userId), eq(adminUsers.isActive, true)));
+    return adminUser;
+  }
+
+  async updateAdminUser(userId: string, updates: Partial<InsertAdminUser>): Promise<AdminUser> {
+    const [updatedAdminUser] = await db
+      .update(adminUsers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(adminUsers.userId, userId))
+      .returning();
+    return updatedAdminUser;
+  }
+
+  async deleteAdminUser(userId: string): Promise<void> {
+    await db
+      .update(adminUsers)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(adminUsers.userId, userId));
+  }
+
+  // Data export operations
+  async createDataExportRequest(request: InsertDataExportRequest): Promise<DataExportRequest> {
+    const [newRequest] = await db
+      .insert(dataExportRequests)
+      .values(request)
+      .returning();
+    return newRequest;
+  }
+
+  async getUserDataExportRequests(userId: string): Promise<DataExportRequest[]> {
+    return await db
+      .select()
+      .from(dataExportRequests)
+      .where(eq(dataExportRequests.userId, userId))
+      .orderBy(desc(dataExportRequests.createdAt));
+  }
+
+  async updateDataExportRequest(id: number, updates: Partial<InsertDataExportRequest>): Promise<DataExportRequest> {
+    const [updatedRequest] = await db
+      .update(dataExportRequests)
+      .set(updates)
+      .where(eq(dataExportRequests.id, id))
+      .returning();
+    return updatedRequest;
+  }
+
+  // Admin dashboard operations
+  async getSystemStats(): Promise<{
+    totalUsers: number;
+    activeUsers: number;
+    totalPayments: number;
+    totalReports: number;
+    recentUsers: User[];
+    recentPayments: RentPayment[];
+  }> {
+    const [userStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users);
+    
+    const [activeUserStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(eq(users.isOnboarded, true));
+
+    const [paymentStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(rentPayments);
+
+    const [reportStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(creditReports);
+
+    const recentUsers = await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt))
+      .limit(10);
+
+    const recentPayments = await db
+      .select()
+      .from(rentPayments)
+      .orderBy(desc(rentPayments.createdAt))
+      .limit(10);
+
+    return {
+      totalUsers: userStats?.count || 0,
+      activeUsers: activeUserStats?.count || 0,
+      totalPayments: paymentStats?.count || 0,
+      totalReports: reportStats?.count || 0,
+      recentUsers,
+      recentPayments,
     };
   }
 }

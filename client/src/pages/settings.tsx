@@ -9,10 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { CheckCircle, Plus, Trash2, Building, CreditCard } from "lucide-react";
+import { CheckCircle, Plus, Trash2, Building, CreditCard, User, Bell, Shield, Download, Send } from "lucide-react";
+import { UserPreferences } from "@/components/settings/preferences";
+import { DataExport } from "@/components/settings/data-export";
+import { SecurityLogs } from "@/components/settings/security-logs";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -63,6 +67,46 @@ export default function Settings() {
   const { data: properties } = useQuery({
     queryKey: ["/api/properties"],
     retry: false,
+  });
+
+  const { data: landlordVerifications } = useQuery({
+    queryKey: ["/api/landlord-verifications"],
+    retry: false,
+  });
+
+  const requestLandlordVerificationMutation = useMutation({
+    mutationFn: async ({ propertyId, landlordEmail }: { propertyId: number; landlordEmail: string }) => {
+      const response = await apiRequest("POST", "/api/landlord/verify-request", {
+        propertyId,
+        landlordEmail,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Verification Request Sent",
+        description: "Your landlord will receive an email to verify your rental history.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/landlord-verifications"] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Request Failed",
+        description: "Failed to send verification request. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateProfileMutation = useMutation({
@@ -142,6 +186,19 @@ export default function Settings() {
     toast({
       title: "Connect Bank",
       description: "Open Banking connection would be initiated here",
+    });
+  };
+
+  const handleLandlordVerificationRequest = (propertyId: number) => {
+    const property = properties?.find((p: any) => p.id === propertyId);
+    if (!property) return;
+
+    const landlordEmail = prompt("Enter your landlord's email address:");
+    if (!landlordEmail) return;
+
+    requestLandlordVerificationMutation.mutate({
+      propertyId,
+      landlordEmail,
     });
   };
 
