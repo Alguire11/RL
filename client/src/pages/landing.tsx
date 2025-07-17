@@ -10,11 +10,11 @@ export default function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleGetStarted = () => {
-    window.location.href = "/auth";
+    window.location.href = "/api/login";
   };
 
   const handleSignIn = () => {
-    window.location.href = "/auth";
+    window.location.href = "/api/login";
   };
 
   return (
@@ -37,12 +37,12 @@ export default function Landing() {
             </div>
             <div className="hidden md:block">
               <div className="ml-4 flex items-center md:ml-6">
-                <Button variant="ghost" onClick={handleSignIn} className="text-gray-500 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Button variant="outline" onClick={handleSignIn} className="text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
                   Sign In
                 </Button>
-                <GradientButton onClick={handleGetStarted} className="ml-3">
+                <Button onClick={handleGetStarted} className="ml-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
                   Get Started
-                </GradientButton>
+                </Button>
               </div>
             </div>
             <div className="md:hidden">
@@ -70,12 +70,12 @@ export default function Landing() {
               <a href="#security" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Security</a>
               <a href="#support" className="block text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">Support</a>
               <hr className="my-4" />
-              <Button variant="ghost" onClick={handleSignIn} className="block w-full text-left text-gray-500 hover:text-primary px-3 py-2 rounded-md text-base font-medium">
+              <Button variant="outline" onClick={handleSignIn} className="block w-full text-left text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700 px-3 py-2 rounded-md text-base font-medium">
                 Sign In
               </Button>
-              <GradientButton onClick={handleGetStarted} className="w-full">
+              <Button onClick={handleGetStarted} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                 Get Started
-              </GradientButton>
+              </Button>
             </div>
           </div>
         </div>
@@ -96,10 +96,10 @@ export default function Landing() {
               Turn your rental history into a powerful financial asset.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <GradientButton onClick={handleGetStarted} className="text-lg px-8 py-3">
+              <Button onClick={handleGetStarted} className="text-lg px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white">
                 Get Started Free
-              </GradientButton>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-3">
+              </Button>
+              <Button variant="outline" size="lg" className="text-lg px-8 py-3 border-blue-600 text-blue-600 hover:bg-blue-50">
                 Watch Demo
               </Button>
             </div>
@@ -483,8 +483,9 @@ export default function Landing() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400">&copy; 2024 Enoíkio. All rights reserved.</p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="#" className="text-gray-400 hover:text-white">Privacy Policy</a>
-              <a href="#" className="text-gray-400 hover:text-white">Terms of Service</a>
+              <a href="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</a>
+              <a href="/terms" className="text-gray-400 hover:text-white">Terms of Service</a>
+              <a href="/admin-login" className="text-gray-400 hover:text-white">Admin Access</a>
             </div>
           </div>
         </div>

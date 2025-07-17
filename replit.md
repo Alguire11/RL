@@ -8,6 +8,37 @@ Enoíkio is a comprehensive rent credit building platform that helps tenants aut
 
 Preferred communication style: Simple, everyday language.
 
+## Admin Access System
+
+The application now includes a comprehensive admin access system with role-based authentication:
+
+### Demo Credentials
+- **Admin Access**: username: `admin`, password: `admin123`
+- **User Access**: username: `user`, password: `user123`  
+- **Landlord Access**: username: `landlord`, password: `landlord123`
+
+### Routes
+- `/admin-login` - Admin login page with demo credentials
+- `/admin` - Admin dashboard (requires admin role)
+- `/landlord-dashboard` - Landlord dashboard (requires landlord role)
+- `/dashboard` - Regular user dashboard (requires user role)
+
+### Authentication Flow
+1. Users visit `/admin-login` to access the admin system
+2. Upon successful login, users are redirected based on their role
+3. Session is stored in localStorage for demo purposes
+4. Each dashboard checks for appropriate role access
+
+## Recent Changes
+
+✓ Enhanced button visibility with better color contrast (blue theme)
+✓ Removed placeholder data from forms and authentication flows
+✓ Created comprehensive admin login system with dummy credentials
+✓ Built role-based access control (admin, user, landlord)
+✓ Enhanced missing pages: help center, contact, status, privacy policy, terms of service
+✓ Fixed signup/login button styling and authentication redirects
+✓ Integrated all new pages into routing system
+
 ## System Architecture
 
 ### Frontend Architecture

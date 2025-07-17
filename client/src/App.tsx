@@ -18,6 +18,8 @@ import Help from "@/pages/help";
 import Status from "@/pages/status";
 import Product from "@/pages/product";
 import AdminDashboard from "@/pages/admin";
+import AdminLogin from "@/pages/admin-login";
+import LandlordDashboard from "@/pages/landlord-dashboard";
 import LandlordVerify from "@/pages/landlord-verify";
 
 function Router() {
@@ -45,6 +47,9 @@ function Router() {
         <>
           <Route path="/" component={Landing} />
           <Route path="/auth" component={AuthPage} />
+          <Route path="/admin-login" component={AdminLogin} />
+          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/landlord-dashboard" component={LandlordDashboard} />
           <Route path="/about" component={About} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/terms" component={Terms} />
@@ -59,7 +64,9 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />
+          <Route path="/admin-login" component={AdminLogin} />
           <Route path="/admin" component={AdminDashboard} />
+          <Route path="/landlord-dashboard" component={LandlordDashboard} />
           <Route path="/about" component={About} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/terms" component={Terms} />

@@ -1,181 +1,255 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Navigation } from "@/components/navigation";
-import { Shield, Lock, Eye, Users } from "lucide-react";
+import { Shield, Eye, Lock, Database, Users, Globe } from "lucide-react";
 
 export default function Privacy() {
+  const sections = [
+    {
+      id: "information-collection",
+      title: "Information We Collect",
+      icon: Database,
+      content: [
+        "Personal information (name, email, phone number, address)",
+        "Financial information (bank account details, transaction history)",
+        "Property information (rental addresses, lease details)",
+        "Usage data (how you interact with our services)",
+        "Device information (browser type, IP address, location data)"
+      ]
+    },
+    {
+      id: "information-use",
+      title: "How We Use Your Information",
+      icon: Eye,
+      content: [
+        "Provide and maintain our rent tracking services",
+        "Process payments and generate credit reports",
+        "Communicate with you about your account and services",
+        "Improve our platform and develop new features",
+        "Comply with legal obligations and prevent fraud"
+      ]
+    },
+    {
+      id: "information-sharing",
+      title: "Information Sharing",
+      icon: Users,
+      content: [
+        "With your consent, we may share information with landlords for verification",
+        "With service providers who assist in our operations",
+        "When required by law or to protect our rights",
+        "In connection with a merger, acquisition, or asset sale",
+        "We never sell your personal information to third parties"
+      ]
+    },
+    {
+      id: "data-security",
+      title: "Data Security",
+      icon: Shield,
+      content: [
+        "Bank-level encryption for all data transmission",
+        "Secure data centers with 24/7 monitoring",
+        "Regular security audits and penetration testing",
+        "Employee access controls and background checks",
+        "Compliance with industry security standards"
+      ]
+    },
+    {
+      id: "data-retention",
+      title: "Data Retention",
+      icon: Lock,
+      content: [
+        "Account information: Retained while your account is active",
+        "Transaction data: Retained for 7 years for credit reporting",
+        "Communication records: Retained for 3 years",
+        "Marketing preferences: Until you unsubscribe",
+        "Legal compliance data: As required by applicable law"
+      ]
+    },
+    {
+      id: "your-rights",
+      title: "Your Rights",
+      icon: Globe,
+      content: [
+        "Access: Request a copy of your personal information",
+        "Correction: Update or correct inaccurate information",
+        "Deletion: Request deletion of your personal information",
+        "Portability: Request transfer of your data to another service",
+        "Objection: Object to processing of your information"
+      ]
+    }
+  ];
+
+  const contactInfo = [
+    {
+      title: "Data Protection Officer",
+      email: "dpo@enoikio.com",
+      phone: "+44 20 7123 4567"
+    },
+    {
+      title: "General Privacy Inquiries",
+      email: "privacy@enoikio.com",
+      phone: "+44 20 7123 4568"
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-screen bg-gray-50">
       <Navigation />
-      
-      <div className="container mx-auto px-4 py-20">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
-              Privacy Policy
-            </h1>
-            <p className="text-xl text-gray-600">
-              Your privacy is fundamental to our service. Learn how we protect and use your information.
-            </p>
-            <p className="text-sm text-gray-500 mt-4">Last updated: December 15, 2024</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 mb-12">
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <Shield className="h-12 w-12 text-blue-600 mb-4" />
-                <CardTitle className="text-2xl">Data Protection</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  We use advanced encryption and security measures to protect your personal and financial information.
-                </p>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <Lock className="h-12 w-12 text-green-600 mb-4" />
-                <CardTitle className="text-2xl">Secure Storage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">
-                  Your data is stored in secure, encrypted databases with restricted access and regular security audits.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">What Information We Collect</h2>
-            
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Personal Information</h3>
-                <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                  <li>Name, email address, and contact information</li>
-                  <li>Identity verification documents (as required by law)</li>
-                  <li>Property and rental agreement details</li>
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Financial Information</h3>
-                <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                  <li>Bank account details for rent payment verification</li>
-                  <li>Payment history and transaction records</li>
-                  <li>Credit report information (where provided)</li>
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Usage Information</h3>
-                <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                  <li>How you use our platform and services</li>
-                  <li>Device information and IP addresses</li>
-                  <li>Cookies and similar tracking technologies</li>
-                </ul>
-              </div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+              <Shield className="h-8 w-8 text-blue-600" />
             </div>
           </div>
-
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">How We Use Your Information</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <Eye className="h-6 w-6 text-blue-600 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Service Provision</h3>
-                  <p className="text-gray-600">To provide our credit building services and track your rent payments</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start space-x-3">
-                <Shield className="h-6 w-6 text-green-600 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Verification</h3>
-                  <p className="text-gray-600">To verify your identity and rental payments for credit reporting</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start space-x-3">
-                <Users className="h-6 w-6 text-purple-600 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Communication</h3>
-                  <p className="text-gray-600">To send you updates, notifications, and customer support</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start space-x-3">
-                <Lock className="h-6 w-6 text-red-600 mt-1" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Legal Compliance</h3>
-                  <p className="text-gray-600">To comply with legal obligations and prevent fraud</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">Your Rights</h2>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Access & Portability</h3>
-                <p className="text-gray-600">
-                  You can request access to your personal data and receive it in a portable format.
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Correction</h3>
-                <p className="text-gray-600">
-                  You can request corrections to any inaccurate or incomplete personal information.
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Deletion</h3>
-                <p className="text-gray-600">
-                  You can request deletion of your personal data, subject to legal requirements.
-                </p>
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">Objection</h3>
-                <p className="text-gray-600">
-                  You can object to certain types of processing of your personal information.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-8 shadow-lg mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">Data Security</h2>
-            <p className="text-gray-600 mb-4">
-              We implement robust security measures to protect your information:
-            </p>
-            <ul className="list-disc pl-6 text-gray-600 space-y-2">
-              <li>256-bit SSL encryption for all data transmission</li>
-              <li>Regular security audits and penetration testing</li>
-              <li>Restricted access controls and employee training</li>
-              <li>Secure cloud infrastructure with backup systems</li>
-              <li>Compliance with UK data protection regulations</li>
-            </ul>
-          </div>
-
-          <div className="bg-white rounded-2xl p-8 shadow-lg">
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">Contact Us</h2>
-            <p className="text-gray-600 mb-4">
-              If you have any questions about this Privacy Policy or wish to exercise your rights, please contact us:
-            </p>
-            <div className="space-y-2 text-gray-600">
-              <p><strong>Email:</strong> privacy@enoikio.com</p>
-              <p><strong>Address:</strong> Enoíkio Ltd, 123 Fintech Street, London, EC2V 8AB</p>
-              <p><strong>Phone:</strong> +44 20 7123 4567</p>
-            </div>
-          </div>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Privacy Policy</h1>
+          <p className="text-xl text-gray-600">
+            Your privacy is important to us. This policy explains how we collect, use, and protect your information.
+          </p>
+          <p className="text-sm text-gray-500 mt-4">
+            Last updated: January 17, 2024
+          </p>
         </div>
+
+        {/* Quick Navigation */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Quick Navigation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-4">
+              {sections.map((section) => (
+                <a
+                  key={section.id}
+                  href={`#${section.id}`}
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <section.icon className="h-5 w-5 text-blue-600" />
+                  <span className="text-sm font-medium">{section.title}</span>
+                </a>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Privacy Policy Sections */}
+        <div className="space-y-8">
+          {sections.map((section) => (
+            <Card key={section.id} id={section.id}>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-3">
+                  <section.icon className="h-6 w-6 text-blue-600" />
+                  <span>{section.title}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  {section.content.map((item, index) => (
+                    <li key={index} className="flex items-start space-x-3">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                      <span className="text-gray-700">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* GDPR Compliance */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>GDPR Compliance</CardTitle>
+            <CardDescription>
+              Our commitment to European data protection standards
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold mb-2">Legal Basis for Processing</h3>
+                <p className="text-gray-700">
+                  We process your personal data based on legitimate interests, contractual necessity, 
+                  legal obligations, and your consent where required.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Data Transfers</h3>
+                <p className="text-gray-700">
+                  When we transfer data outside the EU, we ensure appropriate safeguards are in place, 
+                  including standard contractual clauses and adequacy decisions.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-2">Data Protection Impact Assessments</h3>
+                <p className="text-gray-700">
+                  We conduct regular assessments to ensure our processing activities meet GDPR requirements 
+                  and protect your fundamental rights.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Contact Information */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Contact Us</CardTitle>
+            <CardDescription>
+              Have questions about our privacy practices? Get in touch with our privacy team.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-6">
+              {contactInfo.map((contact, index) => (
+                <div key={index} className="space-y-2">
+                  <h3 className="font-semibold">{contact.title}</h3>
+                  <p className="text-sm text-gray-600">
+                    Email: <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">
+                      {contact.email}
+                    </a>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Phone: <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">
+                      {contact.phone}
+                    </a>
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Mailing Address:</strong> Enoíkio Privacy Team, 123 Fintech Street, London EC2A 4NE, United Kingdom
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Policy Updates */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Policy Updates</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-700 mb-4">
+              We may update this privacy policy from time to time. When we do, we will:
+            </p>
+            <ul className="space-y-2">
+              <li className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <span className="text-gray-700">Post the updated policy on our website</span>
+              </li>
+              <li className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <span className="text-gray-700">Update the "last updated" date</span>
+              </li>
+              <li className="flex items-start space-x-3">
+                <div className="w-2 h-2 bg-blue-600 rounded-full mt-2 flex-shrink-0"></div>
+                <span className="text-gray-700">Notify you of significant changes via email</span>
+              </li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
