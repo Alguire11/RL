@@ -210,7 +210,7 @@ export default function AuthPage() {
                       <Label htmlFor="register-firstName">First Name</Label>
                       <Input
                         id="register-firstName"
-                        placeholder="John"
+                        placeholder="First name"
                         {...registerForm.register("firstName")}
                       />
                       {registerForm.formState.errors.firstName && (
@@ -226,7 +226,7 @@ export default function AuthPage() {
                       <Label htmlFor="register-lastName">Last Name</Label>
                       <Input
                         id="register-lastName"
-                        placeholder="Doe"
+                        placeholder="Last name"
                         {...registerForm.register("lastName")}
                       />
                       {registerForm.formState.errors.lastName && (
@@ -244,7 +244,7 @@ export default function AuthPage() {
                     <Input
                       id="register-email"
                       type="email"
-                      placeholder="john@example.com"
+                      placeholder="Enter your email"
                       {...registerForm.register("email")}
                     />
                     {registerForm.formState.errors.email && (
@@ -304,11 +304,11 @@ export default function AuthPage() {
         <div className="text-center">
           <p className="text-xs text-gray-500">
             By signing up, you agree to our{" "}
-            <a href="#" className="text-blue-600 hover:underline">
+            <a href="/terms" className="text-blue-600 hover:underline">
               Terms of Service
             </a>{" "}
             and{" "}
-            <a href="#" className="text-blue-600 hover:underline">
+            <a href="/privacy" className="text-blue-600 hover:underline">
               Privacy Policy
             </a>
           </p>

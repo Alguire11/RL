@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import AuthPage from "@/pages/auth";
+import ReplitAuth from "@/pages/replit-auth";
 import About from "@/pages/about";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
@@ -46,7 +47,7 @@ function Router() {
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
-          <Route path="/auth" component={AuthPage} />
+          <Route path="/auth" component={ReplitAuth} />
           <Route path="/admin-login" component={AdminLogin} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/landlord-dashboard" component={LandlordDashboard} />
