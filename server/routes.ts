@@ -97,6 +97,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user address
+  app.put('/api/user/address', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { street, city, postcode, country } = req.body;
+      
+      const user = await storage.upsertUser({
+        id: userId,
+        address: { street, city, postcode, country },
+        updatedAt: new Date(),
+      });
+      
+      res.json({ 
+        message: 'Address updated successfully',
+        address: user.address 
+      });
+    } catch (error) {
+      console.error("Error updating user address:", error);
+      res.status(500).json({ message: "Failed to update address" });
+    }
+  });
+
+  // Update user rent information
+  app.put('/api/user/rent-info', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { amount, dayOfMonth, frequency, firstPaymentDate, nextPaymentDate } = req.body;
+      
+      const user = await storage.upsertUser({
+        id: userId,
+        rentInfo: { amount, dayOfMonth, frequency, firstPaymentDate, nextPaymentDate },
+        updatedAt: new Date(),
+      });
+      
+      res.json({ 
+        message: 'Rent information updated successfully',
+        rentInfo: user.rentInfo 
+      });
+    } catch (error) {
+      console.error("Error updating rent information:", error);
+      res.status(500).json({ message: "Failed to update rent information" });
+    }
+  });
+
   // Property routes
   app.get('/api/properties', requireAuth, async (req: any, res) => {
     try {

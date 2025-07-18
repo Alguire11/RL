@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling } from "lucide-react";
 import { format } from "date-fns";
+import { AddressEditor } from "@/components/address-editor";
+import { RentDateEditor } from "@/components/rent-date-editor";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -119,6 +121,12 @@ export default function Dashboard() {
             icon={Calendar}
             color="accent"
           />
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <AddressEditor />
+          <RentDateEditor />
         </div>
 
         {/* Main Content Grid */}
