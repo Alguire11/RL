@@ -47,7 +47,7 @@ function Router() {
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
-          <Route path="/auth" component={ReplitAuth} />
+          <Route path="/auth" component={AuthPage} />
           <Route path="/admin-login" component={AdminLogin} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/landlord-dashboard" component={LandlordDashboard} />

@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 export function Navigation() {
   const [location] = useLocation();
@@ -44,8 +45,14 @@ export function Navigation() {
     return false;
   };
 
-  const handleSignOut = () => {
-    window.location.href = "/api/logout";
+  const handleSignOut = async () => {
+    try {
+      await apiRequest("POST", "/api/logout", {});
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      window.location.href = "/";
+    }
   };
 
   const getUserInitials = (user: any) => {
@@ -70,8 +77,8 @@ export function Navigation() {
               const Icon = item.icon;
               return (
                 <Link key={item.path} href={item.path}>
-                  <a
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  <span
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                       isActive(item.path)
                         ? "text-primary bg-primary/10"
                         : "text-gray-600 hover:text-primary hover:bg-primary/5"
@@ -79,7 +86,7 @@ export function Navigation() {
                   >
                     <Icon className="w-4 h-4" />
                     <span>{item.label}</span>
-                  </a>
+                  </span>
                 </Link>
               );
             })}
