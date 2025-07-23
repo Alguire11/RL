@@ -21,6 +21,7 @@ import Product from "@/pages/product";
 import AdminDashboard from "@/pages/admin";
 import AdminLogin from "@/pages/admin-login";
 import LandlordDashboard from "@/pages/landlord-dashboard";
+import LandlordVerification from "@/pages/landlord-verification";
 import LandlordVerify from "@/pages/landlord-verify";
 
 function Router() {
@@ -58,6 +59,7 @@ function Router() {
           <Route path="/help" component={Help} />
           <Route path="/status" component={Status} />
           <Route path="/product" component={Product} />
+          <Route path="/landlord-verification" component={LandlordVerification} />
         </>
       ) : (
         <>
@@ -75,6 +77,7 @@ function Router() {
           <Route path="/help" component={Help} />
           <Route path="/status" component={Status} />
           <Route path="/product" component={Product} />
+          <Route path="/landlord-verification" component={LandlordVerification} />
         </>
       )}
       <Route component={NotFound} />

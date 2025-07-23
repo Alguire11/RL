@@ -12,6 +12,7 @@ import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterlin
 import { format } from "date-fns";
 import { AddressEditor } from "@/components/address-editor";
 import { RentDateEditor } from "@/components/rent-date-editor";
+import { PropertyForm } from "@/components/property-form";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -37,7 +38,7 @@ export default function Dashboard() {
     retry: false,
   });
 
-  const { data: payments, isLoading: paymentsLoading } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ["/api/payments"],
     retry: false,
   });
@@ -124,9 +125,10 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
           <AddressEditor />
           <RentDateEditor />
+          <PropertyForm />
         </div>
 
         {/* Main Content Grid */}
