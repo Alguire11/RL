@@ -152,6 +152,30 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUserAddress(userId: string, address: any): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ 
+        address: address,
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async updateUserRentInfo(userId: string, rentInfo: any): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ 
+        rentInfo: rentInfo,
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
   // Property operations
   async createProperty(property: InsertProperty): Promise<Property> {
     const [newProperty] = await db

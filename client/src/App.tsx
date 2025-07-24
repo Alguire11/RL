@@ -23,6 +23,9 @@ import AdminLogin from "@/pages/admin-login";
 import LandlordDashboard from "@/pages/landlord-dashboard";
 import LandlordVerification from "@/pages/landlord-verification";
 import LandlordVerify from "@/pages/landlord-verify";
+import OnboardingPage from "@/pages/onboarding";
+import RentTracker from "@/pages/rent-tracker";
+import ReportGenerator from "@/pages/report-generator";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -78,6 +81,9 @@ function Router() {
           <Route path="/status" component={Status} />
           <Route path="/product" component={Product} />
           <Route path="/landlord-verification" component={LandlordVerification} />
+          <Route path="/onboarding" component={OnboardingPage} />
+          <Route path="/rent-tracker" component={RentTracker} />
+          <Route path="/report-generator" component={ReportGenerator} />
         </>
       )}
       <Route component={NotFound} />

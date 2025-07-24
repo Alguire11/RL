@@ -1,0 +1,127 @@
+👤 User Journey (Tenant)
+
+Goal: Track rent payments and build a credit report that can be shared with future landlords or lenders.
+
+1. Onboarding & Account Creation
+
+Lands on Welcome screen with tagline.
+
+Clicks "Get Started"
+
+Signs up via email/password or Google/Apple
+
+2. Bank Connection
+
+Sees brief explainer about Open Banking
+
+Clicks "Connect My Bank"
+
+Goes through mock connection or live Truelayer flow (MVP: simulate)
+
+3. Set Rent Details
+
+Inputs monthly rent amount
+
+Sets recurring due date (e.g. 1st of every month)
+
+Optionally adds landlord name/email
+
+Optionally enters 3 past rent payments (manual entry)
+
+4. Rent Tracking
+
+App checks rent payment data every month (mock or live)
+
+Displays rent streaks on dashboard
+
+Shows next due date
+
+Pushes reminder notifications (if enabled)
+
+5. Generate & Download Rent Report
+
+Clicks "Generate Report"
+
+Sees PDF preview
+
+Can download or copy a shareable link
+
+6. Share with Landlord or Lender
+
+Selects WhatsApp/email to send report
+
+Uses auto-generated message or writes own
+
+7. Optional: Request Landlord Verification
+
+Sends 1-click verify link to landlord
+
+Once landlord confirms, badge added to report
+
+🏠 Landlord Journey
+
+Goal: Confirm tenant rent history or receive shared report.
+
+1. Receives Invite Link from Tenant
+
+Clicks secure link in email/message: "Verify this rent history"
+
+Lands on verification page
+
+2. Simple Verification Form
+
+Confirms tenant's full name
+
+Selects:
+
+Yes, rent has been paid on time for X months
+
+No, or not sure
+
+Optionally leaves comments or selects time range
+
+3. Confirmation Sent to Tenant
+
+Status changes to "Landlord Verified" in their report
+
+4. Optional (Future Feature)
+
+Landlord can join platform to manage multiple tenants
+
+See submitted reports, confirm histories, send digital receipts
+
+🚧 Admin Journey
+
+Goal: Oversee app usage, moderate landlord verifications, support users.
+
+1. Admin Login Panel
+
+Secure login to dashboard backend (e.g. Airtable / Glide Admin)
+
+2. User & Payment Logs View
+
+Access all registered users
+
+View rent logs (dates, success/failure)
+
+Track streaks and rent report generation
+
+3. Moderate Verifications
+
+See pending landlord confirmations
+
+Ability to manually approve/deny in edge cases
+
+4. Data Export / Backup
+
+Export CSV of rent records, users, or landlord responses
+
+5. Send Global or Targeted Notifications
+
+e.g. Push notice: "Reminder to confirm this month’s rent payment"
+
+6. Support Panel (Manual Phase)
+
+Answer questions via email or in-app form
+
+Flag reports for suspicious behavior (if any)
