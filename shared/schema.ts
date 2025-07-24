@@ -38,6 +38,9 @@ export const users = pgTable("users", {
   phone: varchar("phone"),
   isOnboarded: boolean("is_onboarded").default(false),
   emailVerified: boolean("email_verified").default(false),
+  address: jsonb("address"),
+  rentInfo: jsonb("rent_info"),
+  role: varchar("role").default("user"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

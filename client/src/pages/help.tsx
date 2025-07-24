@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { Search, MessageCircle, Book, Phone, Mail, ChevronRight, HelpCircle } from "lucide-react";
+import { useLocation } from "wouter";
+import { Search, MessageCircle, Book, Phone, Mail, ChevronRight, HelpCircle, ArrowLeft } from "lucide-react";
 
 export default function HelpCenter() {
   const { user, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
 
   const faqs = [
     {
@@ -70,6 +72,15 @@ export default function HelpCenter() {
     <div className="min-h-screen bg-gray-50">
       <Navigation />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
+        <Button
+          variant="ghost"  
+          onClick={() => setLocation(isAuthenticated ? "/" : "/")}
+          className="mb-6 hover:bg-gray-100"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to {isAuthenticated ? "Dashboard" : "Home"}
+        </Button>
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Help Center</h1>

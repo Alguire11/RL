@@ -7,10 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Navigation } from "@/components/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, Phone, MapPin, Clock, MessageCircle, Send } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
+import { Mail, Phone, MapPin, Clock, MessageCircle, Send, ArrowLeft } from "lucide-react";
 
 export default function Contact() {
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -69,6 +73,15 @@ export default function Contact() {
     <div className="min-h-screen bg-gray-50">
       <Navigation />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
+        <Button
+          variant="ghost"  
+          onClick={() => setLocation(isAuthenticated ? "/" : "/")}
+          className="mb-6 hover:bg-gray-100"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to {isAuthenticated ? "Dashboard" : "Home"}
+        </Button>
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Us</h1>

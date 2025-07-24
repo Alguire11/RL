@@ -38,13 +38,13 @@ export default function Dashboard() {
     retry: false,
   });
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ["/api/payments"],
+  const { data: properties = [], isLoading: propertiesLoading } = useQuery({
+    queryKey: ["/api/properties"],
     retry: false,
   });
 
-  const { data: properties } = useQuery({
-    queryKey: ["/api/properties"],
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ["/api/payments"],
     retry: false,
   });
 
