@@ -18,6 +18,7 @@ import Contact from "@/pages/contact";
 import Help from "@/pages/help";
 import Status from "@/pages/status";
 import Product from "@/pages/product";
+import Support from "@/pages/support";
 import AdminDashboard from "@/pages/admin";
 import AdminLogin from "@/pages/admin-login";
 import LandlordDashboard from "@/pages/landlord-dashboard";
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/support" component={Support} />
       <Route path="/contact" component={Contact} />  
       <Route path="/help" component={Help} />
       <Route path="/status" component={Status} />
@@ -77,6 +79,7 @@ function Router() {
           <Route path="/about" component={About} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/terms" component={Terms} />
+          <Route path="/support" component={Support} />
           <Route path="/contact" component={Contact} />
           <Route path="/help" component={Help} />
           <Route path="/status" component={Status} />

@@ -467,9 +467,10 @@ export default function Landing() {
             <div>
               <h3 className="text-xl font-semibold mb-4">Support</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white">Help Center</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white">Contact</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white">Status</a></li>
+                <li><Link href="/support" className="text-gray-400 hover:text-white">Support Center</Link></li>
+                <li><Link href="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
+                <li><Link href="/contact" className="text-gray-400 hover:text-white">Contact</Link></li>
+                <li><Link href="/status" className="text-gray-400 hover:text-white">Status</Link></li>
               </ul>
             </div>
             <div>
