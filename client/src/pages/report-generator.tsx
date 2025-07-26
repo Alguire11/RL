@@ -25,6 +25,7 @@ import {
   Star,
   Shield
 } from "lucide-react";
+import { WhatsAppShare } from "@/components/whatsapp-share";
 import { format } from "date-fns";
 
 export default function ReportGenerator() {
@@ -378,10 +379,15 @@ export default function ReportGenerator() {
                                   <Mail className="h-4 w-4 mr-2" />
                                   {shareReportMutation.isPending ? "Sending..." : "Send Email"}
                                 </Button>
-                                <Button variant="outline" className="flex-1">
-                                  <MessageSquare className="h-4 w-4 mr-2" />
-                                  WhatsApp
-                                </Button>
+                                <WhatsAppShare 
+                                  reportUrl={`${window.location.origin}/report/${report.reportId}`}
+                                  reportTitle={property?.address || 'Credit Report'}
+                                >
+                                  <Button variant="outline" className="flex-1">
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    WhatsApp
+                                  </Button>
+                                </WhatsAppShare>
                               </div>
                               <div className="border-t pt-4">
                                 <Label className="text-sm text-gray-600">Shareable Link</Label>

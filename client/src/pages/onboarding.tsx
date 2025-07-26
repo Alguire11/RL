@@ -25,6 +25,7 @@ import {
   CheckCircle,
   Banknote
 } from "lucide-react";
+import { OpenBankingSimulator } from "@/components/open-banking-simulator";
 
 const rentDetailsSchema = z.object({
   monthlyRent: z.string().min(1, "Monthly rent is required"),
@@ -241,90 +242,28 @@ export default function OnboardingPage() {
         )}
 
         {currentStep === 2 && (
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Banknote className="mr-2 h-6 w-6" />
-                Connect Your Bank
-              </CardTitle>
-              <CardDescription>
-                Securely connect your bank account to automatically track rent payments
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={bankForm.handleSubmit(onBankConnect)} className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bankName">Bank Name</Label>
-                    <Select onValueChange={(value) => bankForm.setValue("bankName", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your bank" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="lloyds">Lloyds Bank</SelectItem>
-                        <SelectItem value="barclays">Barclays</SelectItem>
-                        <SelectItem value="hsbc">HSBC</SelectItem>
-                        <SelectItem value="natwest">NatWest</SelectItem>
-                        <SelectItem value="santander">Santander</SelectItem>
-                        <SelectItem value="halifax">Halifax</SelectItem>
-                        <SelectItem value="nationwide">Nationwide</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="accountType">Account Type</Label>
-                    <Select onValueChange={(value) => bankForm.setValue("accountType", value)} defaultValue="current">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="current">Current Account</SelectItem>
-                        <SelectItem value="savings">Savings Account</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sortCode">Sort Code</Label>
-                    <Input
-                      id="sortCode"
-                      placeholder="12-34-56"
-                      maxLength={8}
-                      {...bankForm.register("sortCode")}
-                      onChange={(e) => {
-                        let value = e.target.value.replace(/\D/g, '');
-                        if (value.length >= 2) value = value.slice(0, 2) + '-' + value.slice(2);
-                        if (value.length >= 5) value = value.slice(0, 5) + '-' + value.slice(5, 7);
-                        bankForm.setValue("sortCode", value.replace(/-/g, ''));
-                        e.target.value = value;
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="accountNumber">Account Number</Label>
-                    <Input
-                      id="accountNumber"
-                      placeholder="12345678"
-                      maxLength={10}
-                      {...bankForm.register("accountNumber")}
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-between pt-4">
-                  <Button type="button" variant="outline" onClick={() => setCurrentStep(1)}>
-                    <ChevronLeft className="mr-2 h-4 w-4" />
-                    Back
-                  </Button>
-                  <Button type="submit" disabled={createBankConnectionMutation.isPending}>
-                    {createBankConnectionMutation.isPending ? "Connecting..." : "Connect Bank"}
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          <div className="max-w-4xl mx-auto">
+            <OpenBankingSimulator 
+              mode="onboarding"
+              onConnectionSuccess={() => {
+                toast({
+                  title: "Bank Connected Successfully",
+                  description: "Your bank account has been connected. Let's set up your rent details.",
+                });
+                setCurrentStep(3);
+              }}
+            />
+            <div className="flex justify-between pt-6">
+              <Button type="button" variant="outline" onClick={() => setCurrentStep(1)}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              <Button onClick={() => setCurrentStep(3)} variant="ghost">
+                Skip for now
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         )}
 
         {currentStep === 3 && (

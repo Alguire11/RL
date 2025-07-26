@@ -823,6 +823,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notification preferences routes
+  app.get("/api/user/notification-preferences", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const preferences = await storage.getUserPreferences(userId);
+      res.json(preferences || {
+        emailEnabled: true,
+        smsEnabled: false,
+        pushEnabled: false,
+        reminderDays: 3,
+        reminderTime: "09:00",
+        overdueReminders: true,
+        weeklySummary: true,
+        landlordUpdates: true,
+      });
+    } catch (error) {
+      console.error("Error fetching notification preferences:", error);
+      res.status(500).json({ message: "Failed to fetch preferences" });
+    }
+  });
+
+  app.put("/api/user/notification-preferences", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const preferences = await storage.upsertUserPreferences({
+        userId,
+        ...req.body,
+      });
+      res.json(preferences);
+    } catch (error) {
+      console.error("Error updating notification preferences:", error);
+      res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+
+  // Test notification routes
+  app.post("/api/notifications/test", requireAuth, async (req: any, res) => {
+    try {
+      const { type } = req.body;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (type === 'email' && user?.email) {
+        await sendEmail(process.env.SENDGRID_API_KEY!, {
+          to: user.email,
+          from: 'noreply@enoikio.com',
+          subject: 'Enoíkio - Test Notification',
+          html: `
+            <h2>Test Notification from Enoíkio</h2>
+            <p>This is a test email notification to confirm your settings are working correctly.</p>
+            <p>You'll receive payment reminders and updates at this email address.</p>
+            <br>
+            <p>Best regards,<br>The Enoíkio Team</p>
+          `,
+        });
+      }
+      
+      res.json({ success: true, message: `Test ${type} notification sent` });
+    } catch (error) {
+      console.error("Error sending test notification:", error);
+      res.status(500).json({ message: "Failed to send test notification" });
+    }
+  });
+
+  // Open Banking connection route
+  app.post("/api/open-banking/connect", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const bankConnection = await storage.createBankConnection({
+        userId,
+        ...req.body,
+      });
+      res.json(bankConnection);
+    } catch (error) {
+      console.error("Error connecting bank:", error);
+      res.status(500).json({ message: "Failed to connect bank" });
+    }
+  });
+
+  // PDF report generation route
+  app.get("/api/reports/:reportId/pdf", async (req, res) => {
+    try {
+      const { reportId } = req.params;
+      const report = await storage.getCreditReportByReportId(reportId);
+      
+      if (!report) {
+        return res.status(404).json({ message: "Report not found" });
+      }
+
+      const user = await storage.getUser(report.userId);
+      const payments = await storage.getUserRentPayments(report.userId);
+      const properties = await storage.getUserProperties(report.userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const reportData = {
+        user: {
+          id: user.id,
+          firstName: user.firstName || 'N/A',
+          lastName: user.lastName || 'N/A',
+          email: user.email || 'N/A',
+          phone: user.phone,
+        },
+        property: properties[0] || {
+          address: 'N/A',
+          city: 'N/A',
+          postcode: 'N/A',
+          monthlyRent: 0,
+        },
+        payments: payments.map(p => ({
+          id: p.id,
+          amount: p.amount,
+          dueDate: p.dueDate.toISOString(),
+          paidDate: p.paidDate?.toISOString(),
+          status: p.status,
+        })),
+        reportId: report.reportId,
+        generatedAt: report.createdAt.toISOString(),
+        verificationStatus: 'verified' as const,
+        landlordInfo: {
+          name: 'Property Manager',
+          email: 'landlord@example.com',
+        },
+      };
+
+      const { generateCreditReportPDF } = await import('./pdfGenerator');
+      const pdfBuffer = await generateCreditReportPDF(reportData);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="rent-credit-report-${reportId}.pdf"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

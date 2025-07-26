@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CheckCircle, Plus, Trash2, Building, CreditCard, User, Bell, Shield, Download, Send } from "lucide-react";
+import { NotificationCenter } from "@/components/notification-system";
 import { UserPreferences } from "@/components/settings/preferences";
 import { DataExport } from "@/components/settings/data-export";
 import { SecurityLogs } from "@/components/settings/security-logs";
