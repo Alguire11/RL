@@ -8,7 +8,8 @@ import { GradientButton } from "@/components/ui/gradient-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling } from "lucide-react";
+import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling, Play, HelpCircle } from "lucide-react";
+import { DashboardTour, useDashboardTour } from "@/components/dashboard-tour";
 import { format } from "date-fns";
 import { AddressEditor } from "@/components/address-editor";
 import { RentDateEditor } from "@/components/rent-date-editor";
@@ -17,6 +18,7 @@ import { PropertyForm } from "@/components/property-form";
 export default function Dashboard() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
+  const { showTour, startTour, closeTour, completeTour, shouldShowTour } = useDashboardTour();
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -32,6 +34,16 @@ export default function Dashboard() {
       return;
     }
   }, [isAuthenticated, isLoading, toast]);
+
+  // Auto-start tour for first-time users
+  useEffect(() => {
+    if (isAuthenticated && !isLoading && shouldShowTour()) {
+      const timer = setTimeout(() => {
+        startTour();
+      }, 1000); // Wait 1 second after page load
+      return () => clearTimeout(timer);
+    }
+  }, [isAuthenticated, isLoading, shouldShowTour, startTour]);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
@@ -91,13 +103,41 @@ export default function Dashboard() {
       <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Dashboard Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-          <p className="text-gray-600">Track your rental payments and build your credit portfolio</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
+            <p className="text-gray-600">Track your rental payments and build your credit portfolio</p>
+          </div>
+          <div className="flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={startTour}
+              className="hidden sm:flex items-center"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              Take Tour
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = '/report-generator'}
+              className="hidden sm:flex items-center"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Reports
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = '/settings'}
+              className="notifications hidden sm:flex items-center"
+            >
+              <HelpCircle className="mr-2 h-4 w-4" />
+              Settings
+            </Button>
+          </div>
         </div>
 
         {/* Stats Overview */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
+        <div className="dashboard-stats grid md:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Payment Streak"
             value={`${stats?.paymentStreak || 0} months`}
@@ -125,7 +165,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="bank-connections grid md:grid-cols-3 gap-6 mb-8">
           <AddressEditor />
           <RentDateEditor />
           <PropertyForm />
@@ -134,7 +174,7 @@ export default function Dashboard() {
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Payment History */}
-          <Card>
+          <Card className="payment-history">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-xl font-semibold">Recent Payments</CardTitle>
               <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
@@ -202,7 +242,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Quick Actions */}
-          <Card>
+          <Card className="credit-reports">
             <CardHeader>
               <CardTitle className="text-xl font-semibold">Quick Actions</CardTitle>
             </CardHeader>
@@ -250,6 +290,23 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         )}
+
+        {/* Security Badge */}
+        <div className="security-badge mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <span className="text-sm font-medium text-green-800">
+              Your data is secured with bank-level encryption
+            </span>
+          </div>
+        </div>
+
+        {/* Tour Component */}
+        <DashboardTour 
+          isOpen={showTour} 
+          onClose={closeTour} 
+          onComplete={completeTour} 
+        />
       </div>
     </div>
   );
