@@ -45,7 +45,7 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, shouldShowTour, startTour]);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats = {}, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
   });

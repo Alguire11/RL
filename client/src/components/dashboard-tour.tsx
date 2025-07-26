@@ -341,7 +341,7 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
       </Dialog>
 
       {/* CSS for tour highlighting */}
-      <style jsx global>{`
+      <style>{`
         .tour-active .tour-highlight {
           position: relative;
           z-index: 45;
