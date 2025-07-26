@@ -67,7 +67,14 @@ export default function AdminDashboard() {
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMM yyyy HH:mm');
+    try {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      return format(date, 'dd MMM yyyy HH:mm');
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   const getUserStatusBadge = (user: any) => {

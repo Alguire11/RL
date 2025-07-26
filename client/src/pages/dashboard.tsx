@@ -140,25 +140,25 @@ export default function Dashboard() {
         <div className="dashboard-stats grid md:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Payment Streak"
-            value={`${stats?.paymentStreak || 0} months`}
+            value={`${(stats as any)?.paymentStreak || 0} months`}
             icon={CheckCircle}
             color="success"
           />
           <StatCard
             title="Total Paid"
-            value={formatCurrency(stats?.totalPaid || 0)}
+            value={formatCurrency((stats as any)?.totalPaid || 0)}
             icon={PoundSterling}
             color="primary"
           />
           <StatCard
             title="On-Time Rate"
-            value={`${Math.round(stats?.onTimePercentage || 0)}%`}
+            value={`${Math.round((stats as any)?.onTimePercentage || 0)}%`}
             icon={TrendingUp}
             color="secondary"
           />
           <StatCard
             title="Next Payment"
-            value={stats?.nextPaymentDue ? `${getDaysUntilDue(stats.nextPaymentDue)} days` : 'No upcoming payments'}
+            value={(stats as any)?.nextPaymentDue ? `${getDaysUntilDue((stats as any).nextPaymentDue)} days` : 'No upcoming payments'}
             icon={Calendar}
             color="accent"
           />
@@ -202,7 +202,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {payments?.slice(0, 3).map((payment: any) => (
+                  {(payments as any[])?.slice(0, 3).map((payment: any) => (
                     <div key={payment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -229,7 +229,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ))}
-                  {(!payments || payments.length === 0) && (
+                  {(!payments || (payments as any[]).length === 0) && (
                     <div className="text-center py-8 text-gray-500">
                       <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                       <p>No payment history yet</p>
@@ -272,14 +272,14 @@ export default function Dashboard() {
         </div>
 
         {/* Properties Section */}
-        {properties && properties.length > 0 && (
+        {properties && (properties as any[]).length > 0 && (
           <Card className="mt-8">
             <CardHeader>
               <CardTitle className="text-xl font-semibold">Your Properties</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                {properties.map((property: any) => (
+                {(properties as any[]).map((property: any) => (
                   <div key={property.id} className="p-4 bg-gray-50 rounded-lg">
                     <h3 className="font-medium mb-2">{property.address}</h3>
                     <p className="text-sm text-gray-600 mb-1">{property.city}, {property.postcode}</p>

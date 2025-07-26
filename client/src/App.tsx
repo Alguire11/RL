@@ -48,21 +48,25 @@ function Router() {
       {/* Public landlord verification route */}
       <Route path="/landlord/verify/:token" component={LandlordVerify} />
       
+      {/* Public routes - available when not authenticated */}
+      <Route path="/auth" component={AuthPage} />
+      <Route path="/admin-login" component={AdminLogin} />
+      <Route path="/about" component={About} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/contact" component={Contact} />  
+      <Route path="/help" component={Help} />
+      <Route path="/status" component={Status} />
+      <Route path="/product" component={Product} />
+      <Route path="/landlord-verification" component={LandlordVerification} />
+      
+      {/* Admin and special routes */}
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/landlord-dashboard" component={LandlordDashboard} />
+      
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
-          <Route path="/auth" component={AuthPage} />
-          <Route path="/admin-login" component={AdminLogin} />
-          <Route path="/admin" component={AdminDashboard} />
-          <Route path="/landlord-dashboard" component={LandlordDashboard} />
-          <Route path="/about" component={About} />
-          <Route path="/privacy" component={Privacy} />
-          <Route path="/terms" component={Terms} />
-          <Route path="/contact" component={Contact} />
-          <Route path="/help" component={Help} />
-          <Route path="/status" component={Status} />
-          <Route path="/product" component={Product} />
-          <Route path="/landlord-verification" component={LandlordVerification} />
         </>
       ) : (
         <>
@@ -70,9 +74,6 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />
-          <Route path="/admin-login" component={AdminLogin} />
-          <Route path="/admin" component={AdminDashboard} />
-          <Route path="/landlord-dashboard" component={LandlordDashboard} />
           <Route path="/about" component={About} />
           <Route path="/privacy" component={Privacy} />
           <Route path="/terms" component={Terms} />
