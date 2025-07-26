@@ -9,27 +9,71 @@ import { Navigation } from "@/components/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
-import { Mail, Phone, MapPin, Clock, MessageCircle, Send, ArrowLeft } from "lucide-react";
+import { Mail, Phone, MapPin, Clock, MessageCircle, Send, ArrowLeft, Loader2 } from "lucide-react";
+import { LiveChat, ChatToggle } from "@/components/live-chat";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Contact() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     subject: '',
     category: '',
-    message: ''
+    message: '',
+    priority: 'normal'
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Message Sent",
-      description: "Thank you for contacting us. We'll get back to you within 24 hours.",
-    });
-    setFormData({ name: '', email: '', subject: '', category: '', message: '' });
+    
+    if (!formData.name || !formData.email || !formData.subject || !formData.message || !formData.category) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const response = await apiRequest("POST", "/api/support/contact", formData);
+      
+      toast({
+        title: "Message Sent Successfully!",
+        description: "We've received your support request and will respond within 24 hours. Check your email for confirmation.",
+      });
+      
+      setFormData({ 
+        name: '', 
+        email: '', 
+        subject: '', 
+        category: '', 
+        message: '',
+        priority: 'normal'
+      });
+    } catch (error) {
+      console.error('Contact form error:', error);
+      toast({
+        title: "Failed to Send Message",
+        description: "There was an error sending your message. Please try again or use live chat for immediate help.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const startLiveChat = () => {
+    setIsChatOpen(true);
+    setIsChatMinimized(false);
   };
 
   const contactMethods = [
@@ -52,7 +96,8 @@ export default function Contact() {
       description: "Get instant help",
       icon: MessageCircle,
       value: "Available 24/7",
-      action: "Start Chat"
+      action: "Start Chat",
+      onClick: startLiveChat
     },
     {
       title: "Office Address",
@@ -169,8 +214,37 @@ export default function Contact() {
                   />
                 </div>
 
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                  Send Message
+                <div>
+                  <Label htmlFor="priority">Priority</Label>
+                  <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending Message...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Message
+                    </>
+                  )}
                 </Button>
               </form>
             </CardContent>
@@ -196,7 +270,19 @@ export default function Contact() {
                         <p className="text-gray-600 text-sm">{method.description}</p>
                         <p className="text-blue-600 text-sm font-medium">{method.value}</p>
                       </div>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={(method as any).onClick || (() => {
+                          if (method.title === "Email Support") {
+                            window.open("mailto:support@enoikio.com");
+                          } else if (method.title === "Phone Support") {
+                            window.open("tel:+442071234567");
+                          } else if (method.title === "Office Address") {
+                            window.open("https://maps.google.com/?q=123+Fintech+Street,+London+EC2A+4NE");
+                          }
+                        })}
+                      >
                         {method.action}
                       </Button>
                     </div>
@@ -266,6 +352,27 @@ export default function Contact() {
           </Button>
         </div>
       </div>
+
+      {/* Live Chat Components */}
+      {!isChatMinimized && (
+        <LiveChat 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)}
+          onMinimize={() => {
+            setIsChatMinimized(true);
+            setIsChatOpen(false);
+          }}
+        />
+      )}
+      
+      {(isChatMinimized || !isChatOpen) && (
+        <ChatToggle 
+          onClick={() => {
+            setIsChatOpen(true);
+            setIsChatMinimized(false);
+          }}
+        />
+      )}
     </div>
   );
 }

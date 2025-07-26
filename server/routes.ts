@@ -962,6 +962,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Support contact form endpoint
+  app.post('/api/support/contact', async (req, res) => {
+    try {
+      const { name, email, subject, category, message, priority } = req.body;
+      
+      const supportEmail = 'support@enoikio.com';
+      const userEmail = email;
+      
+      // Send email to support team
+      const supportEmailSuccess = await sendEmail({
+        to: supportEmail,
+        from: 'noreply@enoikio.com',
+        subject: `[${category}] ${subject}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1f2937;">New Support Request</h2>
+            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>From:</strong> ${name} (${email})</p>
+              <p><strong>Category:</strong> ${category}</p>
+              <p><strong>Priority:</strong> ${priority || 'Normal'}</p>
+              <p><strong>Subject:</strong> ${subject}</p>
+            </div>
+            <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h3 style="color: #374151; margin-top: 0;">Message:</h3>
+              <p style="color: #4b5563; line-height: 1.6; white-space: pre-wrap;">${message}</p>
+            </div>
+            <div style="margin-top: 20px; padding: 15px; background-color: #fef3c7; border-radius: 8px;">
+              <p style="color: #92400e; margin: 0; font-size: 14px;">
+                <strong>Action Required:</strong> Please respond to this support request within 24 hours.
+              </p>
+            </div>
+          </div>
+        `
+      });
+
+      // Send confirmation email to user
+      const userEmailSuccess = await sendEmail({
+        to: userEmail,
+        from: 'support@enoikio.com',
+        subject: `Support Request Received: ${subject}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1f2937;">Thank You for Contacting Enoíkio Support</h2>
+            <p style="color: #4b5563; line-height: 1.6;">
+              Hi ${name},
+            </p>
+            <p style="color: #4b5563; line-height: 1.6;">
+              We've received your support request and our team will respond within 24 hours. 
+              Here's a summary of your request:
+            </p>
+            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Subject:</strong> ${subject}</p>
+              <p><strong>Category:</strong> ${category}</p>
+              <p><strong>Submitted:</strong> ${new Date().toLocaleString()}</p>
+            </div>
+            <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h3 style="color: #374151; margin-top: 0;">Your Message:</h3>
+              <p style="color: #4b5563; line-height: 1.6; white-space: pre-wrap;">${message}</p>
+            </div>
+            <div style="margin-top: 30px; padding: 20px; background-color: #dbeafe; border-radius: 8px;">
+              <p style="color: #1e40af; margin: 0; font-size: 14px;">
+                <strong>Need urgent help?</strong> Call our support line at +44 20 7123 4567 
+                or use our live chat feature for immediate assistance.
+              </p>
+            </div>
+            <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+              Best regards,<br>
+              The Enoíkio Support Team
+            </p>
+          </div>
+        `
+      });
+
+      if (supportEmailSuccess && userEmailSuccess) {
+        res.json({ 
+          success: true, 
+          message: 'Support request submitted successfully. You will receive a confirmation email shortly.' 
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: 'Failed to send support request. Please try again or contact us directly.' 
+        });
+      }
+    } catch (error) {
+      console.error('Support contact error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Support system error. Please try again later.' 
+      });
+    }
+  });
+
+  // Live chat message endpoint
+  app.post('/api/support/chat', async (req, res) => {
+    try {
+      const { message, sessionId } = req.body;
+      const userId = req.isAuthenticated ? req.isAuthenticated() ? (req as any).user?.id : 'anonymous' : 'anonymous';
+      
+      // In a real implementation, this would connect to a chat service
+      // For now, we'll simulate a response
+      const responses = [
+        "Thank you for your message. A support agent will be with you shortly.",
+        "I understand your concern. Let me help you with that right away.",
+        "That's a great question! Let me look into that for you.",
+        "I'm here to help. Can you provide a bit more detail about the issue?",
+        "Let me check our knowledge base for the best solution to your problem."
+      ];
+      
+      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      
+      // Simulate processing time
+      setTimeout(() => {
+        res.json({
+          success: true,
+          message: randomResponse,
+          timestamp: new Date().toISOString(),
+          agent: 'Support Agent'
+        });
+      }, 1000 + Math.random() * 2000);
+      
+    } catch (error) {
+      console.error('Chat error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Chat service temporarily unavailable' 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

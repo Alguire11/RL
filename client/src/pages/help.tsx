@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,10 +6,15 @@ import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { Search, MessageCircle, Book, Phone, Mail, ChevronRight, HelpCircle, ArrowLeft } from "lucide-react";
+import { LiveChat, ChatToggle } from "@/components/live-chat";
 
 export default function HelpCenter() {
   const { user, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredFaqs, setFilteredFaqs] = useState<typeof faqs>([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
 
   const faqs = [
     {
@@ -37,13 +43,38 @@ export default function HelpCenter() {
     }
   ];
 
+  // Initialize filtered FAQs
+  useState(() => {
+    setFilteredFaqs(faqs);
+  }, []);
+
+  // Filter FAQs based on search
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setFilteredFaqs(faqs);
+    } else {
+      const filtered = faqs.filter(faq => 
+        faq.question.toLowerCase().includes(query.toLowerCase()) ||
+        faq.answer.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredFaqs(filtered);
+    }
+  };
+
+  const startLiveChat = () => {
+    setIsChatOpen(true);
+    setIsChatMinimized(false);
+  };
+
   const supportChannels = [
     {
       title: "Live Chat",
       description: "Get instant help from our support team",
       icon: MessageCircle,
       action: "Start Chat",
-      available: "24/7"
+      available: "24/7",
+      onClick: startLiveChat
     },
     {
       title: "Knowledge Base",
@@ -94,6 +125,8 @@ export default function HelpCenter() {
             <Input 
               placeholder="Search for help articles, guides, or FAQs..." 
               className="pl-10 py-3 text-lg"
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
             />
           </div>
         </div>
@@ -110,7 +143,17 @@ export default function HelpCenter() {
                 <CardDescription>{channel.description}</CardDescription>
               </CardHeader>
               <CardContent className="text-center">
-                <Button variant="outline" className="w-full mb-2">
+                <Button 
+                  variant="outline" 
+                  className="w-full mb-2"
+                  onClick={(channel as any).onClick || (() => {
+                    if (channel.title === "Phone Support") {
+                      window.open("tel:+442071234567");
+                    } else if (channel.title === "Email Support") {
+                      setLocation('/contact');
+                    }
+                  })}
+                >
                   {channel.action}
                 </Button>
                 <p className="text-sm text-gray-500">{channel.available}</p>
@@ -181,12 +224,18 @@ export default function HelpCenter() {
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {faqs.map((faq, index) => (
+              {filteredFaqs.map((faq, index) => (
                 <div key={index} className="border-b pb-4 last:border-b-0">
                   <h3 className="font-semibold text-lg mb-2">{faq.question}</h3>
                   <p className="text-gray-600">{faq.answer}</p>
                 </div>
               ))}
+              {filteredFaqs.length === 0 && searchQuery && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No FAQs found matching "{searchQuery}"</p>
+                  <p className="text-sm mt-2">Try different keywords or <button onClick={startLiveChat} className="text-blue-600 hover:underline">start a live chat</button> for help.</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -198,15 +247,43 @@ export default function HelpCenter() {
             Our support team is here to help you get the most out of Enoíkio
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button 
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => setLocation('/contact')}
+            >
               Contact Support
             </Button>
-            <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
-              Schedule a Call
+            <Button 
+              variant="outline" 
+              className="border-blue-600 text-blue-600 hover:bg-blue-50"
+              onClick={startLiveChat}
+            >
+              Start Live Chat
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Live Chat Components */}
+      {!isChatMinimized && (
+        <LiveChat 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)}
+          onMinimize={() => {
+            setIsChatMinimized(true);
+            setIsChatOpen(false);
+          }}
+        />
+      )}
+      
+      {(isChatMinimized || !isChatOpen) && (
+        <ChatToggle 
+          onClick={() => {
+            setIsChatOpen(true);
+            setIsChatMinimized(false);
+          }}
+        />
+      )}
     </div>
   );
 }

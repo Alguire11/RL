@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/navigation";
@@ -15,10 +16,18 @@ import {
   AlertCircle,
   Clock
 } from "lucide-react";
+import { LiveChat, ChatToggle } from "@/components/live-chat";
 
 export default function Support() {
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
+
+  const startLiveChat = () => {
+    setIsChatOpen(true);
+    setIsChatMinimized(false);
+  };
 
   const supportCategories = [
     {
@@ -64,10 +73,7 @@ export default function Support() {
       title: "Start Live Chat",
       description: "Get instant help from our support team",
       icon: MessageCircle,
-      action: () => {
-        // In a real app, this would open a chat widget
-        setLocation('/contact');
-      },
+      action: startLiveChat,
       bgColor: "bg-blue-50",
       iconColor: "text-blue-600"
     },
@@ -282,6 +288,27 @@ export default function Support() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Live Chat Components */}
+      {!isChatMinimized && (
+        <LiveChat 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)}
+          onMinimize={() => {
+            setIsChatMinimized(true);
+            setIsChatOpen(false);
+          }}
+        />
+      )}
+      
+      {(isChatMinimized || !isChatOpen) && (
+        <ChatToggle 
+          onClick={() => {
+            setIsChatOpen(true);
+            setIsChatMinimized(false);
+          }}
+        />
+      )}
     </div>
   );
 }
