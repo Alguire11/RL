@@ -1092,6 +1092,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Subscription management routes
+  app.get('/api/subscription', requireAuth, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      const subscription = {
+        id: `sub_${user.id}`,
+        userId: user.id,
+        planId: user.subscriptionPlan || 'free',
+        status: user.subscriptionStatus || 'active',
+        startDate: user.createdAt?.toISOString() || new Date().toISOString(),
+        endDate: user.subscriptionEndDate?.toISOString(),
+      };
+
+      res.json(subscription);
+    } catch (error) {
+      console.error('Error fetching subscription:', error);
+      res.status(500).json({ message: 'Failed to fetch subscription' });
+    }
+  });
+
+  // Admin subscription management
+  app.post('/api/admin/users/:userId/subscription', requireAuth, async (req: any, res) => {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    try {
+      const { userId } = req.params;
+      const { planId, status } = req.body;
+
+      await storage.updateUserSubscription(userId, {
+        subscriptionPlan: planId,
+        subscriptionStatus: status,
+        subscriptionEndDate: status === 'active' ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      res.json({ message: 'Subscription updated successfully' });
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      res.status(500).json({ message: 'Failed to update subscription' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

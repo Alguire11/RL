@@ -7,6 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/hooks/useSubscription";
+import { SubscriptionGuard } from "@/components/subscription-guard";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Calendar, 
@@ -23,6 +25,7 @@ import { format, addDays, isAfter, isBefore } from "date-fns";
 export default function RentTracker() {
   const { toast } = useToast();
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const { hasFeature, plan, isFreePlan } = useSubscription();
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
     queryKey: ["/api/payments"],
@@ -326,15 +329,19 @@ export default function RentTracker() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-              <div>
-                <h3 className="font-medium text-blue-900">Reminder Notifications</h3>
-                <p className="text-sm text-blue-700">Get notified 3 days before rent is due</p>
+            {hasFeature('customReminders') ? (
+              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                <div>
+                  <h3 className="font-medium text-blue-900">Custom Reminder Notifications</h3>
+                  <p className="text-sm text-blue-700">Configure advanced reminder settings</p>
+                </div>
+                <Button variant="outline" size="sm">
+                  Configure
+                </Button>
               </div>
-              <Button variant="outline" size="sm">
-                Configure
-              </Button>
-            </div>
+            ) : (
+              <SubscriptionGuard feature="customReminders" requiredPlan="standard" />
+            )}
           </CardContent>
         </Card>
       </div>

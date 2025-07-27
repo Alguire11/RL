@@ -41,6 +41,10 @@ export const users = pgTable("users", {
   address: jsonb("address"),
   rentInfo: jsonb("rent_info"),
   role: varchar("role").default("user"),
+  subscriptionPlan: varchar("subscription_plan").default("free"),
+  subscriptionStatus: varchar("subscription_status").default("active"),
+  subscriptionEndDate: timestamp("subscription_end_date"),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

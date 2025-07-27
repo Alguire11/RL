@@ -288,6 +288,36 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {/* Subscription Analytics */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <CreditCard className="h-5 w-5" />
+              <span>Subscription Overview</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">89</div>
+                <div className="text-sm text-gray-600">Free Users</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">24</div>
+                <div className="text-sm text-gray-600">Standard Users</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">14</div>
+                <div className="text-sm text-gray-600">Premium Users</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">£486</div>
+                <div className="text-sm text-gray-600">Monthly Revenue</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* System Health & Admin Actions */}
         <div className="grid lg:grid-cols-2 gap-8 mt-8">
           <Card>
@@ -365,6 +395,46 @@ export default function AdminDashboard() {
                 }}>
                   <Shield className="w-4 h-4 mr-2" />
                   Settings
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Button variant="outline" className="w-full" onClick={() => {
+                  toast({
+                    title: "Subscription Management",
+                    description: "Managing user subscriptions and billing",
+                  });
+                }}>
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Subscriptions
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => {
+                  toast({
+                    title: "Financial Reports",
+                    description: "Revenue and subscription analytics",
+                  });
+                }}>
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  Revenue
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Button variant="outline" className="w-full" onClick={() => {
+                  toast({
+                    title: "Content Moderation",
+                    description: "Review reported content and issues",
+                  });
+                }}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  Moderation
+                </Button>
+                <Button variant="outline" className="w-full" onClick={() => {
+                  toast({
+                    title: "System Announcements",
+                    description: "Send platform-wide notifications",
+                  });
+                }}>
+                  <Users className="w-4 h-4 mr-2" />
+                  Announce
                 </Button>
               </div>
             </CardContent>

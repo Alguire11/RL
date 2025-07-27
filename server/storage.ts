@@ -450,6 +450,18 @@ export class DatabaseStorage implements IStorage {
     await db.delete(notifications).where(eq(notifications.id, notificationId));
   }
 
+  // Subscription operations
+  async updateUserSubscription(userId: string, data: { subscriptionPlan: string, subscriptionStatus: string, subscriptionEndDate?: Date | null }): Promise<void> {
+    await db.update(users)
+      .set({
+        subscriptionPlan: data.subscriptionPlan,
+        subscriptionStatus: data.subscriptionStatus,
+        subscriptionEndDate: data.subscriptionEndDate,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
   // User preferences operations
   async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
     const [preferences] = await db
