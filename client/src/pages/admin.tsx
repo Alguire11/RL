@@ -1,46 +1,64 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Navigation } from "@/components/navigation";
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import { Users, CreditCard, FileText, Activity, Shield, TrendingUp } from "lucide-react";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  const [adminSession, setAdminSession] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Redirect to login if not authenticated
+  // Check for admin session
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
+    try {
+      const session = localStorage.getItem('admin_session');
+      if (session) {
+        const parsedSession = JSON.parse(session);
+        if (parsedSession.role === 'admin') {
+          setAdminSession(parsedSession);
+        } else {
+          // Not an admin, redirect to appropriate dashboard
+          if (parsedSession.role === 'landlord') {
+            setLocation('/landlord-dashboard');
+          } else {
+            setLocation('/dashboard');
+          }
+          return;
+        }
+      } else {
+        // No session, redirect to admin login
+        setLocation('/admin-login');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking admin session:', error);
+      setLocation('/admin-login');
       return;
     }
-  }, [isAuthenticated, isLoading, toast]);
+    setIsLoading(false);
+  }, [setLocation]);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ["/api/admin/stats"],
     retry: false,
+    enabled: !!adminSession, // Only fetch when admin session exists
   });
 
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["/api/admin/users"],
     retry: false,
+    enabled: !!adminSession, // Only fetch when admin session exists
   });
 
-  if (isLoading || statsLoading) {
+  if (isLoading || !adminSession) {
     return (
       <div className="min-h-screen bg-light-gray">
         <Navigation />
