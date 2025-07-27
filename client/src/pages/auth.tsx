@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Logo } from "@/components/logo";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Building } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -209,6 +209,27 @@ export default function AuthPage() {
                     {loginMutation.isPending ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
+                
+                <div className="mt-4 text-center">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white px-2 text-gray-500">Or</span>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full mt-4 border-purple-200 text-purple-600 hover:bg-purple-50"
+                    onClick={() => navigate("/admin-login")}
+                  >
+                    <Building className="h-4 w-4 mr-2" />
+                    Landlord Access
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -318,6 +339,26 @@ export default function AuthPage() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Landlord Access */}
+        <Card className="mt-6 border-purple-200 bg-purple-50/50">
+          <CardContent className="pt-4">
+            <div className="text-center">
+              <Building className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+              <h3 className="font-semibold text-purple-900 mb-1">Are you a landlord?</h3>
+              <p className="text-sm text-purple-700 mb-3">
+                Access landlord verification system and tenant management tools
+              </p>
+              <Button
+                variant="outline"
+                className="border-purple-200 text-purple-600 hover:bg-purple-100"
+                onClick={() => navigate("/admin-login")}
+              >
+                Landlord Dashboard Access
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="text-center">
           <p className="text-xs text-gray-500">

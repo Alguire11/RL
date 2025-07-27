@@ -80,11 +80,18 @@ export default function AdminLogin() {
             </div>
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-            Admin Access
+            Landlord & Admin Access
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Sign in with your admin credentials
+            Access landlord verification, admin dashboard, or demo accounts
           </p>
+          
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <p className="font-medium mb-1">Demo Credentials:</p>
+            <p>• Landlord: <code className="bg-white px-1 rounded">landlord / landlord123</code></p>
+            <p>• Admin: <code className="bg-white px-1 rounded">admin / admin123</code></p>
+            <p>• User: <code className="bg-white px-1 rounded">user / user123</code></p>
+          </div>
         </div>
 
         <Card>
