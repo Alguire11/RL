@@ -4,13 +4,49 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar } from "lucide-react";
+import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send } from "lucide-react";
 
 export default function LandlordDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [adminSession, setAdminSession] = useState<any>(null);
+  
+  // Dialog states
+  const [showAddProperty, setShowAddProperty] = useState(false);
+  const [showManageTenants, setShowManageTenants] = useState(false);
+  const [showSendNotice, setShowSendNotice] = useState(false);
+  const [showScheduleInspection, setShowScheduleInspection] = useState(false);
+  
+  // Form states
+  const [propertyForm, setPropertyForm] = useState({
+    address: '',
+    type: '',
+    bedrooms: '',
+    bathrooms: '',
+    rent: '',
+    description: ''
+  });
+  
+  const [noticeForm, setNoticeForm] = useState({
+    tenant: '',
+    subject: '',
+    message: '',
+    urgency: 'normal'
+  });
+  
+  const [inspectionForm, setInspectionForm] = useState({
+    property: '',
+    date: '',
+    time: '',
+    type: 'routine',
+    notes: ''
+  });
 
   useEffect(() => {
     const session = localStorage.getItem('admin_session');
@@ -33,6 +69,52 @@ export default function LandlordDashboard() {
       description: "You have been logged out successfully.",
     });
     setLocation('/admin-login');
+  };
+
+  // Quick Action handlers
+  const handleAddProperty = () => {
+    toast({
+      title: "Property Added",
+      description: `${propertyForm.address} has been added to your portfolio.`,
+    });
+    setPropertyForm({
+      address: '',
+      type: '',
+      bedrooms: '',
+      bathrooms: '',
+      rent: '',
+      description: ''
+    });
+    setShowAddProperty(false);
+  };
+
+  const handleSendNotice = () => {
+    toast({
+      title: "Notice Sent",
+      description: `Notice "${noticeForm.subject}" has been sent to ${noticeForm.tenant}.`,
+    });
+    setNoticeForm({
+      tenant: '',
+      subject: '',
+      message: '',
+      urgency: 'normal'
+    });
+    setShowSendNotice(false);
+  };
+
+  const handleScheduleInspection = () => {
+    toast({
+      title: "Inspection Scheduled",
+      description: `${inspectionForm.type} inspection scheduled for ${inspectionForm.date} at ${inspectionForm.time}.`,
+    });
+    setInspectionForm({
+      property: '',
+      date: '',
+      time: '',
+      type: 'routine',
+      notes: ''
+    });
+    setShowScheduleInspection(false);
   };
 
   const verificationRequests = [
@@ -218,22 +300,306 @@ export default function LandlordDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <Building className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Add Property</span>
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <Users className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Manage Tenants</span>
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <Mail className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Send Notice</span>
-                  </Button>
-                  <Button variant="outline" className="h-20 flex flex-col items-center justify-center">
-                    <Calendar className="h-6 w-6 mb-2" />
-                    <span className="text-sm">Schedule Inspection</span>
-                  </Button>
+                  <Dialog open={showAddProperty} onOpenChange={setShowAddProperty}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200">
+                        <Building className="h-6 w-6 mb-2" />
+                        <span className="text-sm">Add Property</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>Add New Property</DialogTitle>
+                        <DialogDescription>
+                          Add a new property to your portfolio
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="address" className="text-right">
+                            Address
+                          </Label>
+                          <Input
+                            id="address"
+                            value={propertyForm.address}
+                            onChange={(e) => setPropertyForm({...propertyForm, address: e.target.value})}
+                            className="col-span-3"
+                            placeholder="123 Main Street, London"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="type" className="text-right">
+                            Type
+                          </Label>
+                          <Select value={propertyForm.type} onValueChange={(value) => setPropertyForm({...propertyForm, type: value})}>
+                            <SelectTrigger className="col-span-3">
+                              <SelectValue placeholder="Select property type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="apartment">Apartment</SelectItem>
+                              <SelectItem value="house">House</SelectItem>
+                              <SelectItem value="studio">Studio</SelectItem>
+                              <SelectItem value="townhouse">Townhouse</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="bedrooms" className="text-right">
+                            Bedrooms
+                          </Label>
+                          <Input
+                            id="bedrooms"
+                            type="number"
+                            value={propertyForm.bedrooms}
+                            onChange={(e) => setPropertyForm({...propertyForm, bedrooms: e.target.value})}
+                            className="col-span-3"
+                            placeholder="2"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="rent" className="text-right">
+                            Rent (£/month)
+                          </Label>
+                          <Input
+                            id="rent"
+                            type="number"
+                            value={propertyForm.rent}
+                            onChange={(e) => setPropertyForm({...propertyForm, rent: e.target.value})}
+                            className="col-span-3"
+                            placeholder="1200"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowAddProperty(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleAddProperty}>Add Property</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={showManageTenants} onOpenChange={setShowManageTenants}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-green-50 hover:border-green-200">
+                        <Users className="h-6 w-6 mb-2" />
+                        <span className="text-sm">Manage Tenants</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[600px]">
+                      <DialogHeader>
+                        <DialogTitle>Tenant Management</DialogTitle>
+                        <DialogDescription>
+                          View and manage your tenants
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <div className="space-y-4">
+                          {verificationRequests.map((tenant) => (
+                            <div key={tenant.id} className="flex items-center justify-between p-4 border rounded-lg">
+                              <div>
+                                <h4 className="font-semibold">{tenant.tenantName}</h4>
+                                <p className="text-sm text-gray-600">{tenant.property}</p>
+                                <p className="text-sm text-gray-500">£{tenant.rentAmount}/month</p>
+                              </div>
+                              <div className="space-x-2">
+                                <Button size="sm" variant="outline">
+                                  Contact
+                                </Button>
+                                <Button size="sm" variant="outline">
+                                  View Details
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={showSendNotice} onOpenChange={setShowSendNotice}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-orange-50 hover:border-orange-200">
+                        <Mail className="h-6 w-6 mb-2" />
+                        <span className="text-sm">Send Notice</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle>Send Notice to Tenant</DialogTitle>
+                        <DialogDescription>
+                          Send an official notice or communication
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="tenant" className="text-right">
+                            Tenant
+                          </Label>
+                          <Select value={noticeForm.tenant} onValueChange={(value) => setNoticeForm({...noticeForm, tenant: value})}>
+                            <SelectTrigger className="col-span-3">
+                              <SelectValue placeholder="Select tenant" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {verificationRequests.map((tenant) => (
+                                <SelectItem key={tenant.id} value={tenant.tenantName}>
+                                  {tenant.tenantName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="subject" className="text-right">
+                            Subject
+                          </Label>
+                          <Input
+                            id="subject"
+                            value={noticeForm.subject}
+                            onChange={(e) => setNoticeForm({...noticeForm, subject: e.target.value})}
+                            className="col-span-3"
+                            placeholder="Rent reminder, Property inspection..."
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="urgency" className="text-right">
+                            Urgency
+                          </Label>
+                          <Select value={noticeForm.urgency} onValueChange={(value) => setNoticeForm({...noticeForm, urgency: value})}>
+                            <SelectTrigger className="col-span-3">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="normal">Normal</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                              <SelectItem value="urgent">Urgent</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-4 items-start gap-4">
+                          <Label htmlFor="message" className="text-right pt-2">
+                            Message
+                          </Label>
+                          <Textarea
+                            id="message"
+                            value={noticeForm.message}
+                            onChange={(e) => setNoticeForm({...noticeForm, message: e.target.value})}
+                            className="col-span-3"
+                            placeholder="Enter your message..."
+                            rows={4}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowSendNotice(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleSendNotice}>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Notice
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={showScheduleInspection} onOpenChange={setShowScheduleInspection}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200">
+                        <Calendar className="h-6 w-6 mb-2" />
+                        <span className="text-sm">Schedule Inspection</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle>Schedule Property Inspection</DialogTitle>
+                        <DialogDescription>
+                          Schedule a routine or move-out inspection
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="property" className="text-right">
+                            Property
+                          </Label>
+                          <Select value={inspectionForm.property} onValueChange={(value) => setInspectionForm({...inspectionForm, property: value})}>
+                            <SelectTrigger className="col-span-3">
+                              <SelectValue placeholder="Select property" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {verificationRequests.map((req) => (
+                                <SelectItem key={req.id} value={req.property}>
+                                  {req.property}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="inspection-type" className="text-right">
+                            Type
+                          </Label>
+                          <Select value={inspectionForm.type} onValueChange={(value) => setInspectionForm({...inspectionForm, type: value})}>
+                            <SelectTrigger className="col-span-3">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="routine">Routine</SelectItem>
+                              <SelectItem value="move-in">Move-in</SelectItem>
+                              <SelectItem value="move-out">Move-out</SelectItem>
+                              <SelectItem value="maintenance">Maintenance</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="date" className="text-right">
+                            Date
+                          </Label>
+                          <Input
+                            id="date"
+                            type="date"
+                            value={inspectionForm.date}
+                            onChange={(e) => setInspectionForm({...inspectionForm, date: e.target.value})}
+                            className="col-span-3"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="time" className="text-right">
+                            Time
+                          </Label>
+                          <Input
+                            id="time"
+                            type="time"
+                            value={inspectionForm.time}
+                            onChange={(e) => setInspectionForm({...inspectionForm, time: e.target.value})}
+                            className="col-span-3"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-start gap-4">
+                          <Label htmlFor="notes" className="text-right pt-2">
+                            Notes
+                          </Label>
+                          <Textarea
+                            id="notes"
+                            value={inspectionForm.notes}
+                            onChange={(e) => setInspectionForm({...inspectionForm, notes: e.target.value})}
+                            className="col-span-3"
+                            placeholder="Any special instructions or focus areas..."
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowScheduleInspection(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleScheduleInspection}>
+                          <Calendar className="h-4 w-4 mr-2" />
+                          Schedule Inspection
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardContent>
             </Card>
