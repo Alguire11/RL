@@ -11,8 +11,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { FileText, Download, Calendar, Award, DollarSign, CheckCircle } from "lucide-react";
+import { FileText, Download, Calendar, Award, DollarSign, CheckCircle, ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 interface GeneratedReport {
   reportId: string;
@@ -24,6 +25,7 @@ interface GeneratedReport {
 export default function ReportGenerator() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
+  const [, setLocation] = useLocation();
   const [reportType, setReportType] = useState("credit");
   const [includePortfolio, setIncludePortfolio] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<GeneratedReport | null>(null);
@@ -50,7 +52,7 @@ export default function ReportGenerator() {
         includePortfolio,
       });
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setGeneratedReport(data);
       toast({
         title: "Report Generated",
@@ -126,6 +128,17 @@ export default function ReportGenerator() {
       <Navigation />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
+          <div className="flex items-center mb-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setLocation('/dashboard')}
+              className="mr-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Generate Report</h1>
           <p className="text-gray-600">
             Generate comprehensive reports of your payment history and rental achievements to share with landlords, lenders, or agencies.
@@ -187,7 +200,7 @@ export default function ReportGenerator() {
                   <Checkbox
                     id="portfolio"
                     checked={includePortfolio}
-                    onCheckedChange={setIncludePortfolio}
+                    onCheckedChange={(checked) => setIncludePortfolio(checked === true)}
                   />
                   <div className="flex-1">
                     <Label htmlFor="portfolio" className="font-medium cursor-pointer">
@@ -253,7 +266,7 @@ export default function ReportGenerator() {
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-500">Generated</Label>
-                    <p className="text-sm">{formatDate(generatedReport.report.generatedAt)}</p>
+                    <p className="text-sm">{generatedReport.report?.generatedAt ? formatDate(generatedReport.report.generatedAt) : 'N/A'}</p>
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-500">Type</Label>
@@ -275,21 +288,21 @@ export default function ReportGenerator() {
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <DollarSign className="w-6 h-6 mx-auto mb-2 text-blue-600" />
                       <div className="text-2xl font-bold text-blue-900">
-                        {generatedReport.report.paymentSummary.totalPayments}
+                        {generatedReport.report?.paymentSummary?.totalPayments || 0}
                       </div>
                       <p className="text-sm text-blue-700">Total Payments</p>
                     </div>
                     <div className="p-3 bg-green-50 rounded-lg">
                       <CheckCircle className="w-6 h-6 mx-auto mb-2 text-green-600" />
                       <div className="text-2xl font-bold text-green-900">
-                        {generatedReport.report.paymentSummary.onTimePayments}
+                        {generatedReport.report?.paymentSummary?.onTimePayments || 0}
                       </div>
                       <p className="text-sm text-green-700">On-Time Payments</p>
                     </div>
                     <div className="p-3 bg-purple-50 rounded-lg">
                       <Award className="w-6 h-6 mx-auto mb-2 text-purple-600" />
                       <div className="text-2xl font-bold text-purple-900">
-                        {generatedReport.report.badges?.length || 0}
+                        {generatedReport.report?.badges?.length || 0}
                       </div>
                       <p className="text-sm text-purple-700">Achievement Badges</p>
                     </div>

@@ -4,10 +4,14 @@ import { CertificationPortfolio } from "@/components/certification-portfolio";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
+import { useLocation } from "wouter";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 
 export default function Portfolio() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -43,7 +47,18 @@ export default function Portfolio() {
     <div className="min-h-screen bg-gray-50">
       <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <CertificationPortfolio userId={user?.id || ''} />
+        <div className="mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setLocation('/dashboard')}
+            className="mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </div>
+        <CertificationPortfolio userId={(user as any)?.id || ''} />
       </div>
     </div>
   );

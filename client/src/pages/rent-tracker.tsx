@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,12 +19,14 @@ import {
   PoundSterling, 
   Bell,
   Plus,
-  Filter
+  Filter,
+  ArrowLeft
 } from "lucide-react";
 import { format, addDays, isAfter, isBefore } from "date-fns";
 
 export default function RentTracker() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const { hasFeature, plan, isFreePlan } = useSubscription();
 
@@ -130,6 +133,17 @@ export default function RentTracker() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
+          <div className="flex items-center mb-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setLocation('/dashboard')}
+              className="mr-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Rent Tracker</h1>
           <p className="text-gray-600">Monitor your rent payments and build your credit history</p>
         </div>

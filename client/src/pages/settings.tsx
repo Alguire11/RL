@@ -13,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { CheckCircle, Plus, Trash2, Building, CreditCard, User, Bell, Shield, Download, Send } from "lucide-react";
+import { CheckCircle, Plus, Trash2, Building, CreditCard, User, Bell, Shield, Download, Send, ArrowLeft } from "lucide-react";
+import { useLocation } from "wouter";
 import { NotificationCenter } from "@/components/notification-system";
 import { UserPreferences } from "@/components/settings/preferences";
 import { DataExport } from "@/components/settings/data-export";
@@ -22,6 +23,7 @@ import { SecurityLogs } from "@/components/settings/security-logs";
 export default function Settings() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   const [profileData, setProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -227,6 +229,17 @@ export default function Settings() {
       <Navigation />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
+          <div className="flex items-center mb-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setLocation('/dashboard')}
+              className="mr-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
           <p className="text-gray-600">Manage your account and preferences</p>
         </div>
