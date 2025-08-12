@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield } from "lucide-react";
+import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -90,6 +90,37 @@ export function Navigation() {
                 </Link>
               );
             })}
+            
+            {/* Company Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-1 text-gray-600 hover:text-primary">
+                  <Building className="w-4 h-4" />
+                  <span>Company</span>
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/about" className="flex items-center">
+                    <Users className="mr-2 h-4 w-4" />
+                    About Us
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/privacy" className="flex items-center">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Privacy Policy
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/terms" className="flex items-center">
+                    <Scale className="mr-2 h-4 w-4" />
+                    Terms of Service
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* User Menu */}

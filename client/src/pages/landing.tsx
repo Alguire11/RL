@@ -464,9 +464,9 @@ export default function Landing() {
             <div>
               <h3 className="text-xl font-semibold mb-4">Company</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-gray-400 hover:text-white">About</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white">Privacy</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white">Terms</a></li>
+                <li><Link href="/about" className="text-gray-400 hover:text-white">About</Link></li>
+                <li><Link href="/privacy" className="text-gray-400 hover:text-white">Privacy</Link></li>
+                <li><Link href="/terms" className="text-gray-400 hover:text-white">Terms</Link></li>
               </ul>
             </div>
             <div>
@@ -497,9 +497,9 @@ export default function Landing() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400">&copy; 2024 Enoíkio. All rights reserved.</p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</a>
-              <a href="/terms" className="text-gray-400 hover:text-white">Terms of Service</a>
-              <a href="/admin-login" className="text-gray-400 hover:text-white">Admin Access</a>
+              <Link href="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link>
+              <Link href="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link>
+              <Link href="/admin-login" className="text-gray-400 hover:text-white">Admin Access</Link>
             </div>
           </div>
         </div>
