@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/logo";
 import { GradientButton } from "@/components/ui/gradient-button";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { CheckCircle, BarChart3, Share2, Menu, X, Star, Shield, Clock, Users, Award, TrendingUp, Check, FileText, CreditCard, Building, MapPin, Calendar } from "lucide-react";
 
 export default function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [, setLocation] = useLocation();
 
   const handleGetStarted = () => {
     window.location.href = "/auth";
@@ -264,7 +265,11 @@ export default function Landing() {
                     <span>Email support</span>
                   </li>
                 </ul>
-                <Button variant="outline" className="w-full mt-6">
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-6"
+                  onClick={() => setLocation('/auth')}
+                >
                   Get Started
                 </Button>
               </CardContent>
@@ -300,7 +305,10 @@ export default function Landing() {
                     <span>Landlord verification</span>
                   </li>
                 </ul>
-                <GradientButton className="w-full mt-6">
+                <GradientButton 
+                  className="w-full mt-6"
+                  onClick={() => setLocation('/auth')}
+                >
                   Start Free Trial
                 </GradientButton>
               </CardContent>
@@ -331,7 +339,11 @@ export default function Landing() {
                     <span>Custom integrations</span>
                   </li>
                 </ul>
-                <Button variant="outline" className="w-full mt-6">
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-6"
+                  onClick={() => setLocation('/contact')}
+                >
                   Contact Sales
                 </Button>
               </CardContent>
