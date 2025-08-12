@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { X, Send, MessageCircle, User, Bot, Minimize2 } from "lucide-react";
+import { X, Send, MessageCircle, User, Bot, Minimize2, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 interface Message {
@@ -24,7 +24,7 @@ export function LiveChat({ isOpen, onClose, onMinimize }: LiveChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! Welcome to Enoíkio support. How can I help you today?',
+      text: 'Hello! Welcome to Enoíkio support. I can help with general questions about our service. For complex technical issues, billing, or account-specific problems, please email support@enoikio.co.uk. How can I assist you today?',
       sender: 'support',
       timestamp: new Date()
     }
@@ -55,21 +55,39 @@ export function LiveChat({ isOpen, onClose, onMinimize }: LiveChatProps) {
     setInputText('');
     setIsTyping(true);
 
-    // Simulate support response
+    // Simulate support response with escalation logic
     setTimeout(() => {
-      const supportResponses = [
-        "Thank you for reaching out! I'm looking into your question now.",
-        "I understand your concern. Let me help you with that.",
-        "That's a great question! Here's what I can tell you about that...",
-        "I'd be happy to assist you with this. Can you provide a bit more detail?",
-        "Let me check on that for you. This might take just a moment.",
+      const userQuery = inputText.toLowerCase();
+      let supportResponse = "";
+      
+      // Check for complex queries that should be escalated
+      const complexQueries = [
+        'billing', 'payment', 'charge', 'subscription', 'cancel', 'refund',
+        'technical', 'bug', 'error', 'not working', 'broken', 'issue',
+        'account', 'delete', 'privacy', 'gdpr', 'data', 'security',
+        'credit report', 'landlord verification', 'bank connection'
       ];
+      
+      const isComplexQuery = complexQueries.some(keyword => userQuery.includes(keyword));
+      
+      if (isComplexQuery) {
+        supportResponse = `I understand you need help with this important matter. For complex technical issues, billing inquiries, account problems, or detailed credit reporting questions, I recommend emailing our customer service team at support@enoikio.co.uk. They have access to your account details and can provide specialized assistance. They typically respond within 24 hours.
 
-      const randomResponse = supportResponses[Math.floor(Math.random() * supportResponses.length)];
+Would you like me to help you with anything else I can assist with right now?`;
+      } else {
+        const generalResponses = [
+          "Thank you for reaching out! I'm here to help with general questions about Enoíkio.",
+          "I'd be happy to help you with basic questions about our service.",
+          "I can assist with general information about Enoíkio. What would you like to know?",
+          "Thanks for contacting us! I can help with basic questions about rent tracking and credit building.",
+          "I'm here to help with general inquiries. For account-specific or technical issues, you may need to email support@enoikio.co.uk.",
+        ];
+        supportResponse = generalResponses[Math.floor(Math.random() * generalResponses.length)];
+      }
       
       const supportMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: randomResponse,
+        text: supportResponse,
         sender: 'support',
         timestamp: new Date()
       };
@@ -177,21 +195,34 @@ export function LiveChat({ isOpen, onClose, onMinimize }: LiveChatProps) {
 
       {/* Input */}
       <div className="p-4 border-t">
-        <div className="flex space-x-2">
-          <Input
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message..."
-            className="flex-1"
-          />
-          <Button onClick={sendMessage} size="sm" className="bg-blue-600 hover:bg-blue-700">
-            <Send className="w-4 h-4" />
-          </Button>
+        <div className="flex flex-col space-y-2">
+          <div className="flex space-x-2">
+            <Input
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Type your message..."
+              className="flex-1"
+            />
+            <Button onClick={sendMessage} size="sm" className="bg-blue-600 hover:bg-blue-700">
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+          <div className="flex justify-between items-center">
+            <p className="text-xs text-gray-500">
+              Connected as {(user as any)?.firstName || (user as any)?.email || 'Guest'}
+            </p>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => window.location.href = 'mailto:support@enoikio.co.uk'}
+              className="text-xs bg-gray-50 hover:bg-gray-100 border-gray-200"
+            >
+              <Mail className="w-3 h-3 mr-1" />
+              Email Support
+            </Button>
+          </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          Connected as {(user as any)?.firstName || (user as any)?.email || 'Guest'}
-        </p>
       </div>
     </div>
   );

@@ -46,6 +46,9 @@ The application now includes a comprehensive admin access system with role-based
 ✓ Implemented fully functional Quick Actions in landlord dashboard
 ✓ Created working dialogs for Add Property, Manage Tenants, Send Notice, and Schedule Inspection
 ✓ Enhanced landlord dashboard with comprehensive property and tenant management features
+✓ Comprehensive Help Center with detailed FAQs covering Getting Started, Credit Building, and Account & Billing sections
+✓ Enhanced live chat system with smart escalation to customer service email (support@enoikio.co.uk) for complex queries
+✓ Added searchable knowledge base with categorized content and improved user experience
 
 ## System Architecture
 
