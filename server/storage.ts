@@ -37,7 +37,7 @@ import {
   type InsertDataExportRequest,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, or, isNull, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -568,6 +568,10 @@ export class DatabaseStorage implements IStorage {
     activeUsers: number;
     totalPayments: number;
     totalReports: number;
+    freeUsers: number;
+    standardUsers: number;
+    premiumUsers: number;
+    monthlyRevenue: number;
     recentUsers: User[];
     recentPayments: RentPayment[];
   }> {
@@ -588,6 +592,25 @@ export class DatabaseStorage implements IStorage {
       .select({ count: sql<number>`count(*)` })
       .from(creditReports);
 
+    const [freeUserStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(or(eq(users.subscriptionPlan, 'free'), isNull(users.subscriptionPlan)));
+
+    const [standardUserStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(eq(users.subscriptionPlan, 'standard'));
+
+    const [premiumUserStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(eq(users.subscriptionPlan, 'premium'));
+
+    const standardUsers = standardUserStats?.count || 0;
+    const premiumUsers = premiumUserStats?.count || 0;
+    const monthlyRevenue = (standardUsers * 9.99) + (premiumUsers * 19.99);
+
     const recentUsers = await db
       .select()
       .from(users)
@@ -605,9 +628,21 @@ export class DatabaseStorage implements IStorage {
       activeUsers: activeUserStats?.count || 0,
       totalPayments: paymentStats?.count || 0,
       totalReports: reportStats?.count || 0,
+      freeUsers: freeUserStats?.count || 0,
+      standardUsers,
+      premiumUsers,
+      monthlyRevenue,
       recentUsers,
       recentPayments,
     };
+  }
+
+  // Get all users (admin only)
+  async getAllUsers(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt));
   }
 }
 

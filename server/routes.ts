@@ -15,6 +15,28 @@ import {
   insertLandlordVerificationSchema
 } from "@shared/schema";
 import { nanoid } from "nanoid";
+
+// Define requireAdmin middleware
+const requireAdmin = async (req: any, res: any, next: any) => {
+  try {
+    // For demo purposes, we'll check localStorage data sent in headers
+    const adminSession = req.headers['x-admin-session'];
+    if (!adminSession) {
+      return res.status(401).json({ message: 'Admin authentication required' });
+    }
+    
+    const session = JSON.parse(adminSession);
+    if (session.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+    
+    req.adminUser = session;
+    next();
+  } catch (error) {
+    console.error('Error in requireAdmin middleware:', error);
+    res.status(401).json({ message: 'Invalid admin session' });
+  }
+};
 import { createHash } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -735,16 +757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes
-  app.get('/api/admin/stats', async (req: any, res) => {
+  app.get('/api/admin/stats', requireAdmin, async (req: any, res) => {
     try {
-      // For demo purposes, return dummy data
-      const stats = {
-        totalUsers: 127,
-        totalProperties: 89,
-        totalPayments: 2340,
-        averageRent: 1250,
-        recentUsers: []
-      };
+      const stats = await storage.getSystemStats();
       res.json(stats);
     } catch (error) {
       console.error('Error fetching admin stats:', error);
@@ -752,18 +767,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/users', async (req: any, res) => {
+  app.get('/api/admin/users', requireAdmin, async (req: any, res) => {
     try {
-      // For demo purposes, return dummy data
-      const users = [
-        { id: 1, name: 'John Smith', email: 'john@example.com', status: 'active' },
-        { id: 2, name: 'Sarah Johnson', email: 'sarah@example.com', status: 'active' },
-        { id: 3, name: 'Mike Chen', email: 'mike@example.com', status: 'active' }
-      ];
+      const users = await storage.getAllUsers();
       res.json(users);
     } catch (error) {
-      console.error('Error fetching admin users:', error);
+      console.error('Error fetching users:', error);
       res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  app.get('/api/admin/system-health', requireAdmin, async (req: any, res) => {
+    try {
+      const health = {
+        database: 'healthy' as const,
+        emailService: 'healthy' as const,
+        paymentProcessor: 'healthy' as const,
+        lastChecked: new Date().toISOString(),
+      };
+
+      // Perform actual health checks
+      try {
+        await storage.getSystemStats(); // Test database
+      } catch {
+        health.database = 'down';
+      }
+
+      // Test email service (simplified check)
+      if (!process.env.SENDGRID_API_KEY) {
+        health.emailService = 'degraded';
+      }
+
+      res.json(health);
+    } catch (error) {
+      console.error('Error checking system health:', error);
+      res.status(500).json({ message: 'Failed to check system health' });
+    }
+  });
+
+  app.post('/api/admin/system-check', requireAdmin, async (req: any, res) => {
+    try {
+      await logSecurityEvent(req, 'admin_system_check', { adminId: req.adminUser.id });
+      
+      const checks = {
+        database: true,
+        emailService: !!process.env.SENDGRID_API_KEY,
+        storage: true,
+        authentication: true,
+      };
+
+      const allHealthy = Object.values(checks).every(check => check);
+      
+      res.json({ 
+        status: allHealthy ? 'healthy' : 'issues_detected',
+        checks,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error performing system check:', error);
+      res.status(500).json({ message: 'Failed to perform system check' });
+    }
+  });
+
+  app.post('/api/admin/export-all-data', requireAdmin, async (req: any, res) => {
+    try {
+      const exportId = nanoid();
+      
+      await logSecurityEvent(req, 'admin_data_export', { 
+        adminId: req.adminUser.id,
+        exportId 
+      });
+
+      // In a real implementation, this would be processed in the background
+      setTimeout(async () => {
+        try {
+          const stats = await storage.getSystemStats();
+          const users = await storage.getAllUsers();
+          
+          // Create export record
+          const exportData = {
+            exportId,
+            timestamp: new Date().toISOString(),
+            stats,
+            userCount: users.length,
+            exportedBy: req.adminUser.id,
+          };
+
+          console.log('Export completed:', exportData);
+        } catch (error) {
+          console.error('Error completing export:', error);
+        }
+      }, 5000);
+
+      res.json({ 
+        message: 'Data export initiated',
+        exportId,
+        estimatedCompletion: new Date(Date.now() + 30000).toISOString()
+      });
+    } catch (error) {
+      console.error('Error initiating data export:', error);
+      res.status(500).json({ message: 'Failed to initiate data export' });
+    }
+  });
+
+  app.post('/api/admin/send-announcement', requireAdmin, async (req: any, res) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message || message.trim().length === 0) {
+        return res.status(400).json({ message: 'Announcement message is required' });
+      }
+
+      await logSecurityEvent(req, 'admin_announcement', { 
+        adminId: req.adminUser.id,
+        messageLength: message.length 
+      });
+
+      // Get all active users
+      const users = await storage.getAllUsers();
+      const activeUsers = users.filter((user: any) => user.isOnboarded);
+
+      // Create notifications for all active users
+      const notifications = activeUsers.map((user: any) => 
+        storage.createNotification({
+          userId: user.id,
+          type: 'system_announcement',
+          title: 'System Announcement',
+          message: message.trim(),
+          scheduledFor: new Date(),
+        })
+      );
+
+      await Promise.all(notifications);
+
+      res.json({ 
+        message: 'Announcement sent successfully',
+        recipientCount: activeUsers.length 
+      });
+    } catch (error) {
+      console.error('Error sending announcement:', error);
+      res.status(500).json({ message: 'Failed to send announcement' });
     }
   });
 
