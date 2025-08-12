@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/navigation";
+import { PublicNavigation } from "@/components/public-navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import { 
@@ -19,7 +20,7 @@ import {
 import { LiveChat, ChatToggle } from "@/components/live-chat";
 
 export default function Support() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isChatMinimized, setIsChatMinimized] = useState(false);
@@ -114,7 +115,7 @@ export default function Support() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
+      {!isLoading && (isAuthenticated ? <Navigation /> : <PublicNavigation />)}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="text-center mb-12">

@@ -1,12 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PublicNavigation } from "@/components/public-navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { Navigation } from "@/components/navigation";
 import { Users, Target, Award, Heart } from "lucide-react";
 
 export default function About() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <Navigation />
+      {!isLoading && (isAuthenticated ? <Navigation /> : <PublicNavigation />)}
       
       <div className="container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto">

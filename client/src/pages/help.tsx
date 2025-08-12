@@ -3,13 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Navigation } from "@/components/navigation";
+import { PublicNavigation } from "@/components/public-navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { Search, MessageCircle, Book, Phone, Mail, ChevronRight, HelpCircle, ArrowLeft } from "lucide-react";
 import { LiveChat, ChatToggle } from "@/components/live-chat";
 
 export default function HelpCenter() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredFaqs, setFilteredFaqs] = useState<typeof faqs>([]);
@@ -137,7 +138,7 @@ export default function HelpCenter() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
+      {!isLoading && (isAuthenticated ? <Navigation /> : <PublicNavigation />)}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <Button

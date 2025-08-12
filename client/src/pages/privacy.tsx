@@ -1,8 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PublicNavigation } from "@/components/public-navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { Navigation } from "@/components/navigation";
 import { Shield, Eye, Lock, Database, Users, Globe } from "lucide-react";
 
 export default function Privacy() {
+  const { isAuthenticated, isLoading } = useAuth();
   const sections = [
     {
       id: "information-collection",
@@ -93,7 +96,7 @@ export default function Privacy() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
+      {!isLoading && (isAuthenticated ? <Navigation /> : <PublicNavigation />)}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="text-center mb-12">

@@ -2,12 +2,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "@/components/navigation";
+import { PublicNavigation } from "@/components/public-navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { CheckCircle, AlertCircle, Clock, Server, Database, Shield, Zap, ArrowLeft } from "lucide-react";
 
 export default function Status() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const services = [
     {
@@ -105,7 +106,7 @@ export default function Status() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navigation />
+      {!isLoading && (isAuthenticated ? <Navigation /> : <PublicNavigation />)}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <Button
