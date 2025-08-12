@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { lazy, Suspense } from "react";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
@@ -27,6 +28,13 @@ import LandlordVerify from "@/pages/landlord-verify";
 import OnboardingPage from "@/pages/onboarding";
 import RentTracker from "@/pages/rent-tracker";
 import ReportGenerator from "@/pages/report-generator";
+
+// Lazy load admin pages
+const AdminUsers = lazy(() => import("@/pages/admin-users"));
+const AdminSettings = lazy(() => import("@/pages/admin-settings"));
+const AdminSubscriptions = lazy(() => import("@/pages/admin-subscriptions"));
+const AdminRevenue = lazy(() => import("@/pages/admin-revenue"));
+const AdminModeration = lazy(() => import("@/pages/admin-moderation"));
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -64,11 +72,31 @@ function Router() {
       
       {/* Admin and special routes */}
       <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/users" component={() => import("./pages/admin-users").then(m => m.default)} />
-      <Route path="/admin/settings" component={() => import("./pages/admin-settings").then(m => m.default)} />
-      <Route path="/admin/subscriptions" component={() => import("./pages/admin-subscriptions").then(m => m.default)} />
-      <Route path="/admin/revenue" component={() => import("./pages/admin-revenue").then(m => m.default)} />
-      <Route path="/admin/moderation" component={() => import("./pages/admin-moderation").then(m => m.default)} />
+      <Route path="/admin/users" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminUsers />
+        </Suspense>
+      )} />
+      <Route path="/admin/settings" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminSettings />
+        </Suspense>
+      )} />
+      <Route path="/admin/subscriptions" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminSubscriptions />
+        </Suspense>
+      )} />
+      <Route path="/admin/revenue" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminRevenue />
+        </Suspense>
+      )} />
+      <Route path="/admin/moderation" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminModeration />
+        </Suspense>
+      )} />
       <Route path="/landlord-dashboard" component={LandlordDashboard} />
       
       {!isAuthenticated ? (
