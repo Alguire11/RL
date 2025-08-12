@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +32,13 @@ export default function RentTracker() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: '',
+    dueDate: '',
+    propertyId: '',
+    description: ''
+  });
   const { hasFeature, plan, isFreePlan } = useSubscription();
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
@@ -77,6 +88,8 @@ export default function RentTracker() {
         title: "Payment Added",
         description: "New payment record has been created.",
       });
+      setShowAddPayment(false);
+      setPaymentForm({ amount: '', dueDate: '', propertyId: '', description: '' });
     },
   });
 
@@ -220,10 +233,89 @@ export default function RentTracker() {
             ))}
           </div>
           
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Payment
-          </Button>
+          <Dialog open={showAddPayment} onOpenChange={setShowAddPayment}>
+            <DialogTrigger asChild>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Payment
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Payment</DialogTitle>
+                <DialogDescription>
+                  Add a rent payment record to track your payment history.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="amount">Amount (£)</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="1200"
+                    value={paymentForm.amount}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Input
+                    id="dueDate"
+                    type="date"
+                    value={paymentForm.dueDate}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, dueDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="property">Property</Label>
+                  <Select value={paymentForm.propertyId} onValueChange={(value) => setPaymentForm({ ...paymentForm, propertyId: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select property" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {properties.map((property: any) => (
+                        <SelectItem key={property.id} value={property.id.toString()}>
+                          {property.address}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="new">Add new property</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="description">Description (optional)</Label>
+                  <Input
+                    id="description"
+                    placeholder="Monthly rent payment"
+                    value={paymentForm.description}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <Button variant="outline" onClick={() => setShowAddPayment(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      const propertyId = paymentForm.propertyId === 'new' ? null : parseInt(paymentForm.propertyId);
+                      addPaymentMutation.mutate({
+                        amount: parseFloat(paymentForm.amount),
+                        dueDate: paymentForm.dueDate,
+                        propertyId,
+                        description: paymentForm.description || 'Rent payment',
+                        status: 'due'
+                      });
+                    }}
+                    disabled={!paymentForm.amount || !paymentForm.dueDate || addPaymentMutation.isPending}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {addPaymentMutation.isPending ? 'Adding...' : 'Add Payment'}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Payment History */}

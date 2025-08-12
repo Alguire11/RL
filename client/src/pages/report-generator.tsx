@@ -108,6 +108,13 @@ export default function ReportGenerator() {
     });
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP'
+    }).format(amount);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -218,7 +225,7 @@ export default function ReportGenerator() {
                 <Button
                   onClick={() => generateReportMutation.mutate()}
                   disabled={generateReportMutation.isPending}
-                  className="w-full h-12"
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
                   size="lg"
                 >
                   {generateReportMutation.isPending ? (
