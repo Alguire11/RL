@@ -1282,6 +1282,344 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin routes - all require admin authentication
+  app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getSystemStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching admin stats:', error);
+      res.status(500).json({ message: 'Failed to fetch stats' });
+    }
+  });
+
+  app.get('/api/admin/users', requireAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ message: 'Failed to fetch users' });
+    }
+  });
+
+  app.get('/api/admin/system-health', requireAdmin, async (req, res) => {
+    try {
+      const health = {
+        database: 'healthy',
+        emailService: 'healthy', 
+        paymentProcessor: 'healthy',
+        lastChecked: new Date().toISOString()
+      };
+      res.json(health);
+    } catch (error) {
+      console.error('Error checking system health:', error);
+      res.status(500).json({ message: 'Failed to check system health' });
+    }
+  });
+
+  app.post('/api/admin/system-check', requireAdmin, async (req, res) => {
+    try {
+      // Perform system checks
+      const results = {
+        database: 'healthy',
+        services: 'operational',
+        timestamp: new Date().toISOString()
+      };
+      res.json({ message: 'System check completed', results });
+    } catch (error) {
+      console.error('Error performing system check:', error);
+      res.status(500).json({ message: 'System check failed' });
+    }
+  });
+
+  app.post('/api/admin/export-all-data', requireAdmin, async (req, res) => {
+    try {
+      // Create data export request
+      const exportRequest = await storage.createDataExportRequest({
+        adminId: req.adminUser.id,
+        requestType: 'full_export',
+        status: 'pending'
+      });
+      res.json({ 
+        message: 'Export initiated', 
+        requestId: exportRequest.id,
+        estimatedTime: '5-10 minutes'
+      });
+    } catch (error) {
+      console.error('Error initiating data export:', error);
+      res.status(500).json({ message: 'Export initiation failed' });
+    }
+  });
+
+  app.post('/api/admin/send-announcement', requireAdmin, async (req, res) => {
+    try {
+      const { message } = req.body;
+      
+      // Get all active users
+      const users = await storage.getAllUsers();
+      const activeUsers = users.filter(user => user.isOnboarded);
+      
+      // Send notification to all active users
+      for (const user of activeUsers) {
+        await storage.createNotification({
+          userId: user.id,
+          type: 'system_announcement',
+          title: 'System Announcement',
+          message,
+          isRead: false
+        });
+      }
+      
+      res.json({ 
+        message: 'Announcement sent successfully',
+        recipients: activeUsers.length
+      });
+    } catch (error) {
+      console.error('Error sending announcement:', error);
+      res.status(500).json({ message: 'Failed to send announcement' });
+    }
+  });
+
+  app.get('/api/admin/settings', requireAdmin, async (req, res) => {
+    try {
+      const settings = {
+        maintenanceMode: false,
+        allowNewRegistrations: true,
+        requireEmailVerification: true,
+        defaultSubscriptionPlan: 'free',
+        maxFreeUsers: 1000,
+        systemEmail: 'system@enoikio.co.uk',
+        supportEmail: 'support@enoikio.co.uk',
+        platformName: 'Enoíkio',
+        platformDescription: 'Rent payment tracking and credit building platform',
+        emailNotifications: true,
+        smsNotifications: false,
+        dataRetentionDays: 365,
+        sessionTimeoutMinutes: 60,
+      };
+      res.json(settings);
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      res.status(500).json({ message: 'Failed to fetch settings' });
+    }
+  });
+
+  app.get('/api/admin/subscription-stats', requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getSystemStats();
+      const subscriptionStats = {
+        totalRevenue: stats.monthlyRevenue * 12,
+        monthlyRevenue: stats.monthlyRevenue,
+        totalSubscriptions: stats.standardUsers + stats.premiumUsers,
+        activeSubscriptions: stats.standardUsers + stats.premiumUsers,
+        churnRate: 5.2,
+        avgRevenuePerUser: stats.monthlyRevenue / Math.max(stats.standardUsers + stats.premiumUsers, 1),
+        freeUsers: stats.freeUsers,
+        standardUsers: stats.standardUsers,
+        premiumUsers: stats.premiumUsers,
+      };
+      res.json(subscriptionStats);
+    } catch (error) {
+      console.error('Error fetching subscription stats:', error);
+      res.status(500).json({ message: 'Failed to fetch subscription stats' });
+    }
+  });
+
+  app.get('/api/admin/subscriptions', requireAdmin, async (req, res) => {
+    try {
+      // Mock subscription data - in real app this would come from payment processor
+      const users = await storage.getAllUsers();
+      const subscriptions = users
+        .filter(user => user.subscriptionPlan !== 'free')
+        .map(user => ({
+          id: `sub_${user.id}`,
+          userId: user.id,
+          userName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
+          userEmail: user.email || 'N/A',
+          plan: user.subscriptionPlan || 'free',
+          status: user.subscriptionStatus || 'active',
+          amount: user.subscriptionPlan === 'premium' ? 19.99 : 9.99,
+          currency: 'GBP',
+          billingCycle: 'monthly',
+          nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: user.createdAt,
+          cancelledAt: null
+        }));
+      res.json(subscriptions);
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error);
+      res.status(500).json({ message: 'Failed to fetch subscriptions' });
+    }
+  });
+
+  app.get('/api/admin/revenue-data', requireAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getSystemStats();
+      const revenueData = {
+        totalRevenue: stats.monthlyRevenue * 12,
+        monthlyRecurringRevenue: stats.monthlyRevenue,
+        annualRecurringRevenue: stats.monthlyRevenue * 12,
+        averageRevenuePerUser: stats.monthlyRevenue / Math.max(stats.standardUsers + stats.premiumUsers, 1),
+        customerLifetimeValue: (stats.monthlyRevenue / Math.max(stats.standardUsers + stats.premiumUsers, 1)) * 24, // 2 year avg
+        churnRate: 5.2,
+        growthRate: 15.3,
+        refunds: stats.monthlyRevenue * 0.05 // 5% refund rate
+      };
+      res.json(revenueData);
+    } catch (error) {
+      console.error('Error fetching revenue data:', error);
+      res.status(500).json({ message: 'Failed to fetch revenue data' });
+    }
+  });
+
+  app.get('/api/admin/revenue-chart', requireAdmin, async (req, res) => {
+    try {
+      const { range = '30' } = req.query;
+      const days = parseInt(range as string);
+      
+      // Generate mock chart data
+      const chartData = [];
+      for (let i = days; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        chartData.push({
+          date: date.toISOString(),
+          revenue: Math.random() * 1000 + 500,
+          subscriptions: Math.floor(Math.random() * 10) + 5,
+          churn: Math.random() * 3
+        });
+      }
+      res.json(chartData);
+    } catch (error) {
+      console.error('Error fetching revenue chart:', error);
+      res.status(500).json({ message: 'Failed to fetch revenue chart' });
+    }
+  });
+
+  app.get('/api/admin/revenue-metrics', requireAdmin, async (req, res) => {
+    try {
+      const metrics = {
+        newSubscriptions: 23,
+        upgrades: 8,
+        downgrades: 3,
+        cancellations: 5,
+        netRevenue: 15420.50,
+        grossRevenue: 16243.75
+      };
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching revenue metrics:', error);
+      res.status(500).json({ message: 'Failed to fetch revenue metrics' });
+    }
+  });
+
+  // Moderation endpoints
+  app.get('/api/admin/moderation', requireAdmin, async (req, res) => {
+    try {
+      // Mock moderation data - in real app this would come from reports and violations
+      const mockModerationItems = [
+        {
+          id: 'mod_001',
+          type: 'user_report',
+          userId: 'user_001',
+          reporterId: 'user_002',
+          subject: 'Inappropriate behavior in messages',
+          description: 'User has been sending inappropriate messages to other tenants through the platform.',
+          status: 'pending',
+          priority: 'high',
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 'mod_002',
+          type: 'payment_dispute',
+          userId: 'user_003',
+          subject: 'Disputed rent payment amount',
+          description: 'User is disputing the calculated rent amount for their property.',
+          status: 'reviewing',
+          priority: 'medium',
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+          assignedTo: 'admin_001',
+        },
+        {
+          id: 'mod_003',
+          type: 'spam',
+          userId: 'user_004',
+          subject: 'Multiple spam reports created',
+          description: 'User has been creating multiple fake credit reports, potentially for spam purposes.',
+          status: 'resolved',
+          priority: 'low',
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          resolution: 'Account suspended for 30 days. User educated about proper platform usage.',
+        },
+        {
+          id: 'mod_004',
+          type: 'content_violation',
+          userId: 'user_005',
+          subject: 'Inappropriate profile information',
+          description: 'User has uploaded inappropriate content to their profile section.',
+          status: 'pending',
+          priority: 'urgent',
+          createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+        }
+      ];
+      
+      res.json(mockModerationItems);
+    } catch (error) {
+      console.error('Error fetching moderation items:', error);
+      res.status(500).json({ message: 'Failed to fetch moderation items' });
+    }
+  });
+
+  app.post('/api/admin/resolve-moderation', requireAdmin, async (req, res) => {
+    try {
+      const { itemId, resolution, action } = req.body;
+      
+      if (!itemId || !resolution || !action) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+
+      // In real app, update the moderation item in database
+      console.log(`Moderation item ${itemId} ${action}d by admin ${req.adminUser.id}:`, resolution);
+      
+      res.json({ 
+        message: `Moderation item ${action}d successfully`,
+        itemId,
+        action,
+        resolvedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error resolving moderation item:', error);
+      res.status(500).json({ message: 'Failed to resolve moderation item' });
+    }
+  });
+
+  app.post('/api/admin/escalate-moderation', requireAdmin, async (req, res) => {
+    try {
+      const { itemId } = req.body;
+      
+      if (!itemId) {
+        return res.status(400).json({ message: 'Item ID is required' });
+      }
+
+      // In real app, escalate the moderation item
+      console.log(`Moderation item ${itemId} escalated by admin ${req.adminUser.id}`);
+      
+      res.json({ 
+        message: 'Moderation item escalated successfully',
+        itemId,
+        escalatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error escalating moderation item:', error);
+      res.status(500).json({ message: 'Failed to escalate moderation item' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

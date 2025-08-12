@@ -64,6 +64,11 @@ function Router() {
       
       {/* Admin and special routes */}
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/users" component={() => import("./pages/admin-users").then(m => m.default)} />
+      <Route path="/admin/settings" component={() => import("./pages/admin-settings").then(m => m.default)} />
+      <Route path="/admin/subscriptions" component={() => import("./pages/admin-subscriptions").then(m => m.default)} />
+      <Route path="/admin/revenue" component={() => import("./pages/admin-revenue").then(m => m.default)} />
+      <Route path="/admin/moderation" component={() => import("./pages/admin-moderation").then(m => m.default)} />
       <Route path="/landlord-dashboard" component={LandlordDashboard} />
       
       {!isAuthenticated ? (
