@@ -1,0 +1,63 @@
+Enoíkio Feature Expansion & User Stories
+
+This document outlines the expanded feature set and related user stories for the Enoíkio app, a UK-based rent reporting platform designed to help tenants build credit by tracking and verifying on-time rent payments.
+
+1. Core Features
+
+• Secure bank account connection via Open Banking APIs.
+
+• Manual rent payment logging for unlinked accounts.
+
+• Automated rent streak tracking with visual indicators.
+
+• Downloadable PDF rent history report.
+
+• Shareable rent verification link or email.
+
+• Landlord verification via email link.
+
+• In-app rent reminders and push notifications.
+
+• Basic profile management with data export/delete.
+
+2. User Stories
+
+Tenant User Stories
+
+• As a tenant, I want to connect my bank securely so that my rent payments are tracked automatically.
+
+• As a tenant, I want to manually log rent payments so I can still build my credit without bank integration.
+
+• As a tenant, I want to see my rent payment streak so I can stay motivated to pay on time.
+
+• As a tenant, I want to download a PDF report of my rent history so I can share it with landlords and lenders.
+
+• As a tenant, I want to share my rent report via email or link so it’s easy for others to view.
+
+• As a tenant, I want to request my landlord to verify my rent history so it carries more credibility.
+
+Landlord User Stories
+
+• As a landlord, I want to receive a secure email link to verify a tenant’s rent record so I can confirm accuracy quickly.
+
+• As a landlord, I want to see a simple interface showing rent dates and amounts so I can confirm without confusion.
+
+Admin User Stories
+
+• As an admin, I want to manage user accounts so I can resolve issues quickly.
+
+• As an admin, I want to view and export analytics on rent payment data so I can monitor usage trends.
+
+• As an admin, I want to moderate landlord verifications so I can prevent abuse.
+
+• As an admin, I want to send service updates and notifications so I can communicate important information to users.
+
+3. Future Feature Ideas
+
+• Integration with UK credit reference agencies for direct credit score updates.
+
+• Gamification with badges for consistent on-time rent payments.
+
+• Integration with utility payment tracking to expand credit-building scope.
+
+• AI-powered late payment prediction based on historical spending patterns.

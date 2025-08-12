@@ -13,6 +13,10 @@ import {
   dataExportRequests,
   userBadges,
   certificationPortfolios,
+  achievementBadges,
+  manualPayments,
+  paymentStreaks,
+  enhancedReportShares,
   type User,
   type UpsertUser,
   type Property,
@@ -41,6 +45,14 @@ import {
   type InsertUserBadge,
   type CertificationPortfolio,
   type InsertCertificationPortfolio,
+  type AchievementBadge,
+  type InsertAchievementBadge,
+  type ManualPayment,
+  type InsertManualPayment,
+  type PaymentStreak,
+  type InsertPaymentStreak,
+  type EnhancedReportShare,
+  type InsertEnhancedReportShare,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, or, isNull, gte, lte } from "drizzle-orm";
@@ -723,6 +735,205 @@ export class DatabaseStorage implements IStorage {
       .from(rentPayments)
       .where(eq(rentPayments.userId, userId))
       .orderBy(desc(rentPayments.dueDate));
+  }
+  // Manual payment operations
+  async createManualPayment(payment: InsertManualPayment): Promise<ManualPayment> {
+    const [newPayment] = await db
+      .insert(manualPayments)
+      .values(payment)
+      .returning();
+    return newPayment;
+  }
+
+  async getUserManualPayments(userId: string): Promise<ManualPayment[]> {
+    return await db
+      .select()
+      .from(manualPayments)
+      .where(eq(manualPayments.userId, userId))
+      .orderBy(desc(manualPayments.paymentDate));
+  }
+
+  async updateManualPayment(id: number, updates: Partial<InsertManualPayment>): Promise<ManualPayment> {
+    const [updatedPayment] = await db
+      .update(manualPayments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(manualPayments.id, id))
+      .returning();
+    return updatedPayment;
+  }
+
+  async deleteManualPayment(id: number): Promise<void> {
+    await db.delete(manualPayments).where(eq(manualPayments.id, id));
+  }
+
+  // Achievement badge operations
+  async createAchievementBadge(badge: InsertAchievementBadge): Promise<AchievementBadge> {
+    const [newBadge] = await db
+      .insert(achievementBadges)
+      .values(badge)
+      .returning();
+    return newBadge;
+  }
+
+  async getUserAchievementBadges(userId: string): Promise<AchievementBadge[]> {
+    return await db
+      .select()
+      .from(achievementBadges)
+      .where(eq(achievementBadges.userId, userId))
+      .orderBy(desc(achievementBadges.earnedAt));
+  }
+
+  // Payment streak operations
+  async getUserPaymentStreak(userId: string): Promise<PaymentStreak | undefined> {
+    const [streak] = await db
+      .select()
+      .from(paymentStreaks)
+      .where(eq(paymentStreaks.userId, userId));
+    return streak;
+  }
+
+  async updatePaymentStreak(userId: string, streakData: Partial<InsertPaymentStreak>): Promise<PaymentStreak> {
+    const existingStreak = await this.getUserPaymentStreak(userId);
+    
+    if (existingStreak) {
+      const [updatedStreak] = await db
+        .update(paymentStreaks)
+        .set({ ...streakData, lastUpdateAt: new Date() })
+        .where(eq(paymentStreaks.userId, userId))
+        .returning();
+      return updatedStreak;
+    } else {
+      const [newStreak] = await db
+        .insert(paymentStreaks)
+        .values({ 
+          userId, 
+          ...streakData,
+          lastUpdateAt: new Date()
+        })
+        .returning();
+      return newStreak;
+    }
+  }
+
+  // Enhanced report share operations
+  async createEnhancedReportShare(share: InsertEnhancedReportShare): Promise<EnhancedReportShare> {
+    const [newShare] = await db
+      .insert(enhancedReportShares)
+      .values(share)
+      .returning();
+    return newShare;
+  }
+
+  async getEnhancedReportShareByToken(token: string): Promise<EnhancedReportShare | undefined> {
+    const [share] = await db
+      .select()
+      .from(enhancedReportShares)
+      .where(eq(enhancedReportShares.shareToken, token));
+    return share;
+  }
+
+  async getUserEnhancedReportShares(userId: string): Promise<EnhancedReportShare[]> {
+    return await db
+      .select()
+      .from(enhancedReportShares)
+      .where(eq(enhancedReportShares.userId, userId))
+      .orderBy(desc(enhancedReportShares.createdAt));
+  }
+
+  async incrementEnhancedShareAccess(shareId: number): Promise<void> {
+    await db
+      .update(enhancedReportShares)
+      .set({ 
+        accessCount: sql`${enhancedReportShares.accessCount} + 1`,
+        lastAccessedAt: new Date()
+      })
+      .where(eq(enhancedReportShares.id, shareId));
+  }
+
+  // Badge calculation helper method
+  async calculateAndAwardBadges(userId: string): Promise<AchievementBadge[]> {
+    const newBadges: AchievementBadge[] = [];
+    
+    // Get user's payment history
+    const payments = await this.getUserRentPayments(userId);
+    const manualPayments = await this.getUserManualPayments(userId);
+    const allPayments = [...payments, ...manualPayments.map(mp => ({
+      ...mp,
+      status: 'paid' as const,
+      dueDate: mp.paymentDate,
+      paidDate: mp.paymentDate
+    }))];
+    
+    const paidPayments = allPayments.filter(p => p.status === 'paid');
+    const existingBadges = await this.getUserAchievementBadges(userId);
+    const existingBadgeTypes = existingBadges.map(b => b.badgeType);
+
+    // First payment badge
+    if (paidPayments.length >= 1 && !existingBadgeTypes.includes('first_payment')) {
+      const badge = await this.createAchievementBadge({
+        userId,
+        badgeType: 'first_payment',
+        title: 'First Payment',
+        description: 'Made your first rent payment',
+        iconName: 'Trophy'
+      });
+      newBadges.push(badge);
+    }
+
+    // Streak badges
+    const currentStreak = await this.calculateCurrentStreak(userId);
+    
+    const streakBadges = [
+      { type: 'streak_3', months: 3, title: '3-Month Streak', description: '3 consecutive on-time payments' },
+      { type: 'streak_6', months: 6, title: '6-Month Streak', description: '6 consecutive on-time payments' },
+      { type: 'streak_12', months: 12, title: '1-Year Streak', description: '12 consecutive on-time payments' }
+    ];
+
+    for (const streakInfo of streakBadges) {
+      if (currentStreak >= streakInfo.months && !existingBadgeTypes.includes(streakInfo.type as any)) {
+        const badge = await this.createAchievementBadge({
+          userId,
+          badgeType: streakInfo.type as any,
+          title: streakInfo.title,
+          description: streakInfo.description,
+          iconName: 'Award'
+        });
+        newBadges.push(badge);
+      }
+    }
+
+    return newBadges;
+  }
+
+  // Helper method to calculate current payment streak
+  async calculateCurrentStreak(userId: string): Promise<number> {
+    const payments = await this.getUserRentPayments(userId);
+    const manualPayments = await this.getUserManualPayments(userId);
+    
+    // Combine and sort all payments by date
+    const allPayments = [...payments, ...manualPayments.map(mp => ({
+      ...mp,
+      status: 'paid' as const,
+      dueDate: mp.paymentDate,
+      paidDate: mp.paymentDate
+    }))].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+
+    let streak = 0;
+    for (const payment of allPayments) {
+      if (payment.status === 'paid' && payment.paidDate) {
+        const paidDate = new Date(payment.paidDate);
+        const dueDate = new Date(payment.dueDate);
+        if (paidDate <= dueDate) {
+          streak++;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+
+    return streak;
   }
 }
 

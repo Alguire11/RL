@@ -340,6 +340,71 @@ export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = typeof adminUsers.$inferInsert;
 export type DataExportRequest = typeof dataExportRequests.$inferSelect;
 export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;
+
+// Achievement badges table for gamification
+export const achievementBadges = pgTable("achievement_badges", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  badgeType: varchar("badge_type", { 
+    enum: ["first_payment", "streak_3", "streak_6", "streak_12", "perfect_year", "early_bird", "consistent_payer"] 
+  }).notNull(),
+  earnedAt: timestamp("earned_at").defaultNow(),
+  title: varchar("title").notNull(),
+  description: varchar("description").notNull(),
+  iconName: varchar("icon_name").notNull(),
+});
+
+// Manual payment entries for users without bank linking
+export const manualPayments = pgTable("manual_payments", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id).notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentDate: date("payment_date").notNull(),
+  description: varchar("description"),
+  receiptUrl: varchar("receipt_url"), // For uploaded receipt images
+  needsVerification: boolean("needs_verification").default(true),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by"), // landlord email or admin
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Payment streak tracking table
+export const paymentStreaks = pgTable("payment_streaks", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  currentStreak: integer("current_streak").default(0),
+  longestStreak: integer("longest_streak").default(0),
+  lastPaymentDate: date("last_payment_date"),
+  lastUpdateAt: timestamp("last_update_at").defaultNow(),
+});
+
+// Enhanced report shares with more options
+export const enhancedReportShares = pgTable("enhanced_report_shares", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  shareToken: varchar("share_token").unique().notNull(),
+  recipientEmail: varchar("recipient_email"),
+  recipientName: varchar("recipient_name"),
+  shareType: varchar("share_type", { enum: ["email", "link", "download"] }).notNull(),
+  expiresAt: timestamp("expires_at"),
+  accessCount: integer("access_count").default(0),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  isPasswordProtected: boolean("is_password_protected").default(false),
+  passwordHash: varchar("password_hash"),
+  customMessage: text("custom_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type AchievementBadge = typeof achievementBadges.$inferSelect;
+export type InsertAchievementBadge = typeof achievementBadges.$inferInsert;
+export type ManualPayment = typeof manualPayments.$inferSelect;
+export type InsertManualPayment = typeof manualPayments.$inferInsert;
+export type PaymentStreak = typeof paymentStreaks.$inferSelect;
+export type InsertPaymentStreak = typeof paymentStreaks.$inferInsert;
+export type EnhancedReportShare = typeof enhancedReportShares.$inferSelect;
+export type InsertEnhancedReportShare = typeof enhancedReportShares.$inferInsert;
 export type UserBadge = typeof userBadges.$inferSelect;
 export type InsertUserBadge = typeof userBadges.$inferInsert;
 export type CertificationPortfolio = typeof certificationPortfolios.$inferSelect;

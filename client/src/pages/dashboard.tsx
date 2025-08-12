@@ -10,6 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling, Play, HelpCircle } from "lucide-react";
+import { ManualPaymentForm, ManualPaymentList } from "@/components/manual-payment-form";
+import { AchievementBadges } from "@/components/achievement-badges";
+import { EnhancedDataExport } from "@/components/enhanced-data-export";
 import { DashboardTour, useDashboardTour } from "@/components/dashboard-tour";
 import { format } from "date-fns";
 import { AddressEditor } from "@/components/address-editor";
@@ -305,6 +308,24 @@ export default function Dashboard() {
             <span className="text-sm font-medium text-green-800">
               Your data is secured with bank-level encryption
             </span>
+          </div>
+        </div>
+
+        {/* Additional Features Section */}
+        <div className="grid lg:grid-cols-3 gap-8 mt-8">
+          {/* Manual Payment Logging */}
+          <div className="lg:col-span-1">
+            <ManualPaymentList />
+          </div>
+          
+          {/* Achievement Badges */}
+          <div className="lg:col-span-1">
+            <AchievementBadges />
+          </div>
+          
+          {/* Enhanced Data Export */}
+          <div className="lg:col-span-1">
+            <EnhancedDataExport />
           </div>
         </div>
 

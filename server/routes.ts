@@ -1870,6 +1870,83 @@ function calculatePaymentStreak(payments: any[]): number {
   return streak;
 }
 
+// Manual payment routes
+function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
+  app.post('/api/manual-payments', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { propertyId, amount, paymentDate, description, receiptUrl } = req.body;
+      
+      const manualPayment = await storage.createManualPayment({
+        userId,
+        propertyId: parseInt(propertyId),
+        amount: parseFloat(amount).toFixed(2),
+        paymentDate: new Date(paymentDate),
+        description,
+        receiptUrl,
+        needsVerification: true,
+      });
+      
+      // Update payment streak and check for badges
+      const currentStreak = await storage.calculateCurrentStreak(userId);
+      await storage.updatePaymentStreak(userId, {
+        currentStreak,
+        lastPaymentDate: new Date(paymentDate),
+      });
+      
+      // Check for new achievement badges
+      const newBadges = await storage.calculateAndAwardBadges(userId);
+      if (newBadges.length > 0) {
+        await storage.createNotification({
+          userId,
+          type: 'system',
+          title: `New Badge${newBadges.length > 1 ? 's' : ''} Earned!`,
+          message: `Congratulations! You've earned: ${newBadges.map(b => b.title).join(', ')}`,
+        });
+      }
+      
+      res.json({ 
+        manualPayment,
+        newBadges,
+        currentStreak,
+        message: 'Manual payment logged successfully' 
+      });
+    } catch (error) {
+      console.error('Error creating manual payment:', error);
+      res.status(500).json({ message: 'Failed to log manual payment' });
+    }
+  });
+
+  app.get('/api/manual-payments', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const manualPayments = await storage.getUserManualPayments(userId);
+      res.json(manualPayments);
+    } catch (error) {
+      console.error('Error fetching manual payments:', error);
+      res.status(500).json({ message: 'Failed to fetch manual payments' });
+    }
+  });
+
+  // Achievement badge routes
+  app.get('/api/achievements', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const badges = await storage.getUserAchievementBadges(userId);
+      const streak = await storage.getUserPaymentStreak(userId);
+      res.json({ badges, streak });
+    } catch (error) {
+      console.error('Error fetching achievements:', error);
+      res.status(500).json({ message: 'Failed to fetch achievements' });
+    }
+  });
+  // Add the manual payment routes inside the registerRoutes function
+  addManualPaymentRoutes(app, requireAuth, storage);
+
+  const httpServer = createServer(app);
+  return httpServer;
+}
+
 function generateShareToken(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
