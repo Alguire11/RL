@@ -67,6 +67,33 @@ export const properties = pgTable("properties", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// User badges/certifications table
+export const userBadges = pgTable("user_badges", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  badgeType: varchar("badge_type").notNull(), // 'payment_streak', 'reliable_tenant', 'platinum_member', etc.
+  level: integer("level").default(1), // 1-5 star levels
+  earnedAt: timestamp("earned_at").defaultNow(),
+  isActive: boolean("is_active").default(true),
+  metadata: jsonb("metadata"), // Additional badge data like streak count, duration, etc.
+});
+
+// Certification portfolios table for landlord sharing
+export const certificationPortfolios = pgTable("certification_portfolios", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  badges: jsonb("badges"), // Array of badge IDs included in portfolio
+  paymentHistory: jsonb("payment_history"), // Summarized payment data
+  landlordTestimonials: jsonb("landlord_testimonials"), // Previous landlord reviews
+  isActive: boolean("is_active").default(true),
+  shareToken: varchar("share_token").unique(), // Token for secure sharing
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Rent payments table
 export const rentPayments = pgTable("rent_payments", {
   id: serial("id").primaryKey(),
@@ -208,6 +235,8 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   securityLogs: many(securityLogs),
   adminUser: one(adminUsers),
   dataExportRequests: many(dataExportRequests),
+  badges: many(userBadges),
+  certificationPortfolios: many(certificationPortfolios),
 }));
 
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
@@ -261,6 +290,14 @@ export const dataExportRequestsRelations = relations(dataExportRequests, ({ one 
   user: one(users, { fields: [dataExportRequests.userId], references: [users.id] }),
 }));
 
+export const userBadgesRelations = relations(userBadges, ({ one }) => ({
+  user: one(users, { fields: [userBadges.userId], references: [users.id] }),
+}));
+
+export const certificationPortfoliosRelations = relations(certificationPortfolios, ({ one }) => ({
+  user: one(users, { fields: [certificationPortfolios.userId], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users);
 export const insertPropertySchema = createInsertSchema(properties);
@@ -274,6 +311,8 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences);
 export const insertSecurityLogSchema = createInsertSchema(securityLogs);
 export const insertAdminUserSchema = createInsertSchema(adminUsers);
 export const insertDataExportRequestSchema = createInsertSchema(dataExportRequests);
+export const insertUserBadgeSchema = createInsertSchema(userBadges);
+export const insertCertificationPortfolioSchema = createInsertSchema(certificationPortfolios);
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
@@ -301,3 +340,7 @@ export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = typeof adminUsers.$inferInsert;
 export type DataExportRequest = typeof dataExportRequests.$inferSelect;
 export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;
+export type UserBadge = typeof userBadges.$inferSelect;
+export type InsertUserBadge = typeof userBadges.$inferInsert;
+export type CertificationPortfolio = typeof certificationPortfolios.$inferSelect;
+export type InsertCertificationPortfolio = typeof certificationPortfolios.$inferInsert;

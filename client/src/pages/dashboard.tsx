@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Navigation } from "@/components/navigation";
 import { StatCard } from "@/components/ui/stat-card";
@@ -18,6 +19,7 @@ import { PropertyForm } from "@/components/property-form";
 export default function Dashboard() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
   const { showTour, startTour, closeTour, completeTour, shouldShowTour } = useDashboardTour();
 
   // Redirect to login if not authenticated
@@ -248,13 +250,17 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <GradientButton className="w-full h-12 justify-center">
+                <GradientButton 
+                  className="w-full h-12 justify-center"
+                  onClick={() => setLocation('/rent-tracker')}
+                >
                   <Plus className="w-5 h-5 mr-3" />
                   Add Payment Record
                 </GradientButton>
                 <Button 
                   variant="outline" 
                   className="w-full h-12 border-2 border-primary text-primary hover:bg-primary hover:text-white"
+                  onClick={() => setLocation('/report-generator')}
                 >
                   <FileText className="w-5 h-5 mr-3" />
                   Generate Report
@@ -262,6 +268,7 @@ export default function Dashboard() {
                 <Button 
                   variant="outline" 
                   className="w-full h-12 border-2 border-secondary text-secondary hover:bg-secondary hover:text-white"
+                  onClick={() => setLocation('/portfolio')}
                 >
                   <Share2 className="w-5 h-5 mr-3" />
                   Share Portfolio

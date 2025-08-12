@@ -179,11 +179,14 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
   };
 
   const handleSkip = () => {
+    // Mark tour as skipped in localStorage to prevent reshowing
+    localStorage.setItem('enoikio_tour_skipped', 'true');
     document.body.classList.remove('tour-active');
     document.querySelectorAll('.tour-highlight').forEach(el => {
       el.classList.remove('tour-highlight');
     });
     onClose();
+    onComplete(); // Call onComplete to ensure proper cleanup
   };
 
   if (!isOpen) return null;
@@ -400,7 +403,7 @@ export function useDashboardTour() {
   };
 
   const shouldShowTour = () => {
-    return !localStorage.getItem('enoikio_tour_completed');
+    return !localStorage.getItem('enoikio_tour_completed') && !localStorage.getItem('enoikio_tour_skipped');
   };
 
   return {

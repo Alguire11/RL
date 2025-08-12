@@ -1620,6 +1620,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Badge and Portfolio system endpoints
+  app.get('/api/user/badges/:userId?', async (req, res) => {
+    try {
+      const userId = req.params.userId || req.user?.id;
+      if (!userId) {
+        return res.status(400).json({ message: 'User ID is required' });
+      }
+
+      // Get user's payment history to calculate badges
+      const payments = await storage.getUserPayments(userId);
+      const badges = await calculateUserBadges(userId, payments);
+      
+      res.json(badges);
+    } catch (error) {
+      console.error('Error fetching user badges:', error);
+      res.status(500).json({ message: 'Failed to fetch badges' });
+    }
+  });
+
+  app.post('/api/certification-portfolios', requireAuth, async (req, res) => {
+    try {
+      const { title, description } = req.body;
+      const userId = req.user.id;
+
+      if (!title) {
+        return res.status(400).json({ message: 'Portfolio title is required' });
+      }
+
+      // Get user's badges and payment history
+      const payments = await storage.getUserPayments(userId);
+      const badges = await calculateUserBadges(userId, payments);
+      const paymentHistory = {
+        totalPayments: payments.length,
+        onTimePayments: payments.filter(p => p.status === 'paid').length,
+        averageAmount: payments.length > 0 ? payments.reduce((sum, p) => sum + parseFloat(p.amount), 0) / payments.length : 0
+      };
+
+      const portfolio = await storage.createCertificationPortfolio({
+        userId,
+        title,
+        description,
+        badges: JSON.stringify(badges),
+        paymentHistory: JSON.stringify(paymentHistory),
+        landlordTestimonials: JSON.stringify([]),
+        shareToken: generateShareToken(),
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // Expires in 1 year
+      });
+
+      res.status(201).json(portfolio);
+    } catch (error) {
+      console.error('Error creating certification portfolio:', error);
+      res.status(500).json({ message: 'Failed to create portfolio' });
+    }
+  });
+
+  app.get('/api/certification-portfolios/:userId?', async (req, res) => {
+    try {
+      const userId = req.params.userId || req.user?.id;
+      if (!userId) {
+        return res.status(400).json({ message: 'User ID is required' });
+      }
+
+      const portfolios = await storage.getUserCertificationPortfolios(userId);
+      res.json(portfolios);
+    } catch (error) {
+      console.error('Error fetching certification portfolios:', error);
+      res.status(500).json({ message: 'Failed to fetch portfolios' });
+    }
+  });
+
+  app.delete('/api/certification-portfolios/:id', requireAuth, async (req, res) => {
+    try {
+      const portfolioId = parseInt(req.params.id);
+      const userId = req.user.id;
+
+      await storage.deleteCertificationPortfolio(portfolioId, userId);
+      res.json({ message: 'Portfolio deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting certification portfolio:', error);
+      res.status(500).json({ message: 'Failed to delete portfolio' });
+    }
+  });
+
+  // Public portfolio view
+  app.get('/api/portfolio/:shareToken', async (req, res) => {
+    try {
+      const { shareToken } = req.params;
+      const portfolio = await storage.getCertificationPortfolioByToken(shareToken);
+
+      if (!portfolio) {
+        return res.status(404).json({ message: 'Portfolio not found' });
+      }
+
+      if (new Date() > new Date(portfolio.expiresAt)) {
+        return res.status(410).json({ message: 'Portfolio has expired' });
+      }
+
+      res.json(portfolio);
+    } catch (error) {
+      console.error('Error fetching shared portfolio:', error);
+      res.status(500).json({ message: 'Failed to fetch portfolio' });
+    }
+  });
+
+  // Report generation endpoint
+  app.post('/api/generate-report', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const { reportType = 'credit', includePortfolio = false } = req.body;
+
+      const user = await storage.getUser(userId);
+      const payments = await storage.getUserPayments(userId);
+      const properties = await storage.getUserProperties(userId);
+      
+      const report = {
+        id: Date.now().toString(),
+        userId,
+        type: reportType,
+        generatedAt: new Date().toISOString(),
+        user: {
+          name: `${user.firstName} ${user.lastName}`.trim() || 'User',
+          email: user.email
+        },
+        paymentSummary: {
+          totalPayments: payments.length,
+          onTimePayments: payments.filter(p => p.status === 'paid').length,
+          totalAmount: payments.reduce((sum, p) => sum + parseFloat(p.amount), 0),
+          averageMonthlyRent: payments.length > 0 ? payments.reduce((sum, p) => sum + parseFloat(p.amount), 0) / payments.length : 0
+        },
+        properties: properties.map(p => ({
+          address: p.address,
+          monthlyRent: p.monthlyRent,
+          tenancyStart: p.tenancyStartDate,
+          tenancyEnd: p.tenancyEndDate
+        })),
+        paymentHistory: payments.map(p => ({
+          amount: p.amount,
+          dueDate: p.dueDate,
+          paidDate: p.paidDate,
+          status: p.status
+        }))
+      };
+
+      if (includePortfolio) {
+        const badges = await calculateUserBadges(userId, payments);
+        report.badges = badges;
+      }
+
+      // In a real app, you'd generate a PDF and store it
+      res.json({
+        reportId: report.id,
+        downloadUrl: `/api/reports/${report.id}/download`,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
+        report
+      });
+    } catch (error) {
+      console.error('Error generating report:', error);
+      res.status(500).json({ message: 'Failed to generate report' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
+
+// Helper functions
+async function calculateUserBadges(userId: string, payments: any[]) {
+  const badges = [];
+
+  // Payment streak badge
+  const currentStreak = calculatePaymentStreak(payments);
+  if (currentStreak >= 3) {
+    let level = 1;
+    if (currentStreak >= 6) level = 2;
+    if (currentStreak >= 12) level = 3;
+    if (currentStreak >= 24) level = 4;
+    if (currentStreak >= 36) level = 5;
+
+    badges.push({
+      id: `payment_streak_${userId}`,
+      badgeType: 'payment_streak',
+      level,
+      earnedAt: new Date().toISOString(),
+      isActive: true,
+      metadata: { streakMonths: currentStreak }
+    });
+  }
+
+  // Reliable tenant badge
+  const onTimePayments = payments.filter(p => p.status === 'paid').length;
+  if (onTimePayments >= 12) {
+    let level = 1;
+    if (onTimePayments >= 24) level = 2;
+    if (onTimePayments >= 48) level = 3;
+    if (onTimePayments >= 72) level = 4;
+    if (onTimePayments >= 120) level = 5;
+
+    badges.push({
+      id: `reliable_tenant_${userId}`,
+      badgeType: 'reliable_tenant',
+      level,
+      earnedAt: new Date().toISOString(),
+      isActive: true,
+      metadata: { totalPayments: onTimePayments }
+    });
+  }
+
+  // Early payer badge
+  const earlyPayments = payments.filter(p => 
+    p.status === 'paid' && p.paidDate && new Date(p.paidDate) < new Date(p.dueDate)
+  ).length;
+  if (earlyPayments >= 6) {
+    let level = 1;
+    if (earlyPayments >= 12) level = 2;
+    if (earlyPayments >= 24) level = 3;
+    if (earlyPayments >= 48) level = 4;
+    if (earlyPayments >= 72) level = 5;
+
+    badges.push({
+      id: `early_payer_${userId}`,
+      badgeType: 'early_payer',
+      level,
+      earnedAt: new Date().toISOString(),
+      isActive: true,
+      metadata: { earlyPaymentCount: earlyPayments }
+    });
+  }
+
+  return badges;
+}
+
+function calculatePaymentStreak(payments: any[]): number {
+  if (payments.length === 0) return 0;
+  
+  // Sort payments by due date (newest first)
+  const sortedPayments = payments
+    .filter(p => p.status === 'paid')
+    .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+
+  let streak = 0;
+  for (const payment of sortedPayments) {
+    if (payment.status === 'paid') {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  
+  return streak;
+}
+
+function generateShareToken(): string {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
 }

@@ -11,6 +11,8 @@ import {
   securityLogs,
   adminUsers,
   dataExportRequests,
+  userBadges,
+  certificationPortfolios,
   type User,
   type UpsertUser,
   type Property,
@@ -35,6 +37,10 @@ import {
   type InsertAdminUser,
   type DataExportRequest,
   type InsertDataExportRequest,
+  type UserBadge,
+  type InsertUserBadge,
+  type CertificationPortfolio,
+  type InsertCertificationPortfolio,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, or, isNull, gte, lte } from "drizzle-orm";
@@ -113,6 +119,20 @@ export interface IStorage {
   createDataExportRequest(request: InsertDataExportRequest): Promise<DataExportRequest>;
   getUserDataExportRequests(userId: string): Promise<DataExportRequest[]>;
   updateDataExportRequest(id: number, updates: Partial<InsertDataExportRequest>): Promise<DataExportRequest>;
+
+  // Badge operations
+  createUserBadge(badge: InsertUserBadge): Promise<UserBadge>;
+  getUserBadges(userId: string): Promise<UserBadge[]>;
+  updateUserBadge(id: number, badge: Partial<InsertUserBadge>): Promise<UserBadge>;
+
+  // Certification portfolio operations
+  createCertificationPortfolio(portfolio: InsertCertificationPortfolio): Promise<CertificationPortfolio>;
+  getUserCertificationPortfolios(userId: string): Promise<CertificationPortfolio[]>;
+  getCertificationPortfolioByToken(shareToken: string): Promise<CertificationPortfolio | undefined>;
+  deleteCertificationPortfolio(id: number, userId: string): Promise<void>;
+
+  // Payment helper operations
+  getUserPayments(userId: string): Promise<RentPayment[]>;
 
   // Admin dashboard operations
   getSystemStats(): Promise<{
@@ -643,6 +663,66 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .orderBy(desc(users.createdAt));
+  }
+  // Badge operations
+  async createUserBadge(badge: InsertUserBadge): Promise<UserBadge> {
+    const [created] = await db.insert(userBadges).values(badge).returning();
+    return created;
+  }
+
+  async getUserBadges(userId: string): Promise<UserBadge[]> {
+    return await db.select().from(userBadges).where(eq(userBadges.userId, userId));
+  }
+
+  async updateUserBadge(id: number, badge: Partial<InsertUserBadge>): Promise<UserBadge> {
+    const [updated] = await db
+      .update(userBadges)
+      .set(badge)
+      .where(eq(userBadges.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Certification portfolio operations
+  async createCertificationPortfolio(portfolio: InsertCertificationPortfolio): Promise<CertificationPortfolio> {
+    const [created] = await db.insert(certificationPortfolios).values(portfolio).returning();
+    return created;
+  }
+
+  async getUserCertificationPortfolios(userId: string): Promise<CertificationPortfolio[]> {
+    return await db
+      .select()
+      .from(certificationPortfolios)
+      .where(eq(certificationPortfolios.userId, userId))
+      .orderBy(desc(certificationPortfolios.createdAt));
+  }
+
+  async getCertificationPortfolioByToken(shareToken: string): Promise<CertificationPortfolio | undefined> {
+    const [portfolio] = await db
+      .select()
+      .from(certificationPortfolios)
+      .where(eq(certificationPortfolios.shareToken, shareToken));
+    return portfolio;
+  }
+
+  async deleteCertificationPortfolio(id: number, userId: string): Promise<void> {
+    await db
+      .delete(certificationPortfolios)
+      .where(
+        and(
+          eq(certificationPortfolios.id, id),
+          eq(certificationPortfolios.userId, userId)
+        )
+      );
+  }
+
+  // Payment helper operations
+  async getUserPayments(userId: string): Promise<RentPayment[]> {
+    return await db
+      .select()
+      .from(rentPayments)
+      .where(eq(rentPayments.userId, userId))
+      .orderBy(desc(rentPayments.dueDate));
   }
 }
 

@@ -28,6 +28,7 @@ import LandlordVerify from "@/pages/landlord-verify";
 import OnboardingPage from "@/pages/onboarding";
 import RentTracker from "@/pages/rent-tracker";
 import ReportGenerator from "@/pages/report-generator";
+import Portfolio from "@/pages/portfolio";
 
 // Lazy load admin pages
 const AdminUsers = lazy(() => import("@/pages/admin-users"));
@@ -121,6 +122,7 @@ function Router() {
           <Route path="/onboarding" component={OnboardingPage} />
           <Route path="/rent-tracker" component={RentTracker} />
           <Route path="/report-generator" component={ReportGenerator} />
+          <Route path="/portfolio" component={Portfolio} />
         </>
       )}
       <Route component={NotFound} />
