@@ -392,7 +392,7 @@ export default function Dashboard() {
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="w-full h-12 border-2 border-secondary text-secondary hover:bg-secondary hover:text-white"
+                  className="w-full h-12 border-2 border-secondary hover:bg-secondary hover:text-white bg-[#12101045] text-[#000000]"
                   onClick={() => setLocation('/portfolio')}
                 >
                   <Share2 className="w-5 h-5 mr-3" />
