@@ -65,6 +65,7 @@ export function AddressEditor({ currentAddress, onAddressUpdate, propertyId }: A
       });
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setIsEditing(false);
       setIsOpen(false);
       if (onAddressUpdate) {

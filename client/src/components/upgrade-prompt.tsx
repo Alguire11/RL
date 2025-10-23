@@ -14,8 +14,8 @@ export function UpgradePrompt({ feature, requiredPlan, description }: UpgradePro
   const plan = SUBSCRIPTION_PLANS[requiredPlan];
   
   const handleUpgrade = () => {
-    // Navigate to pricing page or open upgrade modal
-    window.location.href = '/#pricing';
+    // Navigate to subscription page
+    window.location.href = '/subscribe';
   };
 
   return (

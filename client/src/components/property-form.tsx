@@ -72,6 +72,7 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       form.reset();
       setIsOpen(false);
       if (onPropertyAdded) {

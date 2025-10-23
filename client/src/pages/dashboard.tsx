@@ -166,7 +166,7 @@ export default function Dashboard() {
                   {plan.id !== 'premium' && (
                     <Button 
                       variant="secondary" 
-                      onClick={() => setLocation('/settings')}
+                      onClick={() => setLocation('/subscribe')}
                       className="bg-white text-blue-600 hover:bg-gray-100"
                     >
                       Upgrade
