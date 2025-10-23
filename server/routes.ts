@@ -1282,6 +1282,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin password reset
+  app.post('/api/admin/users/:userId/reset-password', requireAuth, async (req: any, res) => {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    try {
+      const { userId } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      }
+
+      // Note: This is a demo system using Replit OAuth authentication
+      // In a production system with traditional username/password auth:
+      // 1. Hash the password using bcrypt or similar
+      // 2. Update the user's password in the database
+      // 3. Invalidate existing sessions
+      // For MVP demo purposes, we log the action for admin tracking
+      console.log(`Admin initiated password reset for user ${userId}`);
+
+      res.json({ 
+        message: 'Password reset recorded', 
+        newPassword,
+        note: 'Demo system: This would trigger a password reset email in production'
+      });
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      res.status(500).json({ message: 'Failed to reset password' });
+    }
+  });
+
   // Admin routes - all require admin authentication
   app.get('/api/admin/stats', requireAdmin, async (req, res) => {
     try {

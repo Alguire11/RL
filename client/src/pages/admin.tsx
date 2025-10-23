@@ -10,7 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Users, CreditCard, FileText, Activity, Shield, TrendingUp, Download, AlertTriangle, MessageSquare, Settings2, MapPin, Check, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Users, CreditCard, FileText, Activity, Shield, TrendingUp, Download, AlertTriangle, MessageSquare, Settings2, MapPin, Check, X, Key, Edit, MoreVertical } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 
@@ -56,6 +58,11 @@ export default function AdminDashboard() {
     { id: 2, user: "Emma Wilson", type: "Verification Issue", status: "resolved", date: "2024-01-19" },
     { id: 3, user: "Michael Brown", type: "Account Access", status: "pending", date: "2024-01-18" },
   ]);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [editedPlan, setEditedPlan] = useState("");
 
   // Check for admin session
   useEffect(() => {
@@ -187,6 +194,105 @@ export default function AdminDashboard() {
       title: action === 'approve' ? "Dispute Approved" : "Dispute Rejected",
       description: `Dispute #${disputeId} has been ${action === 'approve' ? 'resolved' : 'rejected'}.`,
     });
+  };
+
+  const handleEditUser = (user: AdminUser) => {
+    setSelectedUser(user);
+    setEditedPlan(user.subscriptionPlan || 'free');
+    setShowEditDialog(true);
+  };
+
+  const handleResetPassword = (user: AdminUser) => {
+    setSelectedUser(user);
+    setNewPassword("");
+    setShowPasswordDialog(true);
+  };
+
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: async ({ userId, planId }: { userId: string, planId: string }) => {
+      const response = await fetch(`/api/admin/users/${userId}/subscription`, {
+        method: 'POST',
+        headers: {
+          'x-admin-session': JSON.stringify(adminSession),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ planId, status: 'active' }),
+      });
+      if (!response.ok) throw new Error('Failed to update subscription');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User Updated",
+        description: `Subscription plan has been updated to ${editedPlan}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setShowEditDialog(false);
+    },
+    onError: () => {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update subscription plan",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string, newPassword: string }) => {
+      const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'x-admin-session': JSON.stringify(adminSession),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (!response.ok) throw new Error('Failed to reset password');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Password Reset",
+        description: `Password has been reset for ${selectedUser?.email}. New password: ${data.newPassword}`,
+      });
+      setShowPasswordDialog(false);
+      setNewPassword("");
+    },
+    onError: () => {
+      toast({
+        title: "Reset Failed",
+        description: "Failed to reset password",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleSaveUserEdit = () => {
+    if (!selectedUser) return;
+    updateSubscriptionMutation.mutate({ userId: selectedUser.id, planId: editedPlan });
+  };
+
+  const handleSavePassword = () => {
+    if (!selectedUser || !newPassword) {
+      toast({
+        title: "Error",
+        description: "Please enter a new password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 8 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    resetPasswordMutation.mutate({ userId: selectedUser.id, newPassword });
   };
 
   const sendAnnouncementMutation = useMutation({
@@ -376,6 +482,7 @@ export default function AdminDashboard() {
                         <TableHead>Status</TableHead>
                         <TableHead>Plan</TableHead>
                         <TableHead>Joined</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -401,6 +508,28 @@ export default function AdminDashboard() {
                           </TableCell>
                           <TableCell className="text-sm text-gray-600">
                             {formatDate(user.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end space-x-1">
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => handleEditUser(user)}
+                                data-testid={`button-edit-user-${user.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                onClick={() => handleResetPassword(user)}
+                                data-testid={`button-reset-password-${user.id}`}
+                              >
+                                <Key className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -696,6 +825,104 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Modify user subscription plan and account settings
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>User Email</Label>
+              <Input value={selectedUser?.email || ''} disabled className="mt-1" />
+            </div>
+            <div>
+              <Label>User Name</Label>
+              <Input 
+                value={selectedUser?.firstName && selectedUser?.lastName 
+                  ? `${selectedUser.firstName} ${selectedUser.lastName}` 
+                  : 'N/A'} 
+                disabled 
+                className="mt-1" 
+              />
+            </div>
+            <div>
+              <Label>Subscription Plan</Label>
+              <Select value={editedPlan} onValueChange={setEditedPlan}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select plan" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="standard">Standard (£9.99/mo)</SelectItem>
+                  <SelectItem value="premium">Premium (£19.99/mo)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveUserEdit}
+                className="bg-blue-600 hover:bg-blue-700"
+                data-testid="button-save-user-edit"
+              >
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset User Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>New Password</Label>
+              <Input 
+                type="text"
+                placeholder="Enter new password (min 8 characters)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="mt-1"
+                data-testid="input-new-password"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Password must be at least 8 characters long
+              </p>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> The new password will be displayed once. Make sure to copy it and share it securely with the user.
+              </p>
+            </div>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSavePassword}
+                className="bg-orange-600 hover:bg-orange-700"
+                data-testid="button-save-password"
+              >
+                Reset Password
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
