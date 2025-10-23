@@ -121,7 +121,7 @@ export default function Status() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">System Status</h1>
           <p className="text-xl text-gray-600">
-            Current status of Enoíkio services and infrastructure
+            Current status of RentLedger services and infrastructure
           </p>
         </div>
 

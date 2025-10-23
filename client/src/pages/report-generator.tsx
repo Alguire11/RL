@@ -86,7 +86,7 @@ export default function ReportGenerator() {
       const dataStr = JSON.stringify(generatedReport.report, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
       
-      const exportFileDefaultName = `enoikio-report-${generatedReport.reportId}.json`;
+      const exportFileDefaultName = `rentledger-report-${generatedReport.reportId}.json`;
       
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);

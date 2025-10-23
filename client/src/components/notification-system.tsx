@@ -125,7 +125,7 @@ export function NotificationCenter() {
 
   const sendTestNotification = (type: string) => {
     if (type === "push" && settings.pushEnabled) {
-      new Notification("Enoíkio - Test Notification", {
+      new Notification("RentLedger - Test Notification", {
         body: "This is a test push notification for payment reminders",
         icon: "/favicon.ico",
         badge: "/favicon.ico",

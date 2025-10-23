@@ -24,7 +24,7 @@ export function LiveChat({ isOpen, onClose, onMinimize }: LiveChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! Welcome to Enoíkio support. I can help with general questions about our service. For complex technical issues, billing, or account-specific problems, please email support@enoikio.co.uk. How can I assist you today?',
+      text: 'Hello! Welcome to RentLedger support. I can help with general questions about our service. For complex technical issues, billing, or account-specific problems, please email support@rentledger.co.uk. How can I assist you today?',
       sender: 'support',
       timestamp: new Date()
     }
@@ -71,16 +71,16 @@ export function LiveChat({ isOpen, onClose, onMinimize }: LiveChatProps) {
       const isComplexQuery = complexQueries.some(keyword => userQuery.includes(keyword));
       
       if (isComplexQuery) {
-        supportResponse = `I understand you need help with this important matter. For complex technical issues, billing inquiries, account problems, or detailed credit reporting questions, I recommend emailing our customer service team at support@enoikio.co.uk. They have access to your account details and can provide specialized assistance. They typically respond within 24 hours.
+        supportResponse = `I understand you need help with this important matter. For complex technical issues, billing inquiries, account problems, or detailed credit reporting questions, I recommend emailing our customer service team at support@rentledger.co.uk. They have access to your account details and can provide specialized assistance. They typically respond within 24 hours.
 
 Would you like me to help you with anything else I can assist with right now?`;
       } else {
         const generalResponses = [
-          "Thank you for reaching out! I'm here to help with general questions about Enoíkio.",
+          "Thank you for reaching out! I'm here to help with general questions about RentLedger.",
           "I'd be happy to help you with basic questions about our service.",
-          "I can assist with general information about Enoíkio. What would you like to know?",
+          "I can assist with general information about RentLedger. What would you like to know?",
           "Thanks for contacting us! I can help with basic questions about rent tracking and credit building.",
-          "I'm here to help with general inquiries. For account-specific or technical issues, you may need to email support@enoikio.co.uk.",
+          "I'm here to help with general inquiries. For account-specific or technical issues, you may need to email support@rentledger.co.uk.",
         ];
         supportResponse = generalResponses[Math.floor(Math.random() * generalResponses.length)];
       }
@@ -215,7 +215,7 @@ Would you like me to help you with anything else I can assist with right now?`;
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => window.location.href = 'mailto:support@enoikio.co.uk'}
+              onClick={() => window.location.href = 'mailto:support@rentledger.co.uk'}
               className="text-xs bg-gray-50 hover:bg-gray-100 border-gray-200"
             >
               <Mail className="w-3 h-3 mr-1" />

@@ -411,7 +411,7 @@ export default function LandlordDashboard() {
           <Alert className="mb-6 border-blue-200 bg-gradient-to-r from-blue-50 to-purple-50">
             <Info className="h-5 w-5 text-blue-600" />
             <AlertTitle className="text-lg font-semibold flex items-center justify-between">
-              <span>Welcome to Enoíkio Landlord Portal</span>
+              <span>Welcome to RentLedger Landlord Portal</span>
               <Button variant="ghost" size="sm" onClick={() => setShowWelcome(false)}>
                 <span className="sr-only">Close</span>
                 ×

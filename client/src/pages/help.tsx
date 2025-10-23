@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ export default function HelpCenter() {
     {
       category: "Getting Started", 
       question: "How do I connect my bank account?",
-      answer: "We use Open Banking technology to securely connect to your bank. Simply select your bank from our supported list, log in through their official website, and authorize Enoíkio to view your transaction data. We never store your banking credentials and only access rent-related transactions."
+      answer: "We use Open Banking technology to securely connect to your bank. Simply select your bank from our supported list, log in through their official website, and authorize RentLedger to view your transaction data. We never store your banking credentials and only access rent-related transactions."
     },
     {
       category: "Getting Started",
@@ -66,12 +66,12 @@ export default function HelpCenter() {
     {
       category: "Technical", 
       question: "What banks are supported?",
-      answer: "We support all major UK banks through Open Banking including Lloyds, Barclays, HSBC, Santander, NatWest, RBS, Monzo, Starling Bank, and over 100+ others. If your bank isn't listed, contact our support team at support@enoikio.co.uk for assistance."
+      answer: "We support all major UK banks through Open Banking including Lloyds, Barclays, HSBC, Santander, NatWest, RBS, Monzo, Starling Bank, and over 100+ others. If your bank isn't listed, contact our support team at support@rentledger.co.uk for assistance."
     },
     {
       category: "Technical",
       question: "Why isn't my rent payment being tracked?",
-      answer: "Ensure your payment matches the rent amount in your profile settings, is made from the connected bank account, and goes to the same recipient each month. Payments may take 1-2 business days to appear. If issues persist, contact support@enoikio.co.uk with your payment details for manual verification."
+      answer: "Ensure your payment matches the rent amount in your profile settings, is made from the connected bank account, and goes to the same recipient each month. Payments may take 1-2 business days to appear. If issues persist, contact support@rentledger.co.uk with your payment details for manual verification."
     },
     {
       category: "Billing",
@@ -81,7 +81,7 @@ export default function HelpCenter() {
   ];
 
   // Initialize filtered FAQs
-  useState(() => {
+  useEffect(() => {
     setFilteredFaqs(faqs);
   }, []);
 
@@ -216,7 +216,7 @@ export default function HelpCenter() {
                     Setting up your account
                     <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                   </a>
-                  <p className="text-sm text-gray-500 mt-1">Create your Enoíkio account in under 3 minutes with email verification and secure profile setup</p>
+                  <p className="text-sm text-gray-500 mt-1">Create your RentLedger account in under 3 minutes with email verification and secure profile setup</p>
                 </li>
                 <li>
                   <a href="#connecting-bank" className="text-blue-600 hover:underline flex items-center group">

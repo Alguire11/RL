@@ -82,7 +82,7 @@ export default function Contact() {
       title: "Email Support",
       description: "Send us a detailed message",
       icon: Mail,
-      value: "support@enoikio.com",
+      value: "support@rentledger.co.uk",
       action: "Send Email"
     },
     {
@@ -132,7 +132,7 @@ export default function Contact() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Us</h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Have questions about Enoíkio? We're here to help. Get in touch with our support team.
+            Have questions about RentLedger? We're here to help. Get in touch with our support team.
           </p>
         </div>
 

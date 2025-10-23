@@ -17,11 +17,17 @@ export default function Landing() {
   const [, setLocation] = useLocation();
 
   const handleGetStarted = () => {
-    window.location.href = "/auth";
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      window.location.href = "/auth";
+    }, 300);
   };
 
   const handleSignIn = () => {
-    window.location.href = "/auth";
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      window.location.href = "/auth";
+    }, 300);
   };
 
   return (

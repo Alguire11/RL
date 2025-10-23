@@ -13,7 +13,7 @@ export default function Product() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
-              Enoíkio Product Suite
+              RentLedger Product Suite
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Complete credit building solution designed specifically for UK tenants. Transform your rent payments into a powerful financial asset.
@@ -196,7 +196,7 @@ export default function Product() {
             </div>
             
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">Why Choose Enoíkio?</h2>
+              <h2 className="text-3xl font-bold text-gray-900 mb-6">Why Choose RentLedger?</h2>
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
                   <CheckCircle className="h-6 w-6 text-green-500 mt-1" />

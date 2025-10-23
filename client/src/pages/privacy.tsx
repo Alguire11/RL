@@ -222,7 +222,7 @@ export default function Privacy() {
             </div>
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Mailing Address:</strong> Enoíkio Privacy Team, 123 Fintech Street, London EC2A 4NE, United Kingdom
+                <strong>Mailing Address:</strong> RentLedger Privacy Team, 123 Fintech Street, London EC2A 4NE, United Kingdom
               </p>
             </div>
           </CardContent>

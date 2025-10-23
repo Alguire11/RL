@@ -57,7 +57,7 @@ export default function Support() {
     },
     {
       title: "System Status",
-      description: "Check the status of all Enoíkio services",
+      description: "Check the status of all RentLedger services",
       icon: Activity,
       href: "/status",
       features: [
@@ -121,7 +121,7 @@ export default function Support() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Support Center</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Get help with Enoíkio. Find answers, contact our team, or check system status.
+            Get help with RentLedger. Find answers, contact our team, or check system status.
           </p>
         </div>
 

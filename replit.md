@@ -47,7 +47,7 @@ The application now includes a comprehensive admin access system with role-based
 ✓ Created working dialogs for Add Property, Manage Tenants, Send Notice, and Schedule Inspection
 ✓ Enhanced landlord dashboard with comprehensive property and tenant management features
 ✓ Comprehensive Help Center with detailed FAQs covering Getting Started, Credit Building, and Account & Billing sections
-✓ Enhanced live chat system with smart escalation to customer service email (support@enoikio.co.uk) for complex queries
+✓ Enhanced live chat system with smart escalation to customer service email (support@rentledger.co.uk) for complex queries
 ✓ Added searchable knowledge base with categorized content and improved user experience
 ✓ Fixed navbar transparency issues - changed to solid white background for better readability across all pages
 ✓ Implemented admin user management: subscription plan updates with full backend API integration and database persistence

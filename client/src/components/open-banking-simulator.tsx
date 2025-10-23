@@ -295,7 +295,7 @@ export function OpenBankingSimulator({ onConnectionSuccess, mode = 'onboarding' 
               <div className="text-center">
                 <h3 className="font-semibold mb-2">Account Access Permissions</h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Enoíkio is requesting access to the following data:
+                  RentLedger is requesting access to the following data:
                 </p>
               </div>
               
