@@ -60,7 +60,6 @@ export default function Landing() {
           </div>
         </div>
       </nav>
-
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="fixed inset-0 bg-white z-40 md:hidden">
@@ -87,7 +86,6 @@ export default function Landing() {
           </div>
         </div>
       )}
-
       {/* Hero Section */}
       <section className="relative pt-20 pb-16 overflow-hidden">
         {/* Background Image with Overlay */}
@@ -122,7 +120,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Product Section */}
       <section id="product" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -183,7 +180,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Features Section */}
       <section id="features" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
@@ -253,7 +249,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Pricing Section */}
       <section id="pricing" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
@@ -383,7 +378,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Security Section */}
       <section id="security" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
@@ -439,7 +433,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Support Section */}
       <section id="support" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
@@ -456,7 +449,7 @@ export default function Landing() {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               We're Here to Help
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-gray-600 max-w-3xl mx-auto ml-[74px] mr-[74px] text-[15px]">
               Get the support you need when you need it
             </p>
           </div>
@@ -506,7 +499,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
