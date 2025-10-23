@@ -445,7 +445,7 @@ export default function Landing() {
         
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mt-[34px] mb-[34px]">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               We're Here to Help
             </h2>
