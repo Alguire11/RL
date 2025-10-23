@@ -300,11 +300,11 @@ export default function RentTracker() {
                     onClick={() => {
                       const propertyId = paymentForm.propertyId === 'new' ? null : parseInt(paymentForm.propertyId);
                       addPaymentMutation.mutate({
-                        amount: parseFloat(paymentForm.amount),
+                        amount: paymentForm.amount,
                         dueDate: paymentForm.dueDate,
                         propertyId,
                         description: paymentForm.description || 'Rent payment',
-                        status: 'due'
+                        status: 'pending'
                       });
                     }}
                     disabled={!paymentForm.amount || !paymentForm.dueDate || addPaymentMutation.isPending}

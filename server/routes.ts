@@ -234,6 +234,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentData = insertRentPaymentSchema.parse({ ...req.body, userId });
       
       const payment = await storage.createRentPayment(paymentData);
+      
+      // Get property and user details for email and notification
+      if (payment.propertyId) {
+        const property = await storage.getPropertyById(payment.propertyId);
+        const user = await storage.getUserById(userId);
+        
+        // Send confirmation email to landlord
+        if (property?.landlordEmail && user) {
+          await sendEmail({
+            to: property.landlordEmail,
+            from: 'noreply@rentledger.co.uk',
+            subject: 'Rent Payment Notification - RentLedger',
+            html: `
+              <h2>New Rent Payment Recorded</h2>
+              <p>Hello ${property.landlordName || 'Landlord'},</p>
+              <p>Your tenant <strong>${user.firstName} ${user.lastName}</strong> has recorded a rent payment:</p>
+              <ul>
+                <li><strong>Property:</strong> ${property.address}, ${property.city}</li>
+                <li><strong>Amount:</strong> £${payment.amount}</li>
+                <li><strong>Due Date:</strong> ${payment.dueDate}</li>
+                <li><strong>Status:</strong> ${payment.status}</li>
+              </ul>
+              <p>This payment has been logged in the RentLedger system to help build your tenant's credit profile.</p>
+              <p>Best regards,<br>The RentLedger Team</p>
+            `
+          });
+        }
+        
+        // Create "due soon" notification if payment is within 5 days
+        const dueDate = new Date(payment.dueDate);
+        const today = new Date();
+        const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilDue <= 5 && daysUntilDue >= 0 && payment.status === 'pending') {
+          await storage.createNotification({
+            userId,
+            type: 'payment_reminder',
+            title: 'Rent Payment Due Soon',
+            message: `Your rent payment of £${payment.amount} is due in ${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'}`,
+            priority: 'high',
+            isRead: false,
+            metadata: { paymentId: payment.id, dueDate: payment.dueDate }
+          });
+        }
+      }
+      
       res.json(payment);
     } catch (error) {
       console.error("Error creating rent payment:", error);
