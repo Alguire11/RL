@@ -84,12 +84,12 @@ export default function Privacy() {
   const contactInfo = [
     {
       title: "Data Protection Officer",
-      email: "dpo@enoikio.com",
+      email: "dpo@rentledger.co.uk",
       phone: "+44 20 7123 4567"
     },
     {
       title: "General Privacy Inquiries",
-      email: "privacy@enoikio.com",
+      email: "privacy@rentledger.co.uk",
       phone: "+44 20 7123 4568"
     }
   ];
@@ -110,7 +110,7 @@ export default function Privacy() {
             Your privacy is important to us. This policy explains how we collect, use, and protect your information.
           </p>
           <p className="text-sm text-gray-500 mt-4">
-            Last updated: January 17, 2024
+            Last updated: January 17, 2025
           </p>
         </div>
 

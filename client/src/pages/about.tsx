@@ -16,7 +16,7 @@ export default function About() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent">
-              About Enoíkio
+              About RentLedger
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               We're on a mission to help UK tenants build credit through their rental payments and create better financial futures.
@@ -27,7 +27,7 @@ export default function About() {
             <div>
               <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Story</h2>
               <p className="text-gray-600 mb-4">
-                Founded in 2024, Enoíkio was born from a simple observation: tenants across the UK make consistent rent payments month after month, yet this reliable payment history rarely contributes to their credit score.
+                Founded in 2025, RentLedger was born from a simple observation: tenants across the UK make consistent rent payments month after month, yet this reliable payment history rarely contributes to their credit score.
               </p>
               <p className="text-gray-600 mb-4">
                 We recognized that this represented a massive missed opportunity for millions of renters who could be building credit through their housing expenses. Our platform bridges this gap by automatically tracking rent payments and transforming them into valuable credit history.

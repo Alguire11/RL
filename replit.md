@@ -1,8 +1,8 @@
-# Enoíkio - Rent Credit Building Platform
+# RentLedger - Rent Credit Building Platform
 
 ## Overview
 
-Enoíkio is a comprehensive rent credit building platform that helps tenants automatically track on-time rent payments and build a credit portfolio. The application uses a modern full-stack TypeScript architecture with React frontend, Express backend, and PostgreSQL database.
+RentLedger is a comprehensive rent credit building platform that helps tenants automatically track on-time rent payments and build a credit portfolio. The application uses a modern full-stack TypeScript architecture with React frontend, Express backend, and PostgreSQL database.
 
 ## User Preferences
 

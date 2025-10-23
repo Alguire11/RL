@@ -12,7 +12,7 @@ export default function Terms() {
       title: "Acceptance of Terms",
       icon: FileText,
       content: [
-        "By accessing and using Enoíkio, you accept and agree to be bound by these Terms of Service",
+        "By accessing and using RentLedger, you accept and agree to be bound by these Terms of Service",
         "If you do not agree to these terms, please do not use our services",
         "These terms apply to all users of the platform",
         "We may modify these terms at any time with notice to users"
@@ -23,7 +23,7 @@ export default function Terms() {
       title: "Description of Services",
       icon: CreditCard,
       content: [
-        "Enoíkio provides rent payment tracking and credit building services",
+        "RentLedger provides rent payment tracking and credit building services",
         "We help tenants build credit history through documented rent payments",
         "Our services include payment monitoring, credit report generation, and landlord verification",
         "We connect to banks through secure Open Banking protocols",
@@ -105,10 +105,10 @@ export default function Terms() {
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Terms of Service</h1>
           <p className="text-xl text-gray-600">
-            Please read these terms carefully before using Enoíkio services
+            Please read these terms carefully before using RentLedger services
           </p>
           <p className="text-sm text-gray-500 mt-4">
-            Last updated: January 17, 2024
+            Last updated: January 17, 2025
           </p>
         </div>
 
@@ -170,8 +170,8 @@ export default function Terms() {
               <div className="space-y-2">
                 <h3 className="font-semibold">Legal Department</h3>
                 <p className="text-sm text-gray-600">
-                  Email: <a href="mailto:legal@enoikio.com" className="text-blue-600 hover:underline">
-                    legal@enoikio.com
+                  Email: <a href="mailto:legal@rentledger.co.uk" className="text-blue-600 hover:underline">
+                    legal@rentledger.co.uk
                   </a>
                 </p>
                 <p className="text-sm text-gray-600">
@@ -183,8 +183,8 @@ export default function Terms() {
               <div className="space-y-2">
                 <h3 className="font-semibold">General Support</h3>
                 <p className="text-sm text-gray-600">
-                  Email: <a href="mailto:support@enoikio.com" className="text-blue-600 hover:underline">
-                    support@enoikio.com
+                  Email: <a href="mailto:support@rentledger.co.uk" className="text-blue-600 hover:underline">
+                    support@rentledger.co.uk
                   </a>
                 </p>
                 <p className="text-sm text-gray-600">

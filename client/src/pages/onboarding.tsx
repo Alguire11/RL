@@ -46,7 +46,7 @@ type RentDetailsData = z.infer<typeof rentDetailsSchema>;
 type BankConnectionData = z.infer<typeof bankConnectionSchema>;
 
 const steps = [
-  { id: 1, title: "Welcome", description: "Get started with Enoíkio" },
+  { id: 1, title: "Welcome", description: "Get started with RentLedger" },
   { id: 2, title: "Bank Connection", description: "Connect your bank securely" },
   { id: 3, title: "Rent Details", description: "Set up your rent information" },
   { id: 4, title: "Complete", description: "Start tracking your payments" },
@@ -140,7 +140,7 @@ export default function OnboardingPage() {
       updateProfileMutation.mutate({ isOnboarded: true });
       toast({
         title: "Onboarding Complete!",
-        description: "Welcome to Enoíkio. You can now start tracking your rent payments.",
+        description: "Welcome to RentLedger. You can now start tracking your rent payments.",
       });
       navigate("/");
     },
@@ -191,7 +191,7 @@ export default function OnboardingPage() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">Get Started with Enoíkio</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Get Started with RentLedger</h1>
             <span className="text-sm text-gray-500">Step {currentStep} of {steps.length}</span>
           </div>
           <Progress value={progress} className="w-full" />
@@ -208,7 +208,7 @@ export default function OnboardingPage() {
         {currentStep === 1 && (
           <Card className="max-w-2xl mx-auto">
             <CardHeader className="text-center">
-              <CardTitle className="text-3xl">Welcome to Enoíkio!</CardTitle>
+              <CardTitle className="text-3xl">Welcome to RentLedger!</CardTitle>
               <CardDescription className="text-lg">
                 Build your credit history through your rent payments
               </CardDescription>
