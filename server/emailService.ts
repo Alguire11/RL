@@ -1,11 +1,13 @@
 import { MailService } from '@sendgrid/mail';
 
-if (!process.env.SENDGRID_API_KEY) {
-  throw new Error("SENDGRID_API_KEY environment variable must be set");
-}
-
 const mailService = new MailService();
-mailService.setApiKey(process.env.SENDGRID_API_KEY);
+const apiKey = process.env.SENDGRID_API_KEY;
+
+if (apiKey) {
+  mailService.setApiKey(apiKey);
+} else {
+  console.warn('SENDGRID_API_KEY not set - email functionality will be disabled');
+}
 
 interface EmailParams {
   to: string;
@@ -16,6 +18,11 @@ interface EmailParams {
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
+  if (!apiKey) {
+    console.warn(`Email sending skipped (no API key configured) - would have sent to ${params.to}`);
+    return false;
+  }
+  
   try {
     await mailService.send({
       to: params.to,
