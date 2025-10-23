@@ -26,6 +26,7 @@ import {
   Banknote
 } from "lucide-react";
 import { OpenBankingSimulator } from "@/components/open-banking-simulator";
+import { Footer } from "@/components/footer";
 
 const rentDetailsSchema = z.object({
   monthlyRent: z.string().min(1, "Monthly rent is required"),
@@ -123,12 +124,16 @@ export default function OnboardingPage() {
 
   const updateRentInfoMutation = useMutation({
     mutationFn: async (data: RentDetailsData) => {
+      // First, save rent info
       const rentData = {
         amount: parseFloat(data.monthlyRent),
         dayOfMonth: parseInt(data.paymentDay),
         frequency: "monthly",
         firstPaymentDate: data.firstPaymentDate,
         nextPaymentDate: calculateNextPayment(data.paymentDay),
+        landlordName: data.landlordName,
+        landlordEmail: data.landlordEmail,
+        landlordPhone: data.landlordPhone,
       };
       
       const response = await apiRequest("PUT", "/api/user/rent-info", rentData);
@@ -136,13 +141,32 @@ export default function OnboardingPage() {
         const error = await response.json();
         throw new Error(error.message || "Failed to save rent details");
       }
+      
+      // Get user properties to send verification email
+      const propertiesResponse = await apiRequest("GET", "/api/properties");
+      const properties = await propertiesResponse.json();
+      const userProperty = properties[0]; // Get first property if available
+      
+      // Send landlord verification email if we have property
+      if (userProperty && data.landlordEmail) {
+        try {
+          await apiRequest("POST", "/api/landlord/verify-request", {
+            propertyId: userProperty.id,
+            landlordEmail: data.landlordEmail,
+          });
+        } catch (error) {
+          console.error("Failed to send landlord verification email:", error);
+          // Don't fail the whole onboarding if email fails
+        }
+      }
+      
       return response.json();
     },
     onSuccess: () => {
       updateProfileMutation.mutate({ isOnboarded: true });
       toast({
         title: "Onboarding Complete!",
-        description: "Welcome to RentLedger. You can now start tracking your rent payments.",
+        description: "Welcome to RentLedger. A verification email has been sent to your landlord.",
       });
       navigate("/");
     },
@@ -210,29 +234,54 @@ export default function OnboardingPage() {
         {currentStep === 1 && (
           <Card className="max-w-2xl mx-auto">
             <CardHeader className="text-center">
-              <CardTitle className="text-3xl">Welcome to RentLedger!</CardTitle>
+              <CardTitle className="text-3xl">
+                {user?.role === "landlord" ? "Welcome Landlords!" : "Welcome to RentLedger!"}
+              </CardTitle>
               <CardDescription className="text-lg">
-                Build your credit history through your rent payments
+                {user?.role === "landlord" 
+                  ? "Manage your properties and verify tenant rent payments"
+                  : "Build your credit history through your rent payments"
+                }
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="text-center p-4">
-                  <CreditCard className="h-12 w-12 text-blue-600 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Track Payments</h3>
-                  <p className="text-sm text-gray-600">Automatically track your rent payments and build a payment history</p>
+              {user?.role === "landlord" ? (
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="text-center p-4">
+                    <Building className="h-12 w-12 text-blue-600 mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Manage Properties</h3>
+                    <p className="text-sm text-gray-600">Add and manage all your rental properties in one place</p>
+                  </div>
+                  <div className="text-center p-4">
+                    <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Verify Tenants</h3>
+                    <p className="text-sm text-gray-600">Verify tenant rent payments and provide rental references</p>
+                  </div>
+                  <div className="text-center p-4">
+                    <CreditCard className="h-12 w-12 text-purple-600 mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Track Payments</h3>
+                    <p className="text-sm text-gray-600">Monitor all rent payments across your properties</p>
+                  </div>
                 </div>
-                <div className="text-center p-4">
-                  <Building className="h-12 w-12 text-green-600 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Get Verified</h3>
-                  <p className="text-sm text-gray-600">Get your rental history verified by your landlord</p>
+              ) : (
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="text-center p-4">
+                    <CreditCard className="h-12 w-12 text-blue-600 mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Track Payments</h3>
+                    <p className="text-sm text-gray-600">Automatically track your rent payments and build a payment history</p>
+                  </div>
+                  <div className="text-center p-4">
+                    <Building className="h-12 w-12 text-green-600 mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Get Verified</h3>
+                    <p className="text-sm text-gray-600">Get your rental history verified by your landlord</p>
+                  </div>
+                  <div className="text-center p-4">
+                    <CheckCircle className="h-12 w-12 text-purple-600 mx-auto mb-3" />
+                    <h3 className="font-semibold mb-2">Build Credit</h3>
+                    <p className="text-sm text-gray-600">Share your rent credit report with future landlords</p>
+                  </div>
                 </div>
-                <div className="text-center p-4">
-                  <CheckCircle className="h-12 w-12 text-purple-600 mx-auto mb-3" />
-                  <h3 className="font-semibold mb-2">Build Credit</h3>
-                  <p className="text-sm text-gray-600">Share your rent credit report with future landlords</p>
-                </div>
-              </div>
+              )}
               <div className="text-center">
                 <Button 
                   onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setCurrentStep(2); }} 
@@ -408,6 +457,7 @@ export default function OnboardingPage() {
           </Card>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

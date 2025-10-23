@@ -71,7 +71,7 @@ export function createLandlordVerificationEmail(
     <body>
       <div class="container">
         <div class="header">
-          <h1>Enoíkio - Landlord Verification Request</h1>
+          <h1>RentLedger - Landlord Verification Request</h1>
         </div>
         <div class="content">
           <h2>Hello,</h2>
@@ -86,14 +86,14 @@ export function createLandlordVerificationEmail(
             <a href="${verificationUrl}" class="button">Verify Tenant Details</a>
           </div>
           
-          <p>This link will expire in 7 days. If you have any questions, please contact us.</p>
+          <p>This link will expire in 7 days. If you have any questions, please contact support@rentledger.co.uk.</p>
           
           <p>Thank you for your time.</p>
-          <p><strong>The Enoíkio Team</strong></p>
+          <p><strong>The RentLedger Team</strong></p>
         </div>
         <div class="footer">
-          <p>This is an automated message from Enoíkio. Please do not reply to this email.</p>
-          <p>If you believe you received this email in error, please ignore it.</p>
+          <p>This is an automated message from RentLedger. Please do not reply to this email.</p>
+          <p>If you believe you received this email in error, please contact support@rentledger.co.uk.</p>
         </div>
       </div>
     </body>
@@ -101,7 +101,7 @@ export function createLandlordVerificationEmail(
   `;
   
   const text = `
-    Enoíkio - Landlord Verification Request
+    RentLedger - Landlord Verification Request
     
     Hello,
     
@@ -112,19 +112,19 @@ export function createLandlordVerificationEmail(
     Please visit the following link to review and verify their rental information:
     ${verificationUrl}
     
-    This link will expire in 7 days. If you have any questions, please contact us.
+    This link will expire in 7 days. If you have any questions, please contact support@rentledger.co.uk.
     
     Thank you for your time.
-    The Enoíkio Team
+    The RentLedger Team
     
     ---
-    This is an automated message from Enoíkio. Please do not reply to this email.
-    If you believe you received this email in error, please ignore it.
+    This is an automated message from RentLedger. Please do not reply to this email.
+    If you believe you received this email in error, please contact support@rentledger.co.uk.
   `;
 
   return {
     to: landlordEmail,
-    from: 'noreply@enoikio.com',
+    from: 'noreply@rentledger.co.uk',
     subject,
     html,
     text

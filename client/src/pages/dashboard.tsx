@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { AddressEditor } from "@/components/address-editor";
 import { RentDateEditor } from "@/components/rent-date-editor";
 import { PropertyForm } from "@/components/property-form";
+import { Footer } from "@/components/footer";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -120,25 +121,22 @@ export default function Dashboard() {
           </div>
           <div className="flex space-x-3">
             <Button
-              variant="outline"
               onClick={startTour}
-              className="hidden sm:flex items-center"
+              className="hidden sm:flex items-center bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Play className="mr-2 h-4 w-4" />
               Take Tour
             </Button>
             <Button
-              variant="outline"
               onClick={() => window.location.href = '/report-generator'}
-              className="hidden sm:flex items-center"
+              className="hidden sm:flex items-center bg-blue-600 hover:bg-blue-700 text-white"
             >
               <FileText className="mr-2 h-4 w-4" />
               Reports
             </Button>
             <Button
-              variant="outline"
               onClick={() => window.location.href = '/settings'}
-              className="notifications hidden sm:flex items-center"
+              className="notifications hidden sm:flex items-center bg-blue-600 hover:bg-blue-700 text-white"
             >
               <HelpCircle className="mr-2 h-4 w-4" />
               Settings
@@ -460,6 +458,7 @@ export default function Dashboard() {
           onComplete={completeTour} 
         />
       </div>
+      <Footer />
     </div>
   );
 }

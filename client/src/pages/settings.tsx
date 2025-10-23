@@ -19,6 +19,7 @@ import { NotificationCenter } from "@/components/notification-system";
 import { UserPreferences } from "@/components/settings/preferences";
 import { DataExport } from "@/components/settings/data-export";
 import { SecurityLogs } from "@/components/settings/security-logs";
+import { Footer } from "@/components/footer";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -438,12 +439,11 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <Button variant="outline" className="w-full">
+                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   Export Data
                 </Button>
                 <Button 
-                  variant="outline" 
-                  className="w-full"
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white"
                   onClick={() => window.location.href = "/api/logout"}
                 >
                   Sign Out
@@ -456,6 +456,7 @@ export default function Settings() {
           </Card>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

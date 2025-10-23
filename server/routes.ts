@@ -144,10 +144,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/user/rent-info', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { amount, dayOfMonth, frequency, firstPaymentDate, nextPaymentDate } = req.body;
+      const { amount, dayOfMonth, frequency, firstPaymentDate, nextPaymentDate, landlordName, landlordEmail, landlordPhone } = req.body;
       
       const user = await storage.updateUserRentInfo(userId, {
-        amount, dayOfMonth, frequency, firstPaymentDate, nextPaymentDate
+        amount, 
+        dayOfMonth, 
+        frequency, 
+        firstPaymentDate, 
+        nextPaymentDate,
+        landlordName,
+        landlordEmail,
+        landlordPhone
       });
       
       res.json({ 
