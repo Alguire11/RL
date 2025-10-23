@@ -15,6 +15,8 @@ import { Home, Plus, Save, X, Mail } from "lucide-react";
 
 const propertySchema = z.object({
   address: z.string().min(1, "Property address is required"),
+  city: z.string().min(1, "City is required"),
+  postcode: z.string().min(1, "Postcode is required"),
   landlordName: z.string().min(1, "Landlord name is required"),
   landlordEmail: z.string().email("Please enter a valid email address"),
   landlordPhone: z.string().optional(),
@@ -41,6 +43,8 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
     resolver: zodResolver(propertySchema),
     defaultValues: {
       address: "",
+      city: "",
+      postcode: "",
       landlordName: "",
       landlordEmail: "",
       landlordPhone: "",
@@ -149,15 +153,38 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <Label htmlFor="address">Property Address</Label>
-              <Textarea
+              <Label htmlFor="address">Street Address</Label>
+              <Input
                 id="address"
-                placeholder="123 Main Street, London, SW1A 1AA"
-                rows={2}
+                placeholder="123 Main Street, Apartment 4B"
                 {...form.register("address")}
               />
               {form.formState.errors.address && (
                 <p className="text-sm text-red-500">{form.formState.errors.address.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                placeholder="London"
+                {...form.register("city")}
+              />
+              {form.formState.errors.city && (
+                <p className="text-sm text-red-500">{form.formState.errors.city.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="postcode">Postcode</Label>
+              <Input
+                id="postcode"
+                placeholder="SW1A 1AA"
+                {...form.register("postcode")}
+              />
+              {form.formState.errors.postcode && (
+                <p className="text-sm text-red-500">{form.formState.errors.postcode.message}</p>
               )}
             </div>
 

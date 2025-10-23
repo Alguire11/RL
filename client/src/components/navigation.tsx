@@ -90,37 +90,6 @@ export function Navigation() {
                 </Link>
               );
             })}
-            
-            {/* Company Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-1 text-gray-600 hover:text-primary">
-                  <Building className="w-4 h-4" />
-                  <span>Company</span>
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem asChild>
-                  <Link href="/about" className="flex items-center">
-                    <Users className="mr-2 h-4 w-4" />
-                    About Us
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/privacy" className="flex items-center">
-                    <Shield className="mr-2 h-4 w-4" />
-                    Privacy Policy
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/terms" className="flex items-center">
-                    <Scale className="mr-2 h-4 w-4" />
-                    Terms of Service
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
 
           {/* User Menu */}
