@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy } from "lucide-react";
+import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield } from "lucide-react";
 
 export default function LandlordDashboard() {
   const [, setLocation] = useLocation();
@@ -24,6 +24,14 @@ export default function LandlordDashboard() {
   const [showScheduleInspection, setShowScheduleInspection] = useState(false);
   const [showInviteTenant, setShowInviteTenant] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
+  const [showDocumentVault, setShowDocumentVault] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [documents, setDocuments] = useState([
+    { id: 1, name: "Tenancy Agreement - 123 Main St.pdf", type: "Contract", uploadDate: "2024-01-15", tenant: "Sarah Johnson", fileData: null as Blob | null },
+    { id: 2, name: "Property Inspection Report - 456 Oak Ave.pdf", type: "Report", uploadDate: "2024-01-10", tenant: "Michael Chen", fileData: null as Blob | null },
+    { id: 3, name: "Lease Renewal - 789 Pine Rd.pdf", type: "Contract", uploadDate: "2024-01-05", tenant: "Emma Williams", fileData: null as Blob | null },
+  ]);
   
   // Form states
   const [propertyForm, setPropertyForm] = useState({
@@ -138,6 +146,124 @@ export default function LandlordDashboard() {
     });
   };
 
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload PDF, DOC, or DOCX files only.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (10MB = 10 * 1024 * 1024 bytes)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: "File Too Large",
+        description: "File size must be less than 10MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const handleDocumentUpload = () => {
+    if (!selectedFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a file to upload.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create new document entry with the actual file as a Blob
+    const newDocument = {
+      id: documents.length + 1,
+      name: selectedFile.name,
+      type: selectedFile.name.endsWith('.pdf') ? 'PDF' : 'Document',
+      uploadDate: new Date().toISOString().split('T')[0],
+      tenant: "Current Tenant", // In production, this would come from a form or context
+      fileData: selectedFile as Blob
+    };
+
+    // Add to documents list (persisted in state for this session)
+    setDocuments(prev => [newDocument, ...prev]);
+
+    toast({
+      title: "Document Uploaded",
+      description: `${selectedFile.name} uploaded successfully`,
+    });
+    
+    setSelectedFile(null);
+    // Reset file input
+    const fileInput = document.getElementById('document-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+  };
+
+  const handleDocumentDownload = (docId: number, docName: string) => {
+    // Find the document
+    const doc = documents.find(d => d.id === docId);
+    
+    if (!doc || !doc.fileData) {
+      // If no file data (mock documents), show a message
+      toast({
+        title: "Download Unavailable",
+        description: "This is a sample document. Upload a real document to enable downloads.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Create blob URL and trigger download
+      const url = window.URL.createObjectURL(doc.fileData);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = docName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download Started",
+        description: `Downloading ${docName}...`,
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "An error occurred while downloading the file.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Calculate landlord badge tier
+  const calculateBadgeTier = () => {
+    const verificationRate = 85; // Mock: 85% verification rate
+    const tenantSatisfaction = 4.5; // Mock: 4.5/5 satisfaction
+    const totalVerifications = 8;
+
+    if (verificationRate >= 80 && tenantSatisfaction >= 4.0 && totalVerifications >= 5) {
+      return { tier: "Gold", color: "text-yellow-600", bgColor: "bg-yellow-100" };
+    } else if (verificationRate >= 60 && tenantSatisfaction >= 3.5) {
+      return { tier: "Silver", color: "text-gray-600", bgColor: "bg-gray-100" };
+    } else {
+      return { tier: "Bronze", color: "text-orange-600", bgColor: "bg-orange-100" };
+    }
+  };
+
+  const badgeTier = calculateBadgeTier();
+
   const verificationRequests = [
     {
       id: 1,
@@ -219,6 +345,38 @@ export default function LandlordDashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Trusted Landlord Badge */}
+        <Card className="mb-6 border-2" style={{borderColor: badgeTier.tier === 'Gold' ? '#ca8a04' : badgeTier.tier === 'Silver' ? '#71717a' : '#ea580c'}}>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className={`w-16 h-16 ${badgeTier.bgColor} rounded-full flex items-center justify-center`}>
+                  <Award className={`h-8 w-8 ${badgeTier.color}`} />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h3 className="text-2xl font-bold">{badgeTier.tier} Landlord</h3>
+                    <Badge className={`${badgeTier.bgColor} ${badgeTier.color} border-0`}>
+                      Trusted
+                    </Badge>
+                  </div>
+                  <p className="text-gray-600">85% verification rate • 4.5/5 tenant satisfaction • 8 total verifications</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowAnalytics(true)}
+                  className="hover:bg-blue-50"
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  View Analytics
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => (
@@ -578,6 +736,84 @@ export default function LandlordDashboard() {
                     </DialogContent>
                   </Dialog>
 
+                  <Dialog open={showDocumentVault} onOpenChange={setShowDocumentVault}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-indigo-50 hover:border-indigo-200">
+                        <FileText className="h-6 w-6 mb-2" />
+                        <span className="text-sm">Document Vault</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[700px]">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center text-xl">
+                          <FileText className="h-5 w-5 mr-2 text-indigo-600" />
+                          Document Vault
+                        </DialogTitle>
+                        <DialogDescription>
+                          Manage tenancy agreements and property documents
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="p-4 border-2 border-dashed rounded-lg hover:bg-gray-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <Upload className="h-8 w-8 text-gray-400" />
+                              <div>
+                                <p className="font-medium">Upload New Document</p>
+                                <p className="text-sm text-gray-500">PDF, DOC, or DOCX (max 10MB)</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              id="document-upload"
+                              type="file"
+                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                              onChange={handleFileSelect}
+                              className="flex-1"
+                            />
+                            <Button onClick={handleDocumentUpload} disabled={!selectedFile}>
+                              <Upload className="h-4 w-4 mr-2" />
+                              Upload
+                            </Button>
+                          </div>
+                          {selectedFile && (
+                            <p className="text-sm text-green-600 mt-2">
+                              Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm text-gray-700">Recent Documents</h4>
+                          {documents.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-blue-100 rounded flex items-center justify-center">
+                                  <FileText className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">{doc.name}</p>
+                                  <p className="text-xs text-gray-500">{doc.tenant} • {doc.uploadDate}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Badge variant="secondary" className="text-xs">{doc.type}</Badge>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleDocumentDownload(doc.id, doc.name)}
+                                  data-testid={`button-download-doc-${doc.id}`}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
                   <Dialog open={showScheduleInspection} onOpenChange={setShowScheduleInspection}>
                     <DialogTrigger asChild>
                       <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200">
@@ -707,6 +943,155 @@ export default function LandlordDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Analytics Dialog */}
+      <Dialog open={showAnalytics} onOpenChange={setShowAnalytics}>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-xl">
+              <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+              Analytics Snapshot
+            </DialogTitle>
+            <DialogDescription>
+              Comprehensive overview of your landlord performance
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            {/* Performance Metrics */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 mb-1">Verification Rate</p>
+                  <p className="text-3xl font-bold text-green-600">85%</p>
+                  <p className="text-xs text-gray-500 mt-1">↑ 5% from last month</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 mb-1">Avg Response Time</p>
+                  <p className="text-3xl font-bold text-blue-600">2.3h</p>
+                  <p className="text-xs text-gray-500 mt-1">↓ 0.5h from last month</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 mb-1">Tenant Satisfaction</p>
+                  <p className="text-3xl font-bold text-purple-600">4.5/5</p>
+                  <p className="text-xs text-gray-500 mt-1">Based on 18 reviews</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Monthly Trends */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Monthly Verification Trends</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-gray-600">January</span>
+                      <span className="text-sm font-semibold">12 verifications</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{width: '80%'}}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-gray-600">February</span>
+                      <span className="text-sm font-semibold">15 verifications</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{width: '100%'}}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm text-gray-600">March</span>
+                      <span className="text-sm font-semibold">10 verifications</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{width: '67%'}}></div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Property Performance */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Top Performing Properties</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <Star className="h-5 w-5 text-yellow-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">123 Main Street, London</p>
+                        <p className="text-xs text-gray-500">100% on-time payments • 5.0 rating</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-green-100 text-green-800">Excellent</Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Building className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">456 Oak Avenue, Manchester</p>
+                        <p className="text-xs text-gray-500">95% on-time payments • 4.8 rating</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-blue-100 text-blue-800">Great</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Badge Progress */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Badge Tier Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Current: {badgeTier.tier}</span>
+                      <span className="text-sm text-gray-500">Next: Platinum</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 h-3 rounded-full" style={{width: '85%'}}></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">15% away from Platinum tier</p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 bg-gray-50 rounded">
+                      <p className="text-xs text-gray-600">Verification Rate</p>
+                      <p className="text-sm font-semibold text-green-600">85%</p>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded">
+                      <p className="text-xs text-gray-600">Satisfaction</p>
+                      <p className="text-sm font-semibold text-blue-600">4.5/5</p>
+                    </div>
+                    <div className="p-2 bg-gray-50 rounded">
+                      <p className="text-xs text-gray-600">Total Verifications</p>
+                      <p className="text-sm font-semibold text-purple-600">8</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
