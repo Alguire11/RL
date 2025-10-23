@@ -8,6 +8,7 @@ import { Link, useLocation } from "wouter";
 import { CheckCircle, BarChart3, Share2, Menu, X, Star, Shield, Clock, Users, Award, TrendingUp, Check, FileText, CreditCard, Building, MapPin, Calendar } from "lucide-react";
 import heroBackground from "@assets/stock_images/modern_professional__232a68fd.jpg";
 import featuresBackground from "@assets/stock_images/abstract_light_geome_e310ffc3.jpg";
+import securityBackground from "@assets/stock_images/digital_security_loc_2fe42728.jpg";
 
 export default function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -373,13 +374,22 @@ export default function Landing() {
       </section>
 
       {/* Security Section */}
-      <section id="security" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="security" className="relative py-20 overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${securityBackground})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/85 via-slate-900/90 to-purple-900/85"></div>
+        </div>
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               Bank-Level Security
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-200 max-w-3xl mx-auto">
               Your financial data is protected with the highest standards
             </p>
           </div>
@@ -387,22 +397,22 @@ export default function Landing() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               {
-                icon: <Shield className="h-12 w-12 text-primary" />,
+                icon: <Shield className="h-12 w-12 text-blue-400" />,
                 title: "256-bit SSL Encryption",
                 description: "All data transmission is encrypted with industry-standard SSL"
               },
               {
-                icon: <Building className="h-12 w-12 text-primary" />,
+                icon: <Building className="h-12 w-12 text-purple-400" />,
                 title: "Bank-Grade Security",
                 description: "Same security standards used by major financial institutions"
               },
               {
-                icon: <Users className="h-12 w-12 text-primary" />,
+                icon: <Users className="h-12 w-12 text-cyan-400" />,
                 title: "Privacy Protected",
                 description: "We never sell or share your personal information"
               },
               {
-                icon: <Award className="h-12 w-12 text-primary" />,
+                icon: <Award className="h-12 w-12 text-pink-400" />,
                 title: "Compliance Ready",
                 description: "Fully compliant with UK data protection regulations"
               }
@@ -411,8 +421,8 @@ export default function Landing() {
                 <div className="flex justify-center mb-4">
                   {item.icon}
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.title}</h3>
-                <p className="text-gray-600">{item.description}</p>
+                <h3 className="text-xl font-semibold text-white mb-2">{item.title}</h3>
+                <p className="text-gray-300">{item.description}</p>
               </div>
             ))}
           </div>
