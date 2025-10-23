@@ -49,6 +49,9 @@ The application now includes a comprehensive admin access system with role-based
 ✓ Comprehensive Help Center with detailed FAQs covering Getting Started, Credit Building, and Account & Billing sections
 ✓ Enhanced live chat system with smart escalation to customer service email (support@enoikio.co.uk) for complex queries
 ✓ Added searchable knowledge base with categorized content and improved user experience
+✓ Fixed navbar transparency issues - changed to solid white background for better readability across all pages
+✓ Implemented admin user management: subscription plan updates with full backend API integration and database persistence
+✓ Added password reset UI for admins (demo system - production would require password hashing and email notifications)
 
 ## System Architecture
 
