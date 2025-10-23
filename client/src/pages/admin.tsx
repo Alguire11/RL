@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Users, CreditCard, FileText, Activity, Shield, TrendingUp, Download, AlertTriangle, MessageSquare, Settings2 } from "lucide-react";
+import { Users, CreditCard, FileText, Activity, Shield, TrendingUp, Download, AlertTriangle, MessageSquare, Settings2, MapPin, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 
@@ -51,6 +51,11 @@ export default function AdminDashboard() {
   const [announcementText, setAnnouncementText] = useState("");
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const queryClient = useQueryClient();
+  const [disputes, setDisputes] = useState([
+    { id: 1, user: "John Smith", type: "Payment Dispute", status: "pending", date: "2024-01-20" },
+    { id: 2, user: "Emma Wilson", type: "Verification Issue", status: "resolved", date: "2024-01-19" },
+    { id: 3, user: "Michael Brown", type: "Account Access", status: "pending", date: "2024-01-18" },
+  ]);
 
   // Check for admin session
   useEffect(() => {
@@ -168,6 +173,21 @@ export default function AdminDashboard() {
       });
     }
   });
+
+  const handleDisputeAction = (disputeId: number, action: 'approve' | 'reject') => {
+    // Update dispute status in state
+    setDisputes(prev => prev.map(dispute => 
+      dispute.id === disputeId 
+        ? { ...dispute, status: action === 'approve' ? 'resolved' : 'rejected' }
+        : dispute
+    ));
+    
+    // In production, this would make an API call to update the dispute
+    toast({
+      title: action === 'approve' ? "Dispute Approved" : "Dispute Rejected",
+      description: `Dispute #${disputeId} has been ${action === 'approve' ? 'resolved' : 'rejected'}.`,
+    });
+  };
 
   const sendAnnouncementMutation = useMutation({
     mutationFn: (announcement: string) => 
@@ -454,6 +474,106 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Disputes Management & Regional Activity */}
+        <div className="grid lg:grid-cols-2 gap-8 mb-8">
+          {/* Disputes Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertTriangle className="h-5 w-5 text-orange-600" />
+                <span>Disputes Management</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {disputes.map((dispute) => (
+                  <div key={dispute.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <p className="font-medium text-sm">{dispute.user}</p>
+                        <Badge variant={dispute.status === 'pending' ? 'secondary' : 'default'} 
+                               className={dispute.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}>
+                          {dispute.status}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-600">{dispute.type}</p>
+                      <p className="text-xs text-gray-500">Opened: {dispute.date}</p>
+                    </div>
+                    <div className="flex space-x-1">
+                      {dispute.status === 'pending' && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => handleDisputeAction(dispute.id, 'approve')}
+                            data-testid={`button-approve-dispute-${dispute.id}`}
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDisputeAction(dispute.id, 'reject')}
+                            data-testid={`button-reject-dispute-${dispute.id}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <Button variant="outline" className="w-full mt-2">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  View All Disputes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Regional Activity Heatmap */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <MapPin className="h-5 w-5 text-blue-600" />
+                <span>Regional Activity</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { region: "London", users: 245, activity: 95 },
+                  { region: "Manchester", users: 142, activity: 78 },
+                  { region: "Birmingham", users: 98, activity: 65 },
+                  { region: "Edinburgh", users: 76, activity: 54 },
+                  { region: "Bristol", users: 63, activity: 42 },
+                ].map((region) => (
+                  <div key={region.region}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm font-medium">{region.region}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-semibold text-blue-600">{region.users} users</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full" 
+                        style={{width: `${region.activity}%`}}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{region.activity}% activity rate</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Admin Actions */}
         <Card>
