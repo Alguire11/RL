@@ -20,10 +20,10 @@ const propertySchema = z.object({
   landlordName: z.string().min(1, "Landlord name is required"),
   landlordEmail: z.string().email("Please enter a valid email address"),
   landlordPhone: z.string().optional(),
-  monthlyRent: z.string().min(1, "Monthly rent is required").transform((val) => parseFloat(val)),
+  monthlyRent: z.string().min(1, "Monthly rent is required"),
   leaseStartDate: z.string().min(1, "Lease start date is required"),
   leaseEndDate: z.string().min(1, "Lease end date is required"),
-  depositAmount: z.string().optional().transform((val) => val ? parseFloat(val) : undefined),
+  depositAmount: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -54,10 +54,10 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
       landlordName: "",
       landlordEmail: "",
       landlordPhone: "",
-      monthlyRent: 0,
+      monthlyRent: "",
       leaseStartDate: "",
       leaseEndDate: "",
-      depositAmount: undefined,
+      depositAmount: "",
       notes: "",
     },
   });
