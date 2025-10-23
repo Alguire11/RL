@@ -113,9 +113,6 @@ export default function Landing() {
               <Button onClick={handleGetStarted} className="text-lg px-8 py-3 bg-white hover:bg-gray-100 text-blue-600 shadow-lg">
                 Get Started Free
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-3 border-white text-[#2563eb] hover:bg-white/10">
-                Watch Demo
-              </Button>
             </div>
           </div>
         </div>
