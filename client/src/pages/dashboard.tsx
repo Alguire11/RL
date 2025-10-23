@@ -8,8 +8,12 @@ import { StatCard } from "@/components/ui/stat-card";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling, Play, HelpCircle } from "lucide-react";
+import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling, Play, HelpCircle, Shield, Award, CreditCard } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
 import { ManualPaymentForm, ManualPaymentList } from "@/components/manual-payment-form";
 import { AchievementBadges } from "@/components/achievement-badges";
 import { EnhancedDataExport } from "@/components/enhanced-data-export";
@@ -24,6 +28,7 @@ export default function Dashboard() {
   const { isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { showTour, startTour, closeTour, completeTour, shouldShowTour } = useDashboardTour();
+  const { plan, isLoading: subLoading, subscription } = useSubscription();
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -67,7 +72,7 @@ export default function Dashboard() {
 
   if (isLoading || statsLoading) {
     return (
-      <div className="min-h-screen bg-light-gray">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
         <Navigation />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse">
@@ -104,7 +109,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-light-gray">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
       <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Dashboard Header */}
@@ -141,6 +146,40 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Subscription Status Banner */}
+        {!subLoading && (
+          <Card className="mb-6 bg-gradient-to-r from-blue-500 to-purple-600 border-0 text-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                    <CreditCard className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm opacity-90">Current Plan</p>
+                    <p className="text-xl font-bold">{plan.name}</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="text-right">
+                    <p className="text-sm opacity-90">Monthly Price</p>
+                    <p className="text-lg font-semibold">{plan.price === 0 ? 'Free' : `£${plan.price}/mo`}</p>
+                  </div>
+                  {plan.id !== 'premium' && (
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => setLocation('/settings')}
+                      className="bg-white text-blue-600 hover:bg-gray-100"
+                    >
+                      Upgrade
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Overview */}
         <div className="dashboard-stats grid md:grid-cols-4 gap-6 mb-8">
           <StatCard
@@ -167,6 +206,80 @@ export default function Dashboard() {
             icon={Calendar}
             color="accent"
           />
+        </div>
+
+        {/* Monthly Summary & Credit Score */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Monthly Summary Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl">
+                <Calendar className="h-5 w-5 mr-2 text-primary" />
+                Monthly Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Rent Paid This Month</span>
+                  <span className="font-semibold text-lg">{formatCurrency((stats as any)?.monthlyRentPaid || 0)}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Verification Status</span>
+                  <Badge variant={(stats as any)?.verificationStatus === 'verified' ? 'default' : 'secondary'} className="bg-green-100 text-green-800">
+                    {(stats as any)?.verified || 0} Verified
+                  </Badge>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Credit Growth</span>
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    <span className="font-semibold text-green-600">+{(stats as any)?.creditGrowth || 0} points</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Credit Score Tracker */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center text-xl">
+                <Award className="h-5 w-5 mr-2 text-purple-600" />
+                Credit Score
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                    {(stats as any)?.creditScore || 0}
+                  </div>
+                  <p className="text-sm text-gray-600">out of 1000</p>
+                </div>
+                <Progress value={((stats as any)?.creditScore || 0) / 10} className="h-3" />
+                <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                  <div>
+                    <p className="text-gray-500">On-Time</p>
+                    <p className="font-semibold">{Math.round(((stats as any)?.creditScore || 0) * 0.6)} pts</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Verified</p>
+                    <p className="font-semibold">{Math.round(((stats as any)?.creditScore || 0) * 0.2)} pts</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Ratio</p>
+                    <p className="font-semibold">{Math.round(((stats as any)?.creditScore || 0) * 0.2)} pts</p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 text-center">
+                  Score based on: On-time payments (60%), Verification (20%), Rent-to-income (20%)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Actions */}
@@ -208,7 +321,7 @@ export default function Dashboard() {
               ) : (
                 <div className="space-y-4">
                   {(payments as any[])?.slice(0, 3).map((payment: any) => (
-                    <div key={payment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div key={payment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-l-4" style={{borderLeftColor: payment.verified ? '#10b981' : '#9ca3af'}}>
                       <div className="flex items-center space-x-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                           payment.status === 'paid' ? 'bg-success/10' : 'bg-gray-300'
@@ -220,7 +333,18 @@ export default function Dashboard() {
                           )}
                         </div>
                         <div>
-                          <p className="font-medium">{formatDate(payment.dueDate)}</p>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-medium">{formatDate(payment.dueDate)}</p>
+                            {payment.verified && (
+                              <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                                <Shield className="w-3 h-3 mr-1" />
+                                Verified
+                              </Badge>
+                            )}
+                            {!payment.verified && payment.status === 'paid' && (
+                              <Badge variant="secondary" className="text-xs">Pending</Badge>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600">
                             {payment.status === 'paid' ? 'Paid on time' : 'Pending payment'}
                           </p>

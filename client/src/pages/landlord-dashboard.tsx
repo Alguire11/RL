@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send } from "lucide-react";
+import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy } from "lucide-react";
 
 export default function LandlordDashboard() {
   const [, setLocation] = useLocation();
@@ -22,6 +22,8 @@ export default function LandlordDashboard() {
   const [showManageTenants, setShowManageTenants] = useState(false);
   const [showSendNotice, setShowSendNotice] = useState(false);
   const [showScheduleInspection, setShowScheduleInspection] = useState(false);
+  const [showInviteTenant, setShowInviteTenant] = useState(false);
+  const [inviteLink, setInviteLink] = useState("");
   
   // Form states
   const [propertyForm, setPropertyForm] = useState({
@@ -117,6 +119,25 @@ export default function LandlordDashboard() {
     setShowScheduleInspection(false);
   };
 
+  const handleGenerateInviteLink = (propertyId: string) => {
+    // Generate unique invite link
+    const uniqueCode = Math.random().toString(36).substring(2, 15);
+    const link = `${window.location.origin}/tenant/invite/${uniqueCode}`;
+    setInviteLink(link);
+    toast({
+      title: "Invite Link Generated",
+      description: "Share this link with your tenant to connect their account.",
+    });
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(inviteLink);
+    toast({
+      title: "Link Copied",
+      description: "Invite link copied to clipboard",
+    });
+  };
+
   const verificationRequests = [
     {
       id: 1,
@@ -172,14 +193,14 @@ export default function LandlordDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Building className="h-5 w-5 text-blue-600" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Building className="h-5 w-5 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Landlord Dashboard</h1>
@@ -300,6 +321,60 @@ export default function LandlordDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
+                  <Dialog open={showInviteTenant} onOpenChange={setShowInviteTenant}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="h-20 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200"
+                        onClick={() => handleGenerateInviteLink('property-1')}
+                      >
+                        <Link2 className="h-6 w-6 mb-2" />
+                        <span className="text-sm">Invite Tenant</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center text-xl">
+                          <Link2 className="h-5 w-5 mr-2 text-purple-600" />
+                          Invite Tenant to Connect
+                        </DialogTitle>
+                        <DialogDescription>
+                          Share this unique link with your tenant to connect their account
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Invite Link</Label>
+                          <div className="flex space-x-2">
+                            <Input value={inviteLink} readOnly className="font-mono text-sm" />
+                            <Button onClick={handleCopyLink} variant="outline" size="icon">
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            This link is unique and can be used only once. Valid for 7 days.
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
+                          <div className="text-center">
+                            <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-600">QR Code Preview</p>
+                            <p className="text-xs text-gray-500">Tenant can scan this to connect</p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button onClick={() => setShowInviteTenant(false)} variant="outline" className="flex-1">
+                            Close
+                          </Button>
+                          <Button onClick={handleCopyLink} className="flex-1 bg-purple-600 hover:bg-purple-700">
+                            <Mail className="h-4 w-4 mr-2" />
+                            Send via Email
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+
                   <Dialog open={showAddProperty} onOpenChange={setShowAddProperty}>
                     <DialogTrigger asChild>
                       <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200">
