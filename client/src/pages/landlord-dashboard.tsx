@@ -9,13 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield } from "lucide-react";
+import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield, Lock, Info, Sparkles, ArrowRight } from "lucide-react";
 
 export default function LandlordDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [adminSession, setAdminSession] = useState<any>(null);
+  const [subscriptionPlan, setSubscriptionPlan] = useState<'free' | 'standard' | 'premium'>('free');
+  const [propertyCount, setPropertyCount] = useState(0); // Track actual property count
   
   // Dialog states
   const [showAddProperty, setShowAddProperty] = useState(false);
@@ -26,6 +29,7 @@ export default function LandlordDashboard() {
   const [inviteLink, setInviteLink] = useState("");
   const [showDocumentVault, setShowDocumentVault] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [documents, setDocuments] = useState([
     { id: 1, name: "Tenancy Agreement - 123 Main St.pdf", type: "Contract", uploadDate: "2024-01-15", tenant: "Sarah Johnson", fileData: null as Blob | null },
@@ -83,9 +87,23 @@ export default function LandlordDashboard() {
 
   // Quick Action handlers
   const handleAddProperty = () => {
+    // Check subscription limits
+    const maxProperties = subscriptionPlan === 'free' ? 1 : subscriptionPlan === 'standard' ? 3 : Infinity;
+    
+    if (propertyCount >= maxProperties) {
+      toast({
+        title: "Property Limit Reached",
+        description: `Your ${subscriptionPlan} plan allows ${maxProperties} ${maxProperties === 1 ? 'property' : 'properties'}. Upgrade to add more.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Add property and increment count
+    setPropertyCount(prev => prev + 1);
     toast({
       title: "Property Added",
-      description: `${propertyForm.address} has been added to your portfolio.`,
+      description: `${propertyForm.address} has been added to your portfolio. You now have ${propertyCount + 1} ${propertyCount + 1 === 1 ? 'property' : 'properties'}.`,
     });
     setPropertyForm({
       address: '',
@@ -301,7 +319,7 @@ export default function LandlordDashboard() {
   ];
 
   const stats = [
-    { title: "Properties", value: "12", icon: Building, color: "text-blue-600" },
+    { title: "Properties", value: propertyCount.toString(), icon: Building, color: "text-blue-600" },
     { title: "Active Tenants", value: "18", icon: Users, color: "text-green-600" },
     { title: "Verifications", value: "8", icon: CheckCircle, color: "text-purple-600" },
     { title: "Pending Requests", value: "3", icon: Clock, color: "text-orange-600" }
@@ -333,22 +351,89 @@ export default function LandlordDashboard() {
                 <p className="text-gray-600">Welcome back, {adminSession.username}</p>
               </div>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={handleLogout}
-              className="border-red-200 text-red-600 hover:bg-red-50"
-            >
-              Logout
-            </Button>
+            <div className="flex items-center space-x-3">
+              {/* Demo: Subscription Plan Switcher */}
+              <Select value={subscriptionPlan} onValueChange={(value: 'free' | 'standard' | 'premium') => setSubscriptionPlan(value)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free Plan</SelectItem>
+                  <SelectItem value="standard">Standard Plan</SelectItem>
+                  <SelectItem value="premium">Premium Plan</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="outline" 
+                onClick={handleLogout}
+                className="border-red-200 text-red-600 hover:bg-red-50"
+              >
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        {showWelcome && (
+          <Alert className="mb-6 border-blue-200 bg-gradient-to-r from-blue-50 to-purple-50">
+            <Info className="h-5 w-5 text-blue-600" />
+            <AlertTitle className="text-lg font-semibold flex items-center justify-between">
+              <span>Welcome to Enoíkio Landlord Portal</span>
+              <Button variant="ghost" size="sm" onClick={() => setShowWelcome(false)}>
+                <span className="sr-only">Close</span>
+                ×
+              </Button>
+            </AlertTitle>
+            <AlertDescription className="mt-2 text-sm">
+              <p className="mb-2">Your complete platform for tenant management and credit building verification.</p>
+              <div className="grid md:grid-cols-3 gap-3 mt-3">
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                  <span>Verify tenant rental history</span>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <Shield className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <span>Build your landlord reputation</span>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <BarChart3 className="h-4 w-4 text-purple-600 mt-0.5" />
+                  <span>Track performance metrics</span>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Subscription Status & Upgrade Prompt */}
+        {subscriptionPlan === 'free' && (
+          <Alert className="mb-6 border-yellow-200 bg-yellow-50">
+            <Sparkles className="h-5 w-5 text-yellow-600" />
+            <AlertTitle className="text-lg font-semibold flex items-center justify-between">
+              <span>You're on the Free Plan</span>
+              <Badge variant="outline" className="bg-white">Limited Features</Badge>
+            </AlertTitle>
+            <AlertDescription className="mt-2">
+              <p className="text-sm mb-3">Upgrade to unlock advanced analytics, unlimited properties, and priority support.</p>
+              <div className="flex items-center space-x-3">
+                <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Upgrade to Premium - £19.99/mo
+                </Button>
+                <Button variant="outline" size="sm">
+                  View Plans
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Trusted Landlord Badge */}
         <Card className="mb-6 border-2" style={{borderColor: badgeTier.tier === 'Gold' ? '#ca8a04' : badgeTier.tier === 'Silver' ? '#71717a' : '#ea580c'}}>
           <CardContent className="p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
               <div className="flex items-center space-x-4">
                 <div className={`w-16 h-16 ${badgeTier.bgColor} rounded-full flex items-center justify-center`}>
                   <Award className={`h-8 w-8 ${badgeTier.color}`} />
@@ -363,17 +448,97 @@ export default function LandlordDashboard() {
                   <p className="text-gray-600">85% verification rate • 4.5/5 tenant satisfaction • 8 total verifications</p>
                 </div>
               </div>
-              <div className="text-right">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowAnalytics(true)}
-                  className="hover:bg-blue-50"
-                >
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View Analytics
-                </Button>
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className="text-sm">
+                  {subscriptionPlan === 'free' && 'Free Plan'}
+                  {subscriptionPlan === 'standard' && 'Standard Plan'}
+                  {subscriptionPlan === 'premium' && 'Premium Plan'}
+                </Badge>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Analytics Dashboard - Visible Section */}
+        <Card className="mb-8 border-blue-200">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center text-xl">
+                  <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+                  Performance Analytics
+                  {subscriptionPlan === 'free' && (
+                    <Badge variant="outline" className="ml-3 text-xs">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Limited in Free Plan
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>Real-time insights into your landlord performance</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 mb-1">Verification Rate</p>
+                  <p className="text-3xl font-bold text-green-600">85%</p>
+                  <p className="text-xs text-gray-500 mt-1 flex items-center">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    ↑ 5% from last month
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 mb-1">Avg Response Time</p>
+                  <p className="text-3xl font-bold text-blue-600">2.3h</p>
+                  <p className="text-xs text-gray-500 mt-1">↓ 0.5h faster</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 mb-1">Tenant Satisfaction</p>
+                  <p className="text-3xl font-bold text-purple-600">4.5/5</p>
+                  <p className="text-xs text-gray-500 mt-1">Based on 18 reviews</p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {subscriptionPlan === 'free' ? (
+              <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
+                <Lock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <h3 className="text-lg font-semibold mb-2">Unlock Advanced Analytics</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Get detailed trends, property performance insights, and tenant behavior analysis with Premium.
+                </p>
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
+                  Upgrade Now <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Monthly Verification Trends</span>
+                  </div>
+                  <div className="space-y-2">
+                    {['January', 'February', 'March'].map((month, idx) => (
+                      <div key={month}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-gray-600">{month}</span>
+                          <span className="text-sm font-semibold">{12 + idx * 2} verifications</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="bg-blue-600 h-2 rounded-full" style={{width: `${60 + idx * 15}%`}}></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -535,9 +700,14 @@ export default function LandlordDashboard() {
 
                   <Dialog open={showAddProperty} onOpenChange={setShowAddProperty}>
                     <DialogTrigger asChild>
-                      <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200">
+                      <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200 relative">
                         <Building className="h-6 w-6 mb-2" />
                         <span className="text-sm">Add Property</span>
+                        {subscriptionPlan !== 'premium' && (
+                          <Badge variant="outline" className="absolute -top-2 -right-2 text-[10px] px-1">
+                            {subscriptionPlan === 'free' ? '1 max' : '3 max'}
+                          </Badge>
+                        )}
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
@@ -545,6 +715,16 @@ export default function LandlordDashboard() {
                         <DialogTitle>Add New Property</DialogTitle>
                         <DialogDescription>
                           Add a new property to your portfolio
+                          {subscriptionPlan === 'free' && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              Free: 1 property max
+                            </Badge>
+                          )}
+                          {subscriptionPlan === 'standard' && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              Standard: 3 properties max
+                            </Badge>
+                          )}
                         </DialogDescription>
                       </DialogHeader>
                       <div className="grid gap-4 py-4">
