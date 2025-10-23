@@ -232,10 +232,9 @@ export default function Settings() {
         <div className="mb-8">
           <div className="flex items-center mb-4">
             <Button 
-              variant="ghost" 
               size="sm" 
               onClick={() => setLocation('/dashboard')}
-              className="mr-4"
+              className="mr-4 bg-gray-600 hover:bg-gray-700 text-white"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
@@ -326,11 +325,10 @@ export default function Settings() {
                         </div>
                       </div>
                       <Button
-                        variant="ghost"
                         size="sm"
                         onClick={() => handleDisconnectBank(connection.id)}
                         disabled={disconnectBankMutation.isPending}
-                        className="text-red-500 hover:text-red-700"
+                        className="bg-red-500 hover:bg-red-600 text-white"
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
                         Disconnect
@@ -341,14 +339,14 @@ export default function Settings() {
                   <div className="text-center py-8">
                     <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-600 mb-4">No bank connections yet</p>
-                    <Button variant="outline" onClick={handleConnectBank}>
+                    <Button onClick={handleConnectBank} className="bg-blue-600 hover:bg-blue-700 text-white">
                       <Plus className="w-4 h-4 mr-2" />
                       Connect Bank Account
                     </Button>
                   </div>
                 )}
                 {bankConnections && bankConnections.length > 0 && (
-                  <Button variant="outline" onClick={handleConnectBank}>
+                  <Button onClick={handleConnectBank} className="bg-blue-600 hover:bg-blue-700 text-white">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Another Bank
                   </Button>
@@ -387,7 +385,7 @@ export default function Settings() {
                   <div className="text-center py-8">
                     <Building className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-600 mb-4">No properties added yet</p>
-                    <Button variant="outline">
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                       <Plus className="w-4 h-4 mr-2" />
                       Add Property
                     </Button>

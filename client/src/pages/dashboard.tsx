@@ -293,7 +293,7 @@ export default function Dashboard() {
           <Card className="payment-history">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-xl font-semibold">Recent Payments</CardTitle>
-              <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
                 View All
               </Button>
             </CardHeader>
