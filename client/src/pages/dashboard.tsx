@@ -384,7 +384,7 @@ export default function Dashboard() {
                 </GradientButton>
                 <Button 
                   variant="outline" 
-                  className="w-full h-12 border-2 border-primary text-primary hover:bg-primary hover:text-white"
+                  className="w-full h-12 border-2 border-primary text-primary hover:bg-primary hover:text-white bg-[#0000001f]"
                   onClick={() => setLocation('/report-generator')}
                 >
                   <FileText className="w-5 h-5 mr-3" />
