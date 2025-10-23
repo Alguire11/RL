@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -332,12 +332,42 @@ export default function LandlordDashboard() {
     });
   };
 
+  // Handle stats card clicks
+  const handleStatsCardClick = (statTitle: string) => {
+    switch(statTitle) {
+      case 'Properties':
+        toast({
+          title: "Properties",
+          description: `You have ${propertyCount} ${propertyCount === 1 ? 'property' : 'properties'}. ${propertyCount === 0 ? 'Click "Add Property" to get started!' : 'Manage them in the Quick Actions section.'}`,
+        });
+        break;
+      case 'Active Tenants':
+        toast({
+          title: "Active Tenants",
+          description: "View all your active tenants and their payment history in the tenant management section.",
+        });
+        break;
+      case 'Verifications':
+        toast({
+          title: "Verifications",
+          description: "View pending verification requests below or approve/reject tenant payments.",
+        });
+        break;
+      case 'Pending Requests':
+        toast({
+          title: "Pending Requests",
+          description: "You have verification requests waiting for your review. Check the Verification Requests section.",
+        });
+        break;
+    }
+  };
+
   if (!adminSession) {
     return <div>Loading...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -418,13 +448,17 @@ export default function LandlordDashboard() {
             <AlertDescription className="mt-2">
               <p className="text-sm mb-3">Upgrade to unlock advanced analytics, unlimited properties, and priority support.</p>
               <div className="flex items-center space-x-3">
-                <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Upgrade to Premium - £19.99/mo
-                </Button>
-                <Button variant="outline" size="sm">
-                  View Plans
-                </Button>
+                <Link href="/subscribe">
+                  <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg" data-testid="button-upgrade-premium">
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Upgrade to Premium - £19.99/mo
+                  </Button>
+                </Link>
+                <Link href="/subscribe">
+                  <Button variant="outline" size="sm" className="border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold" data-testid="button-view-plans">
+                    View Plans
+                  </Button>
+                </Link>
               </div>
             </AlertDescription>
           </Alert>
@@ -513,9 +547,11 @@ export default function LandlordDashboard() {
                 <p className="text-sm text-gray-600 mb-4">
                   Get detailed trends, property performance insights, and tenant behavior analysis with Premium.
                 </p>
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600">
-                  Upgrade Now <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <Link href="/subscribe">
+                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg" data-testid="button-upgrade-analytics">
+                    Upgrade Now <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
               </div>
             ) : (
               <div className="space-y-4">
@@ -542,17 +578,27 @@ export default function LandlordDashboard() {
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - Clickable Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => (
-            <Card key={stat.title}>
+            <Card 
+              key={stat.title}
+              className="cursor-pointer hover:shadow-lg transition-all duration-300 border-0 shadow-md"
+              onClick={() => handleStatsCardClick(stat.title)}
+              data-testid={`card-stat-${stat.title.toLowerCase().replace(' ', '-')}`}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">{stat.title}</p>
                     <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                   </div>
-                  <div className={`p-3 rounded-full bg-gray-100 ${stat.color}`}>
+                  <div className={`p-3 rounded-full bg-gradient-to-br ${
+                    stat.title === 'Properties' ? 'from-blue-100 to-blue-200' :
+                    stat.title === 'Active Tenants' ? 'from-green-100 to-green-200' :
+                    stat.title === 'Verifications' ? 'from-purple-100 to-purple-200' :
+                    'from-orange-100 to-orange-200'
+                  } ${stat.color}`}>
                     <stat.icon className="h-6 w-6" />
                   </div>
                 </div>

@@ -1976,6 +1976,44 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
   // Add the manual payment routes inside the registerRoutes function
   addManualPaymentRoutes(app, requireAuth, storage);
 
+  // Stripe payment intent endpoint
+  app.post("/api/create-payment-intent", async (req, res) => {
+    try {
+      // Check if Stripe is configured
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({ 
+          message: "Payment system not configured. Please contact support." 
+        });
+      }
+
+      const { default: Stripe } = await import('stripe');
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: "2024-10-28.acacia",
+      });
+
+      const { amount, plan } = req.body;
+      const paymentAmount = amount || (plan === 'standard' ? 9.99 : 19.99);
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(paymentAmount * 100), // Convert to pence
+        currency: "gbp",
+        automatic_payment_methods: {
+          enabled: true, // Enables Apple Pay, Google Pay, and cards
+        },
+        metadata: {
+          plan: plan || 'unknown'
+        }
+      });
+
+      res.json({ clientSecret: paymentIntent.client_secret });
+    } catch (error: any) {
+      console.error("Stripe payment error:", error);
+      res.status(500).json({ 
+        message: "Error creating payment intent: " + error.message 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

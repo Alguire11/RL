@@ -58,6 +58,12 @@ The application now includes a comprehensive admin access system with role-based
 ✓ Created upgrade prompts and feature gates for free tier landlords with clear pricing CTAs
 ✓ Added subscription plan switcher in landlord dashboard header for demo testing
 ✓ Enhanced mobile responsiveness for all landlord dashboard sections
+✓ Aligned landlord/tenant UI with landing page brand colors (clean white backgrounds, blue-purple gradients)
+✓ Made stats cards clickable (Properties, Active Tenants, Verifications, Pending Requests)
+✓ Enhanced button visibility and contrast across all dashboards (brand blue-purple gradients)
+✓ Created subscription upgrade page (/subscribe) with Stripe Elements supporting Apple Pay and Google Pay
+✓ Added Stripe payment intent endpoint (requires VITE_STRIPE_PUBLIC_KEY and STRIPE_SECRET_KEY to function)
+✓ Linked all upgrade buttons to subscription page with clear pricing tiers
 
 ## System Architecture
 
