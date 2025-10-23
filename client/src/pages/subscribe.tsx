@@ -6,8 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, Shield, TrendingUp, Users, Building, BarChart3, Crown } from "lucide-react";
-import { Link } from "wouter";
+import { Check, Sparkles, Shield, TrendingUp, Users, Building, BarChart3, Crown, ArrowLeft } from "lucide-react";
+import { Link, useLocation } from "wouter";
 
 // Load Stripe outside of component
 const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY 
@@ -74,6 +74,7 @@ const CheckoutForm = ({ selectedPlan }: { selectedPlan: 'standard' | 'premium' }
 
 export default function Subscribe() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'standard' | 'premium'>('premium');
   const [clientSecret, setClientSecret] = useState("");
   const [showCheckout, setShowCheckout] = useState(false);
@@ -219,13 +220,24 @@ export default function Subscribe() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-900 via-purple-900 to-blue-800 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Choose Your Perfect Plan
-          </h1>
-          <p className="text-xl text-gray-200 max-w-2xl mx-auto">
-            Unlock powerful landlord features and grow your property portfolio with RentLedger
-          </p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Button 
+            variant="ghost" 
+            onClick={() => setLocation('/dashboard')}
+            className="mb-6 text-white hover:bg-white/10"
+            data-testid="button-back-to-home"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Home
+          </Button>
+          <div className="text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+              Choose Your Perfect Plan
+            </h1>
+            <p className="text-xl text-gray-200 max-w-2xl mx-auto">
+              Unlock powerful landlord features and grow your property portfolio with RentLedger
+            </p>
+          </div>
         </div>
       </div>
 

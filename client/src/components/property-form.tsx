@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Plus, Save, X, Mail } from "lucide-react";
@@ -39,6 +39,12 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch user data to get saved address
+  const { data: user } = useQuery({
+    queryKey: ["/api/auth/user"],
+    retry: false,
+  });
+
   const form = useForm<PropertyData>({
     resolver: zodResolver(propertySchema),
     defaultValues: {
@@ -55,6 +61,22 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
       notes: "",
     },
   });
+
+  // Pre-fill address fields when user data is available
+  useEffect(() => {
+    if (user && (user as any).address) {
+      const userAddress = (user as any).address;
+      if (userAddress.street) {
+        form.setValue('address', userAddress.street);
+      }
+      if (userAddress.city) {
+        form.setValue('city', userAddress.city);
+      }
+      if (userAddress.postcode) {
+        form.setValue('postcode', userAddress.postcode);
+      }
+    }
+  }, [user, form]);
 
   const createPropertyMutation = useMutation({
     mutationFn: async (data: PropertyData) => {
