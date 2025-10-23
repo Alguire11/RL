@@ -263,15 +263,15 @@ export default function Dashboard() {
                 <div className="grid grid-cols-3 gap-2 text-center text-sm">
                   <div>
                     <p className="text-gray-500">On-Time</p>
-                    <p className="font-semibold">{Math.round(((stats as any)?.creditScore || 0) * 0.6)} pts</p>
+                    <p className="font-semibold">{(stats as any)?.onTimeScore || 0} pts</p>
                   </div>
                   <div>
                     <p className="text-gray-500">Verified</p>
-                    <p className="font-semibold">{Math.round(((stats as any)?.creditScore || 0) * 0.2)} pts</p>
+                    <p className="font-semibold">{(stats as any)?.verificationScore || 0} pts</p>
                   </div>
                   <div>
                     <p className="text-gray-500">Ratio</p>
-                    <p className="font-semibold">{Math.round(((stats as any)?.creditScore || 0) * 0.2)} pts</p>
+                    <p className="font-semibold">{(stats as any)?.rentToIncomeScore || 0} pts</p>
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 text-center">

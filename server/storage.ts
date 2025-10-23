@@ -105,6 +105,10 @@ export interface IStorage {
     totalPaid: number;
     onTimePercentage: number;
     nextPaymentDue: string | null;
+    creditScore: number;
+    onTimeScore: number;
+    verificationScore: number;
+    rentToIncomeScore: number;
   }>;
 
   // Notification operations
@@ -410,6 +414,10 @@ export class DatabaseStorage implements IStorage {
     totalPaid: number;
     onTimePercentage: number;
     nextPaymentDue: string | null;
+    creditScore: number;
+    onTimeScore: number;
+    verificationScore: number;
+    rentToIncomeScore: number;
   }> {
     // Get all payments for the user
     const payments = await db
@@ -446,11 +454,40 @@ export class DatabaseStorage implements IStorage {
     const nextPayment = payments.find(p => p.status === 'pending');
     const nextPaymentDue = nextPayment ? nextPayment.dueDate : null;
 
+    // Calculate Credit Score (0-1000 scale)
+    // Algorithm: 60% on-time payments, 20% verification, 20% rent-to-income ratio
+    
+    // 1. On-time payment score (600 points max)
+    const onTimeScore = (onTimePercentage / 100) * 600;
+    
+    // 2. Verification frequency score (200 points max)
+    const verifiedPayments = paidPayments.filter(p => p.isVerified);
+    const verificationRate = paidPayments.length > 0 
+      ? (verifiedPayments.length / paidPayments.length) 
+      : 0;
+    const verificationScore = verificationRate * 200;
+    
+    // 3. Rent-to-income ratio score (200 points max)
+    // For MVP: Use payment consistency and streak as proxy for financial stability
+    // In production, this would use actual income data
+    const consistencyFactor = paidPayments.length > 0 
+      ? Math.min(paidPayments.length / 12, 1) // Reward up to 12 months of history
+      : 0;
+    const streakBonus = Math.min(paymentStreak / 12, 0.5); // Up to 50% bonus for good streak
+    const rentToIncomeScore = (consistencyFactor * 0.5 + streakBonus) * 200;
+    
+    // Calculate total credit score
+    const creditScore = Math.round(onTimeScore + verificationScore + rentToIncomeScore);
+
     return {
       paymentStreak,
       totalPaid,
       onTimePercentage,
       nextPaymentDue,
+      creditScore,
+      onTimeScore: Math.round(onTimeScore),
+      verificationScore: Math.round(verificationScore),
+      rentToIncomeScore: Math.round(rentToIncomeScore),
     };
   }
 
