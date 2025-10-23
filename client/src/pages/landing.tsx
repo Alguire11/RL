@@ -7,6 +7,7 @@ import { GradientButton } from "@/components/ui/gradient-button";
 import { Link, useLocation } from "wouter";
 import { CheckCircle, BarChart3, Share2, Menu, X, Star, Shield, Clock, Users, Award, TrendingUp, Check, FileText, CreditCard, Building, MapPin, Calendar } from "lucide-react";
 import heroBackground from "@assets/stock_images/modern_professional__232a68fd.jpg";
+import featuresBackground from "@assets/stock_images/abstract_light_geome_e310ffc3.jpg";
 
 export default function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -111,7 +112,7 @@ export default function Landing() {
               <Button onClick={handleGetStarted} className="text-lg px-8 py-3 bg-white hover:bg-gray-100 text-blue-600 shadow-lg">
                 Get Started Free
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-3 border-white text-white hover:bg-white/10">
+              <Button variant="outline" size="lg" className="text-lg px-8 py-3 border-white text-[#2563eb] hover:bg-white/10">
                 Watch Demo
               </Button>
             </div>
@@ -181,8 +182,17 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="features" className="relative py-20 overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${featuresBackground})` }}
+        >
+          <div className="absolute inset-0 bg-white/80"></div>
+        </div>
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Powerful Features
