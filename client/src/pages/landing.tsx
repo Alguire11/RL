@@ -6,6 +6,7 @@ import { Logo } from "@/components/logo";
 import { GradientButton } from "@/components/ui/gradient-button";
 import { Link, useLocation } from "wouter";
 import { CheckCircle, BarChart3, Share2, Menu, X, Star, Shield, Clock, Users, Award, TrendingUp, Check, FileText, CreditCard, Building, MapPin, Calendar } from "lucide-react";
+import heroBackground from "@assets/stock_images/modern_professional__232a68fd.jpg";
 
 export default function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -84,24 +85,33 @@ export default function Landing() {
       )}
 
       {/* Hero Section */}
-      <section className="pt-20 pb-16 bg-gradient-to-br from-blue-50 via-white to-purple-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative pt-20 pb-16 overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${heroBackground})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/85 to-blue-800/90"></div>
+        </div>
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
               Transform Your Rent Into{" "}
-              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
                 Credit History
               </span>
             </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-100 mb-8 max-w-3xl mx-auto">
               Enoíkio automatically tracks your on-time rent payments and builds a comprehensive credit portfolio. 
               Turn your rental history into a powerful financial asset.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleGetStarted} className="text-lg px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white">
+              <Button onClick={handleGetStarted} className="text-lg px-8 py-3 bg-white hover:bg-gray-100 text-blue-600 shadow-lg">
                 Get Started Free
               </Button>
-              <Button variant="outline" size="lg" className="text-lg px-8 py-3 border-blue-600 text-blue-600 hover:bg-blue-50">
+              <Button variant="outline" size="lg" className="text-lg px-8 py-3 border-white text-white hover:bg-white/10">
                 Watch Demo
               </Button>
             </div>
