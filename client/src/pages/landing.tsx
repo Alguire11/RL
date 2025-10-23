@@ -9,6 +9,8 @@ import { CheckCircle, BarChart3, Share2, Menu, X, Star, Shield, Clock, Users, Aw
 import heroBackground from "@assets/stock_images/modern_professional__232a68fd.jpg";
 import featuresBackground from "@assets/stock_images/abstract_light_geome_e310ffc3.jpg";
 import securityBackground from "@assets/stock_images/digital_security_loc_2fe42728.jpg";
+import pricingBackground from "@assets/stock_images/elegant_gradient_wav_0f8a663d.jpg";
+import supportBackground from "@assets/stock_images/professional_workspa_0840ba58.jpg";
 
 export default function Landing() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -253,8 +255,17 @@ export default function Landing() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="pricing" className="relative py-20 overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${pricingBackground})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-white/95 via-blue-50/95 to-purple-50/95"></div>
+        </div>
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Simple, Transparent Pricing
@@ -430,8 +441,17 @@ export default function Landing() {
       </section>
 
       {/* Support Section */}
-      <section id="support" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section id="support" className="relative py-20 overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${supportBackground})` }}
+        >
+          <div className="absolute inset-0 bg-white/92"></div>
+        </div>
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               We're Here to Help
