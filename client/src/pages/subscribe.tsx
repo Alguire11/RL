@@ -225,10 +225,10 @@ export default function Subscribe() {
             variant="ghost" 
             onClick={() => setLocation('/dashboard')}
             className="mb-6 text-white hover:bg-white/10"
-            data-testid="button-back-to-home"
+            data-testid="button-back-to-dashboard"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
+            Back to Dashboard
           </Button>
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
