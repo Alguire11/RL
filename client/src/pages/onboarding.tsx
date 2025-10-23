@@ -30,8 +30,9 @@ import { OpenBankingSimulator } from "@/components/open-banking-simulator";
 const rentDetailsSchema = z.object({
   monthlyRent: z.string().min(1, "Monthly rent is required"),
   paymentDay: z.string().min(1, "Payment day is required"),
-  landlordName: z.string().optional(),
-  landlordEmail: z.string().email().optional().or(z.literal("")),
+  landlordName: z.string().min(1, "Landlord/Agent name is required"),
+  landlordEmail: z.string().email("Valid landlord/agent email is required"),
+  landlordPhone: z.string().min(10, "Landlord/Agent phone number is required"),
   firstPaymentDate: z.string().min(1, "First payment date is required"),
 });
 
@@ -65,6 +66,7 @@ export default function OnboardingPage() {
       paymentDay: "1",
       landlordName: "",
       landlordEmail: "",
+      landlordPhone: "",
       firstPaymentDate: "",
     },
   });
@@ -232,9 +234,14 @@ export default function OnboardingPage() {
                 </div>
               </div>
               <div className="text-center">
-                <Button onClick={() => setCurrentStep(2)} size="lg" className="bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setCurrentStep(2); }} 
+                  size="lg" 
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold text-lg px-10 py-6"
+                  data-testid="button-get-started"
+                >
                   Get Started
-                  <ChevronRight className="ml-2 h-4 w-4" />
+                  <ChevronRight className="ml-2 h-5 w-5" />
                 </Button>
               </div>
             </CardContent>
@@ -254,11 +261,20 @@ export default function OnboardingPage() {
               }}
             />
             <div className="flex justify-between pt-6">
-              <Button type="button" variant="outline" onClick={() => setCurrentStep(1)}>
+              <Button 
+                type="button" 
+                onClick={() => setCurrentStep(1)}
+                className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6"
+                data-testid="button-back-to-welcome"
+              >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button onClick={() => setCurrentStep(3)} variant="ghost">
+              <Button 
+                onClick={() => setCurrentStep(3)}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6"
+                data-testid="button-skip-bank"
+              >
                 Skip for now
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
@@ -314,31 +330,75 @@ export default function OnboardingPage() {
                     {...rentForm.register("firstPaymentDate")}
                   />
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="landlordName">Landlord Name (Optional)</Label>
+                    <Label htmlFor="landlordName" className="text-sm font-semibold">
+                      Landlord/Agent Name <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="landlordName"
                       placeholder="John Smith"
                       {...rentForm.register("landlordName")}
+                      className="border-2"
                     />
+                    {rentForm.formState.errors.landlordName && (
+                      <p className="text-sm text-red-600">{rentForm.formState.errors.landlordName.message}</p>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="landlordEmail">Landlord Email (Optional)</Label>
-                    <Input
-                      id="landlordEmail"
-                      type="email"
-                      placeholder="landlord@example.com"
-                      {...rentForm.register("landlordEmail")}
-                    />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="landlordEmail" className="text-sm font-semibold">
+                        Landlord/Agent Email <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="landlordEmail"
+                        type="email"
+                        placeholder="landlord@example.com"
+                        {...rentForm.register("landlordEmail")}
+                        className="border-2"
+                      />
+                      {rentForm.formState.errors.landlordEmail && (
+                        <p className="text-sm text-red-600">{rentForm.formState.errors.landlordEmail.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="landlordPhone" className="text-sm font-semibold">
+                        Landlord/Agent Phone <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="landlordPhone"
+                        type="tel"
+                        placeholder="+44 20 1234 5678"
+                        {...rentForm.register("landlordPhone")}
+                        className="border-2"
+                      />
+                      {rentForm.formState.errors.landlordPhone && (
+                        <p className="text-sm text-red-600">{rentForm.formState.errors.landlordPhone.message}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Why we need this:</strong> We'll send a verification email to your landlord/agent to confirm your rent payment history.
+                    </p>
                   </div>
                 </div>
                 <div className="flex justify-between pt-4">
-                  <Button type="button" variant="outline" onClick={() => setCurrentStep(2)}>
+                  <Button 
+                    type="button" 
+                    onClick={() => setCurrentStep(2)}
+                    className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6"
+                    data-testid="button-back-to-bank"
+                  >
                     <ChevronLeft className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  <Button type="submit" disabled={updateRentInfoMutation.isPending}>
+                  <Button 
+                    type="submit" 
+                    disabled={updateRentInfoMutation.isPending}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-8"
+                    data-testid="button-complete-setup"
+                  >
                     {updateRentInfoMutation.isPending ? "Saving..." : "Complete Setup"}
                     <CheckCircle className="ml-2 h-4 w-4" />
                   </Button>
