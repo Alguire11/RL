@@ -167,13 +167,26 @@ export default function Subscribe() {
 
   if (!stripePromise) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Payment Setup Required</CardTitle>
-            <CardDescription>Stripe is not configured yet. Please contact support.</CardDescription>
-          </CardHeader>
-        </Card>
+      <div className="min-h-screen bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <Button 
+            variant="ghost" 
+            onClick={() => setLocation('/dashboard')}
+            className="mb-6"
+            data-testid="button-back-to-dashboard"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div className="flex items-center justify-center">
+            <Card className="max-w-md">
+              <CardHeader>
+                <CardTitle>Payment Setup Required</CardTitle>
+                <CardDescription>Stripe is not configured yet. Please contact support.</CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }
