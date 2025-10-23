@@ -106,7 +106,7 @@ export default function Landing() {
               </span>
             </h1>
             <p className="text-xl text-gray-100 mb-8 max-w-3xl mx-auto">
-              Enoíkio automatically tracks your on-time rent payments and builds a comprehensive credit portfolio. 
+              RentLedger automatically tracks your on-time rent payments and builds a comprehensive credit portfolio. 
               Turn your rental history into a powerful financial asset.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -526,7 +526,7 @@ export default function Landing() {
               </ul>
             </div>
             <div>
-              <h3 className="text-xl font-semibold mb-4">Enoíkio</h3>
+              <h3 className="text-xl font-semibold mb-4">RentLedger</h3>
               <p className="text-gray-400">
                 Building credit through rent payments, one payment at a time.
               </p>
@@ -534,7 +534,7 @@ export default function Landing() {
           </div>
           <hr className="my-8 border-gray-800" />
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <p className="text-gray-400">&copy; 2024 Enoíkio. All rights reserved.</p>
+            <p className="text-gray-400">&copy; 2025 RentLedger. All rights reserved.</p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link href="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link>
               <Link href="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link>

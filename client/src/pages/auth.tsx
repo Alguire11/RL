@@ -92,7 +92,7 @@ export default function AuthPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
         title: "Account created!",
-        description: "Welcome to Enoíkio. Let's get you started.",
+        description: "Welcome to RentLedger. Let's get you started.",
       });
       navigate("/");
     },
@@ -129,7 +129,7 @@ export default function AuthPage() {
         <div className="text-center">
           <Logo className="mx-auto h-12 w-12 mb-4" />
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-            Welcome to Enoíkio
+            Welcome to RentLedger
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             Build your credit history through rent payments
@@ -239,7 +239,7 @@ export default function AuthPage() {
               <CardHeader>
                 <CardTitle>Create Account</CardTitle>
                 <CardDescription>
-                  Join Enoíkio to start building your credit history
+                  Join RentLedger to start building your credit history
                 </CardDescription>
               </CardHeader>
               <CardContent>

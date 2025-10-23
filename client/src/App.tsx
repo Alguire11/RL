@@ -47,7 +47,7 @@ function Router() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Enoíkio
+            RentLedger
           </div>
         </div>
       </div>

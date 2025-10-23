@@ -224,7 +224,7 @@ export default function Subscribe() {
             Choose Your Perfect Plan
           </h1>
           <p className="text-xl text-gray-200 max-w-2xl mx-auto">
-            Unlock powerful landlord features and grow your property portfolio with Enoíkio
+            Unlock powerful landlord features and grow your property portfolio with RentLedger
           </p>
         </div>
       </div>
