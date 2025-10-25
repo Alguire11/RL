@@ -1,0 +1,94 @@
+UAT Test Script: Tenant Module (MVP)
+Purpose
+
+To verify that tenants can register, log in, link rent payments, track credit progress, and export verified rent ledgers, all within MVP scope.
+
+1. Tenant MVP Feature Scope
+Feature	Description	Included in MVP
+User Registration/Login	Tenant creates account via invite or open registration	✅
+Link Property / Accept Invite	Tenant links to a landlord via email token or property code	✅
+Record Rent Payment	Upload or log rent payment proof (bank statement, receipt, etc.)	✅
+View Rent History	See list of past rent payments and their verification status	✅
+Export Verified Ledger	Download verified rent history PDF	✅
+Credit Progress Tracker	Basic progress bar showing “months verified”	✅
+Notifications	Alerts when rent is verified or rejected by landlord	✅
+Profile Settings	Edit name, address, or bank info	✅
+Support Form	Contact support for help	✅
+2. Functional Requirements (For UAT Testing)
+ID	Requirement	Description / Expected Behaviour	MVP
+FR-T1	User Registration	Tenant can create an account via email/password or via invite token.	✅
+FR-T2	Login Authentication	Tenant can log in securely and remain authenticated.	✅
+FR-T3	Link to Property	Tenant can join a property using code/invite link from landlord.	✅
+FR-T4	Upload Rent Proof	Tenant uploads rent payment (file or input amount/date).	✅
+FR-T5	View Payment History	Tenant can view all submitted payments with status.	✅
+FR-T6	Notification Alerts	Tenant receives alert when landlord verifies/rejects payment.	✅
+FR-T7	View Credit Progress	Progress tracker updates based on verified payments.	✅
+FR-T8	Download Verified Ledger (PDF)	Tenant can download full ledger for references or credit use.	✅
+FR-T9	Edit Profile	Tenant can update personal info, bank name, etc.	✅
+FR-T10	Support Request	Tenant can send inquiries via a simple form.	✅
+3. Non-Functional Requirements
+Category	Requirement	Description
+Security	End-to-end encryption for payment records.	Use HTTPS & AES-256 encryption.
+Performance	Dashboard loads in under 3 seconds.	Required.
+Usability	Mobile-first responsive design.	Required (tenant app = mobile-first).
+Compliance	GDPR and ICO-compliant data collection.	Required.
+Reliability	Rent records persist after logout.	Required.
+Audit Logging	All uploads timestamped and linked to user ID.	Required.
+4. Tenant UAT Scenarios
+Test ID	Scenario / Feature	Objective	Test Steps	Expected Result	Pass/Fail	Notes / Comments
+UAT-T01	Tenant Registration (Direct)	Verify open registration	1. Go to /register
+2. Enter email/password
+3. Accept GDPR consent
+4. Submit	Tenant receives verification email and account is created	☐	
+UAT-T02	Tenant Registration (Invite)	Test registration via landlord invite	1. Open invite email
+2. Click link
+3. Set password and confirm	Tenant account linked to property successfully	☐	
+UAT-T03	Login Authentication	Verify login flow	1. Go to /login
+2. Enter credentials
+3. Submit	Redirected to dashboard; session persists	☐	
+UAT-T04	Link Property (Code)	Test property linking	1. Tenant enters property code in dashboard
+2. Click “Link Property”	Property and landlord details appear	☐	
+UAT-T05	Upload Rent Payment Proof	Verify rent submission	1. Go to “Rent Payments”
+2. Click “Add Payment”
+3. Upload file / enter date + amount	Payment status shows “Pending Verification”	☐	
+UAT-T06	Landlord Verification Update	Validate payment status sync	1. Landlord marks payment verified
+2. Tenant dashboard refreshes	Status updates to “Verified”	☐	
+UAT-T07	Rejected Payment	Test rejection message	1. Landlord marks payment as “Rejected”
+2. Tenant views dashboard	Red “Rejected” badge appears with reason note	☐	
+UAT-T08	Credit Progress Tracker	Verify score progression	1. Tenant has 3 verified payments
+2. Open dashboard	Progress bar updates to 3/12 months verified	☐	
+UAT-T09	Download Rent Ledger PDF	Confirm ledger generation	1. Go to “Ledger” tab
+2. Click “Download”	PDF downloads with RentLedger branding and all verified records	☐	
+UAT-T10	Notification Alerts	Test alert system	1. Landlord verifies payment
+2. Tenant refreshes page	“Your rent for July was verified” notification appears	☐	
+UAT-T11	Edit Profile Details	Verify data updates	1. Go to “Profile”
+2. Edit name/address
+3. Save	Details update successfully	☐	
+UAT-T12	Support Contact Form	Validate support communication	1. Go to “Support”
+2. Fill out issue form
+3. Submit	Confirmation message displays; ticket logged	☐	
+UAT-T13	Logout Session	Confirm session termination	1. Click “Logout”
+2. Return to dashboard link manually	Redirects to login screen (session cleared)	☐	
+5. Additional Recommended UAT Scenarios
+Test ID	Scenario	Objective	Expected Result
+UAT-T14	Upload Invalid File	Verify file validation	Shows “Unsupported file format” error
+UAT-T15	Duplicate Payment Upload	Prevent duplicates	Displays message “Payment already submitted for this month”
+UAT-T16	GDPR Consent Enforcement	Confirm compliance	Registration blocked until consent checkbox ticked
+UAT-T17	Connection Lost	Test system recovery	Displays “Unable to connect. Please retry.” message
+UAT-T18	Email Notification Delay	Confirm async handling	Email arrives within 5 minutes of event trigger
+6. MVP Alignment Check (Tenant)
+Area	Aligned with MVP?	Notes
+Manual rent upload	✅	Core MVP function
+Credit progress tracker	✅	Basic version only
+Landlord verification updates	✅	Core function
+Rent ledger PDF	✅	Required for proof
+Notifications	✅	Simple UI alerts
+
+Acceptance Criteria
+
+✅ Tenant can create account, log in, and link property
+✅ Can upload rent proof and view status changes
+✅ Can download verified ledger
+✅ Notifications display correctly
+✅ GDPR consent recorded and enforced
+✅ All actions logged with timestamps
