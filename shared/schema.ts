@@ -164,6 +164,23 @@ export const landlordVerifications = pgTable("landlord_verifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Tenant invitations table
+export const tenantInvitations = pgTable("tenant_invitations", {
+  id: serial("id").primaryKey(),
+  landlordId: varchar("landlord_id").references(() => users.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id),
+  tenantEmail: varchar("tenant_email").notNull(),
+  inviteToken: varchar("invite_token").unique().notNull(),
+  status: varchar("status", { enum: ["pending", "accepted", "expired", "cancelled"] }).default("pending"),
+  inviteUrl: text("invite_url").notNull(),
+  qrCodeData: text("qr_code_data"), // Base64 encoded QR code
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  tenantId: varchar("tenant_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Notifications table
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
@@ -270,6 +287,12 @@ export const landlordVerificationsRelations = relations(landlordVerifications, (
   property: one(properties, { fields: [landlordVerifications.propertyId], references: [properties.id] }),
 }));
 
+export const tenantInvitationsRelations = relations(tenantInvitations, ({ one }) => ({
+  landlord: one(users, { fields: [tenantInvitations.landlordId], references: [users.id] }),
+  property: one(properties, { fields: [tenantInvitations.propertyId], references: [properties.id] }),
+  tenant: one(users, { fields: [tenantInvitations.tenantId], references: [users.id] }),
+}));
+
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));
@@ -306,6 +329,7 @@ export const insertBankConnectionSchema = createInsertSchema(bankConnections);
 export const insertCreditReportSchema = createInsertSchema(creditReports);
 export const insertReportShareSchema = createInsertSchema(reportShares);
 export const insertLandlordVerificationSchema = createInsertSchema(landlordVerifications);
+export const insertTenantInvitationSchema = createInsertSchema(tenantInvitations);
 export const insertNotificationSchema = createInsertSchema(notifications);
 export const insertUserPreferencesSchema = createInsertSchema(userPreferences);
 export const insertSecurityLogSchema = createInsertSchema(securityLogs);
@@ -330,6 +354,8 @@ export type ReportShare = typeof reportShares.$inferSelect;
 export type InsertReportShare = typeof reportShares.$inferInsert;
 export type LandlordVerification = typeof landlordVerifications.$inferSelect;
 export type InsertLandlordVerification = typeof landlordVerifications.$inferInsert;
+export type TenantInvitation = typeof tenantInvitations.$inferSelect;
+export type InsertTenantInvitation = typeof tenantInvitations.$inferInsert;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 export type UserPreferences = typeof userPreferences.$inferSelect;
