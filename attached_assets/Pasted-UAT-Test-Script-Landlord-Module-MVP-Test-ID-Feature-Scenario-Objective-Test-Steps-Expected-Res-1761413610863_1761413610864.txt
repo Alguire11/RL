@@ -1,0 +1,77 @@
+UAT Test Script: Landlord Module (MVP)
+Test ID	Feature / Scenario	Objective	Test Steps	Expected Result	Pass/Fail	Notes / Comments
+UAT-01	Landlord Registration	Validate landlord account creation	1. Go to /signup
+2. Enter valid email & password
+3. Accept privacy/GDPR consent
+4. Submit form	Account is created and verification email sent successfully	☐	
+UAT-02	Login Authentication	Verify login and session persistence	1. Visit /login
+2. Enter registered credentials
+3. Submit form
+4. Refresh page to confirm session persists	Landlord is redirected to dashboard and remains logged in	☐	
+UAT-03	Add Property	Confirm landlord can add property details	1. From dashboard, click “Add Property”
+2. Input address, monthly rent, and tenant name
+3. Save	Property appears in landlord’s property list	☐	
+UAT-04	Edit Property	Ensure property details are editable	1. Select an existing property
+2. Edit rent or tenant details
+3. Save changes	Property record updates successfully	☐	
+UAT-05	Delete Property	Verify deletion of property records	1. Select a property
+2. Click “Delete” and confirm	Property removed from dashboard	☐	
+UAT-06	Invite Tenant	Validate tenant invite flow	1. Go to property detail page
+2. Click “Invite Tenant”
+3. Enter tenant’s email
+4. Send invite	Tenant receives invite email with registration link	☐	
+UAT-07	View Tenant List	Confirm property tenant list display	1. Open property view
+2. View associated tenants	All linked tenants displayed with payment status	☐	
+UAT-08	Verify Payment (Manual)	Test rent verification process	1. Tenant uploads payment record (simulate)
+2. Landlord opens tenant record
+3. Click “Verify Payment”	Payment status updates to “Verified”	☐	
+UAT-09	Mark Payment Pending/Rejected	Check alternate verification actions	1. Select tenant payment
+2. Choose “Mark Pending” or “Reject”	Status changes accordingly, with audit log entry	☐	
+UAT-10	Generate Rent Ledger PDF	Confirm ledger generation	1. Select tenant
+2. Click “Generate Ledger”
+3. Download PDF	PDF file downloads with RentLedger logo, timestamp, and verified entries	☐	
+UAT-11	Portfolio Dashboard Overview	Validate data aggregation	1. Open landlord dashboard
+2. Check stats: verified, pending, missed payments	Summary data matches underlying records	☐	
+UAT-12	Notification System	Test alert triggers	1. Tenant uploads payment (simulate webhook)
+2. Landlord dashboard refreshes	Notification appears under “Alerts” panel	☐	
+UAT-13	Trusted Landlord Badge	Validate badge automation	1. Verify 3 consecutive tenant payments
+2. Refresh dashboard	“Trusted Landlord” badge appears beside profile name	☐	
+UAT-14	Support Request Form	Verify support contact functionality	1. Click “Support”
+2. Fill form with query
+3. Submit	Confirmation message displayed; support email sent	☐	
+UAT-15	Basic Analytics	Validate rent analytics chart	1. Go to “Analytics” tab
+2. View chart data (Verified vs Pending payments)	Chart renders accurately based on database records	☐	
+UAT-16	Logout Session	Confirm secure logout	1. Click “Logout”
+2. Return to homepage
+3. Attempt to access /dashboard	Redirects to login screen (session cleared)	☐	
+🧮 Additional Validation Scenarios (Recommended)
+Test ID	Scenario	Objective	Expected Result
+UAT-17	Invalid Login Attempt	Check error handling	Displays “Invalid credentials” message without crashing
+UAT-18	Duplicate Property Entry	Prevent data duplication	System blocks duplicate addresses for same landlord
+UAT-19	Form Validation	Ensure input validation works	Empty or invalid fields trigger error tooltips
+UAT-20	Audit Log Review	Verify activity tracking	Audit page shows all actions with timestamps & actors
+UAT-21	Data Privacy Confirmation	Confirm GDPR consent	Consent checkbox required before registration completes
+⚙️ Environment Setup for Replit Testing
+Component	Tech Stack / Tool	Notes
+Frontend	React + TailwindCSS	Use reusable card components for dashboard
+Backend	Flask or Node.js (Express)	REST API endpoints for CRUD operations
+Database	SQLite (MVP) / Supabase (future)	Store landlords, tenants, payments
+File Handling	Cloudinary or Firebase	For rent receipts and ledger PDFs
+Email Service	SendGrid API / Nodemailer	For invites & support confirmation
+Testing Framework	Jest or Pytest	Automate key scenario tests
+Deployment	Replit web deployment or Render	Accessible URL for testers
+🔐 Acceptance Criteria (MVP Definition of Done)
+
+Landlord can register, log in, and manage properties without errors.
+
+Tenant invite system works with valid email flow.
+
+Payments can be marked as verified, pending, or rejected.
+
+Rent ledger PDF generates accurately with timestamp and brand elements.
+
+Notifications trigger for pending verifications.
+
+Dashboard reflects accurate rent data and badge logic.
+
+All data actions logged and GDPR consent captured.
