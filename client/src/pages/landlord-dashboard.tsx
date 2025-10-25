@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +20,17 @@ export default function LandlordDashboard() {
   const { toast } = useToast();
   const [adminSession, setAdminSession] = useState<any>(null);
   const [subscriptionPlan, setSubscriptionPlan] = useState<'free' | 'standard' | 'premium'>('free');
-  const [propertyCount, setPropertyCount] = useState(0); // Track actual property count
+  const [propertyCount, setPropertyCount] = useState(0);
+  
+  // Refs for scroll navigation
+  const propertiesRef = useRef<HTMLDivElement>(null);
+  const tenantsRef = useRef<HTMLDivElement>(null);
+  const verificationsRef = useRef<HTMLDivElement>(null);
+  const pendingRef = useRef<HTMLDivElement>(null);
+  
+  // Invite tenant form
+  const [tenantEmail, setTenantEmail] = useState('');
+  const [selectedPropertyForInvite, setSelectedPropertyForInvite] = useState('');
   
   // Dialog states
   const [showAddProperty, setShowAddProperty] = useState(false);
@@ -318,11 +330,58 @@ export default function LandlordDashboard() {
     }
   ];
 
+  // API queries for tenant management
+  const landlordId = adminSession?.username || 'landlord';
+  
+  const { data: tenants = [] } = useQuery({
+    queryKey: ['/api/landlord', landlordId, 'tenants'],
+    enabled: !!adminSession
+  });
+  
+  const { data: verifications = [] } = useQuery({
+    queryKey: ['/api/landlord', landlordId, 'verifications'],
+    enabled: !!adminSession
+  });
+  
+  const { data: pendingRequests = [] } = useQuery({
+    queryKey: ['/api/landlord', landlordId, 'pending-requests'],
+    enabled: !!adminSession
+  });
+  
+  const inviteTenantMutation = useMutation({
+    mutationFn: async (data: { landlordId: string; propertyId: number | null; tenantEmail: string; landlordName: string; propertyAddress: string }) => {
+      const response = await fetch('/api/landlord/invite-tenant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Failed to send invitation');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Invitation Sent!",
+        description: `Tenant invitation sent to ${tenantEmail} with QR code.`,
+      });
+      setTenantEmail('');
+      setSelectedPropertyForInvite('');
+      setShowInviteTenant(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/landlord', landlordId, 'tenants'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send invitation. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
+
   const stats = [
     { title: "Properties", value: propertyCount.toString(), icon: Building, color: "text-blue-600" },
-    { title: "Active Tenants", value: "18", icon: Users, color: "text-green-600" },
-    { title: "Verifications", value: "8", icon: CheckCircle, color: "text-purple-600" },
-    { title: "Pending Requests", value: "3", icon: Clock, color: "text-orange-600" }
+    { title: "Active Tenants", value: Array.isArray(tenants) ? tenants.length.toString() : "0", icon: Users, color: "text-green-600" },
+    { title: "Verifications", value: Array.isArray(verifications) ? verifications.length.toString() : "0", icon: CheckCircle, color: "text-purple-600" },
+    { title: "Pending Requests", value: Array.isArray(pendingRequests) ? pendingRequests.length.toString() : "0", icon: Clock, color: "text-orange-600" }
   ];
 
   const handleVerification = (id: number, action: 'approve' | 'reject') => {
@@ -332,32 +391,20 @@ export default function LandlordDashboard() {
     });
   };
 
-  // Handle stats card clicks
+  // Handle stats card clicks - scroll to sections
   const handleStatsCardClick = (statTitle: string) => {
     switch(statTitle) {
       case 'Properties':
-        toast({
-          title: "Properties",
-          description: `You have ${propertyCount} ${propertyCount === 1 ? 'property' : 'properties'}. ${propertyCount === 0 ? 'Click "Add Property" to get started!' : 'Manage them in the Quick Actions section.'}`,
-        });
+        propertiesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         break;
       case 'Active Tenants':
-        toast({
-          title: "Active Tenants",
-          description: "View all your active tenants and their payment history in the tenant management section.",
-        });
+        tenantsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         break;
       case 'Verifications':
-        toast({
-          title: "Verifications",
-          description: "View pending verification requests below or approve/reject tenant payments.",
-        });
+        verificationsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         break;
       case 'Pending Requests':
-        toast({
-          title: "Pending Requests",
-          description: "You have verification requests waiting for your review. Check the Verification Requests section.",
-        });
+        pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         break;
     }
   };
@@ -1141,31 +1188,217 @@ export default function LandlordDashboard() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm">Sarah Johnson's verification approved</span>
+            {/* Active Tenants Section */}
+            <div ref={tenantsRef} id="active-tenants">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Active Tenants</span>
+                    <Dialog open={showInviteTenant} onOpenChange={setShowInviteTenant}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Invite Tenant
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Invite Tenant</DialogTitle>
+                          <DialogDescription>Send an invitation email with QR code to your tenant</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div>
+                            <Label htmlFor="tenant-email">Tenant Email</Label>
+                            <Input
+                              id="tenant-email"
+                              type="email"
+                              value={tenantEmail}
+                              onChange={(e) => setTenantEmail(e.target.value)}
+                              placeholder="tenant@example.com"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="property-address">Property Address</Label>
+                            <Input
+                              id="property-address"
+                              value={selectedPropertyForInvite}
+                              onChange={(e) => setSelectedPropertyForInvite(e.target.value)}
+                              placeholder="123 Main Street, London"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                          <Button variant="outline" onClick={() => setShowInviteTenant(false)}>Cancel</Button>
+                          <Button 
+                            onClick={() => {
+                              if (!tenantEmail || !selectedPropertyForInvite) {
+                                toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
+                                return;
+                              }
+                              inviteTenantMutation.mutate({
+                                landlordId,
+                                propertyId: null,
+                                tenantEmail,
+                                landlordName: adminSession.username,
+                                propertyAddress: selectedPropertyForInvite
+                              });
+                            }}
+                            disabled={inviteTenantMutation.isPending}
+                          >
+                            {inviteTenantMutation.isPending ? "Sending..." : "Send Invitation"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </CardTitle>
+                  <CardDescription>Manage and communicate with your tenants</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!Array.isArray(tenants) || tenants.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p>No active tenants yet. Invite your first tenant!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {tenants.map((tenantData: any, idx: number) => (
+                        <div key={idx} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start space-x-4">
+                              <Avatar>
+                                <AvatarFallback>{tenantData.tenant?.name?.[0] || 'T'}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <h4 className="font-semibold">{tenantData.tenant?.name || 'Unknown Tenant'}</h4>
+                                <p className="text-sm text-gray-600">{tenantData.property?.address || 'Unknown Property'}</p>
+                                <p className="text-sm text-gray-500 mt-1">
+                                  {tenantData.payments?.length || 0} payment{tenantData.payments?.length !== 1 ? 's' : ''} recorded
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button size="sm" variant="outline"><Mail className="h-4 w-4 mr-1" />Contact</Button>
+                              <Button size="sm" variant="outline">View Details</Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Verifications Section */}
+            <div ref={verificationsRef} id="verifications">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Verifications</CardTitle>
+                  <CardDescription>Review and verify tenant payment records</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!Array.isArray(verifications) || verifications.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <CheckCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p>No payment verifications to review</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {verifications.map((payment: any) => (
+                        <div key={payment.id} className="p-4 border rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-semibold">Payment #{payment.id}</h4>
+                              <p className="text-sm text-gray-600">Amount: £{payment.amount}</p>
+                              <p className="text-sm text-gray-500">Due: {new Date(payment.dueDate).toLocaleDateString()}</p>
+                              <Badge className={payment.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                {payment.status}
+                              </Badge>
+                            </div>
+                            {payment.status === 'pending' && (
+                              <div className="space-x-2">
+                                <Button size="sm" variant="outline" className="text-green-600">Approve</Button>
+                                <Button size="sm" variant="outline" className="text-red-600">Reject</Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Pending Requests Section */}
+            <div ref={pendingRef} id="pending-requests">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pending Requests</CardTitle>
+                  <CardDescription>Review pending tenant requests and verifications</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!Array.isArray(pendingRequests) || pendingRequests.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                      <p>No pending requests</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {pendingRequests.map((request: any) => (
+                        <div key={request.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center space-x-2 mb-2">
+                                <Badge variant="outline">{request.type.replace('_', ' ')}</Badge>
+                                <span className="text-sm text-gray-500">#{request.id}</span>
+                              </div>
+                              <h4 className="font-semibold">{request.tenant?.name || 'Unknown Tenant'}</h4>
+                              <p className="text-sm text-gray-600">{request.property?.address || 'Unknown Property'}</p>
+                              {request.data && (
+                                <p className="text-sm text-gray-500 mt-1">Amount: £{request.data.amount}</p>
+                              )}
+                            </div>
+                            <div className="space-x-2">
+                              <Button size="sm" className="bg-gradient-to-r from-green-500 to-green-600 text-white">Approve</Button>
+                              <Button size="sm" variant="outline" className="text-red-600">Decline</Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div ref={propertiesRef} id="properties">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm">Sarah Johnson's verification approved</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm">New tenant application received</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <span className="text-sm">Monthly rent payment confirmed</span>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span className="text-sm">Property inspection scheduled</span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm">New tenant application received</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span className="text-sm">Monthly rent payment confirmed</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <span className="text-sm">Property inspection scheduled</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </div>
