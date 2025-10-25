@@ -134,6 +134,9 @@ export default function AuthPage() {
           <p className="mt-2 text-sm text-gray-600">
             Build your credit history through rent payments
           </p>
+          <div className="mt-3 px-4 py-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+            👤 Tenant sign up/login - Create your free account
+          </div>
         </div>
 
         <Tabs defaultValue="login" className="w-full">
@@ -216,7 +219,7 @@ export default function AuthPage() {
                       <span className="w-full border-t" />
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-white px-2 text-gray-500">Or</span>
+                      <span className="bg-white px-2 text-gray-500">Landlord or Admin?</span>
                     </div>
                   </div>
                   
@@ -225,10 +228,14 @@ export default function AuthPage() {
                     variant="outline"
                     className="w-full mt-4 border-purple-200 text-purple-600 hover:bg-purple-50"
                     onClick={() => navigate("/admin-login")}
+                    data-testid="button-landlord-access"
                   >
                     <Building className="h-4 w-4 mr-2" />
-                    Landlord Access
+                    Landlord & Admin Access
                   </Button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Access landlord dashboard or admin panel
+                  </p>
                 </div>
               </CardContent>
             </Card>

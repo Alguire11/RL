@@ -20,10 +20,9 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Demo credentials
+  // Demo credentials - ONLY for landlords and admins
   const adminCredentials = {
     admin: { username: 'admin', password: 'admin123', role: 'admin' },
-    user: { username: 'user', password: 'user123', role: 'user' },
     landlord: { username: 'landlord', password: 'landlord123', role: 'landlord' }
   };
 
@@ -83,22 +82,26 @@ export default function AdminLogin() {
             Landlord & Admin Access
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Access landlord verification, admin dashboard, or demo accounts
+            Demo access for landlords and administrators only
           </p>
           
           <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
             <p className="font-medium mb-1">Demo Credentials:</p>
             <p>• Landlord: <code className="bg-white px-1 rounded">landlord / landlord123</code></p>
             <p>• Admin: <code className="bg-white px-1 rounded">admin / admin123</code></p>
-            <p>• User: <code className="bg-white px-1 rounded">user / user123</code></p>
+          </div>
+          
+          <div className="mt-3 p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
+            <p className="font-medium">👤 Regular users (tenants):</p>
+            <p className="text-xs mt-1">Please use the main sign up/login page instead</p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Admin Login</CardTitle>
+            <CardTitle>Landlord & Admin Login</CardTitle>
             <CardDescription>
-              Enter your admin credentials to access the system
+              Enter landlord or admin credentials (demo accounts only)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -163,7 +166,7 @@ export default function AdminLogin() {
         <Card className="bg-gray-50">
           <CardHeader>
             <CardTitle className="text-lg">Demo Credentials</CardTitle>
-            <CardDescription>Use these credentials to test different roles</CardDescription>
+            <CardDescription>Landlord & Admin access only</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -172,13 +175,25 @@ export default function AdminLogin() {
                 <span className="text-sm text-gray-600">admin / admin123</span>
               </div>
               <div className="flex justify-between">
-                <span className="font-medium">User:</span>
-                <span className="text-sm text-gray-600">user / user123</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="font-medium">Landlord:</span>
                 <span className="text-sm text-gray-600">landlord / landlord123</span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-purple-50 border-purple-200">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-sm font-medium text-purple-900 mb-2">Are you a tenant?</p>
+              <p className="text-xs text-purple-700 mb-3">Regular users should create an account on the main sign up page</p>
+              <Button
+                variant="outline"
+                onClick={() => setLocation('/auth')}
+                className="w-full border-purple-300 text-purple-700 hover:bg-purple-100"
+              >
+                Go to User Sign Up/Login
+              </Button>
             </div>
           </CardContent>
         </Card>
