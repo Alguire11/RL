@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { sendEmail, createLandlordVerificationEmail } from "./emailService";
+import { sendEmail, createLandlordVerificationEmail, createTenantInviteEmail } from "./emailService";
+import QRCode from "qrcode";
 import { z } from "zod";
 import { 
   insertPropertySchema, 
@@ -12,7 +13,8 @@ import {
   insertUserPreferencesSchema,
   insertSecurityLogSchema,
   insertDataExportRequestSchema,
-  insertLandlordVerificationSchema
+  insertLandlordVerificationSchema,
+  insertTenantInvitationSchema
 } from "@shared/schema";
 import { nanoid } from "nanoid";
 
@@ -297,6 +299,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating rent payment:", error);
       res.status(500).json({ message: "Failed to update rent payment" });
+    }
+  });
+
+  // Landlord routes
+  app.post('/api/landlord/invite-tenant', async (req: any, res) => {
+    try {
+      const { landlordId, propertyId, tenantEmail, landlordName, propertyAddress } = req.body;
+      
+      const inviteToken = nanoid(32);
+      const inviteUrl = `${req.protocol}://${req.get('host')}/tenant/accept-invite/${inviteToken}`;
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      
+      const qrCodeDataUrl = await QRCode.toDataURL(inviteUrl);
+      
+      const invitation = await storage.createTenantInvitation({
+        landlordId,
+        propertyId: propertyId ? parseInt(propertyId) : null,
+        tenantEmail,
+        inviteToken,
+        inviteUrl,
+        qrCodeData: qrCodeDataUrl,
+        status: 'pending',
+        expiresAt
+      });
+      
+      const emailParams = createTenantInviteEmail(tenantEmail, landlordName, propertyAddress, inviteUrl, qrCodeDataUrl);
+      await sendEmail(emailParams);
+      
+      res.json({ success: true, invitation, qrCodeDataUrl });
+    } catch (error) {
+      console.error("Error inviting tenant:", error);
+      res.status(500).json({ message: "Failed to send invitation" });
+    }
+  });
+
+  app.get('/api/landlord/:landlordId/tenants', async (req: any, res) => {
+    try {
+      const { landlordId } = req.params;
+      const tenants = await storage.getLandlordTenants(landlordId);
+      res.json(tenants);
+    } catch (error) {
+      console.error("Error fetching landlord tenants:", error);
+      res.status(500).json({ message: "Failed to fetch tenants" });
+    }
+  });
+
+  app.get('/api/landlord/:landlordId/verifications', async (req: any, res) => {
+    try {
+      const { landlordId } = req.params;
+      const verifications = await storage.getLandlordVerifications(landlordId);
+      res.json(verifications);
+    } catch (error) {
+      console.error("Error fetching verifications:", error);
+      res.status(500).json({ message: "Failed to fetch verifications" });
+    }
+  });
+
+  app.get('/api/landlord/:landlordId/pending-requests', async (req: any, res) => {
+    try {
+      const { landlordId} = req.params;
+      const requests = await storage.getLandlordPendingRequests(landlordId);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching pending requests:", error);
+      res.status(500).json({ message: "Failed to fetch pending requests" });
     }
   });
 

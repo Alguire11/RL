@@ -39,6 +39,84 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 }
 
+export function createTenantInviteEmail(
+  tenantEmail: string,
+  landlordName: string,
+  propertyAddress: string,
+  inviteUrl: string,
+  qrCodeDataUrl: string
+): EmailParams {
+  const subject = `You're invited to join RentLedger - ${landlordName}`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { padding: 30px; background: #f9f9f9; }
+        .button { 
+          display: inline-block; 
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+          color: white; 
+          padding: 15px 30px; 
+          text-decoration: none; 
+          border-radius: 8px; 
+          margin: 20px 0;
+          font-weight: bold;
+        }
+        .qr-section { text-align: center; margin: 30px 0; padding: 20px; background: white; border-radius: 8px; }
+        .footer { padding: 20px; text-align: center; font-size: 12px; color: #666; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🏠 Welcome to RentLedger!</h1>
+        </div>
+        <div class="content">
+          <h2>Hello!</h2>
+          <p><strong>${landlordName}</strong> has invited you to join RentLedger for the property:</p>
+          <p style="font-size: 16px; font-weight: bold; color: #667eea;">${propertyAddress}</p>
+          
+          <p>RentLedger helps you build your credit history through on-time rent payments. Join now to:</p>
+          <ul>
+            <li>✅ Track all your rent payments automatically</li>
+            <li>📊 Build a verified payment history</li>
+            <li>🌟 Earn credit-building badges</li>
+            <li>📄 Generate shareable credit reports</li>
+          </ul>
+          
+          <div style="text-align: center;">
+            <a href="${inviteUrl}" class="button">Accept Invitation & Sign Up</a>
+          </div>
+          
+          <div class="qr-section">
+            <p style="margin-bottom: 15px;"><strong>Or scan this QR code:</strong></p>
+            <img src="${qrCodeDataUrl}" alt="QR Code" style="width: 200px; height: 200px;" />
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">This invitation link will expire in 7 days. If you have any questions, please contact support@rentledger.co.uk.</p>
+        </div>
+        <div class="footer">
+          <p>This is an automated message from RentLedger. Please do not reply to this email.</p>
+          <p>© ${new Date().getFullYear()} RentLedger. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return {
+    to: tenantEmail,
+    from: 'noreply@rentledger.co.uk',
+    subject,
+    html
+  };
+}
+
 export function createLandlordVerificationEmail(
   landlordEmail: string,
   tenantName: string,

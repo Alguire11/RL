@@ -425,6 +425,71 @@ export class DatabaseStorage implements IStorage {
     return updatedVerification;
   }
 
+  // Tenant invitation operations
+  async createTenantInvitation(invitation: InsertTenantInvitation): Promise<TenantInvitation> {
+    const [newInvitation] = await db.insert(tenantInvitations).values(invitation).returning();
+    return newInvitation;
+  }
+
+  async getTenantInvitation(token: string): Promise<TenantInvitation | undefined> {
+    const [invitation] = await db.select().from(tenantInvitations).where(eq(tenantInvitations.inviteToken, token)).limit(1);
+    return invitation;
+  }
+
+  async getLandlordInvitations(landlordId: string): Promise<TenantInvitation[]> {
+    return db.select().from(tenantInvitations).where(eq(tenantInvitations.landlordId, landlordId)).orderBy(desc(tenantInvitations.createdAt));
+  }
+
+  async acceptTenantInvitation(id: number, tenantId: string): Promise<TenantInvitation> {
+    const [updated] = await db.update(tenantInvitations).set({status: 'accepted', tenantId, acceptedAt: sql`NOW()`, updatedAt: sql`NOW()`}).where(eq(tenantInvitations.id, id)).returning();
+    return updated;
+  }
+
+  async expireInvitation(id: number): Promise<void> {
+    await db.update(tenantInvitations).set({status: 'expired', updatedAt: sql`NOW()`}).where(eq(tenantInvitations.id, id));
+  }
+
+  // Landlord operations
+  async getPropertyById(id: number): Promise<Property | undefined> {
+    const [property] = await db.select().from(properties).where(eq(properties.id, id)).limit(1);
+    return property;
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.getUser(id);
+  }
+
+  async getLandlordTenants(landlordId: string): Promise<Array<{tenant: User; property: Property; payments: RentPayment[]}>> {
+    const landlordProperties = await db.select().from(properties).where(eq(properties.userId, landlordId));
+    const results = [];
+    for (const property of landlordProperties) {
+      const payments = await db.select().from(rentPayments).where(eq(rentPayments.propertyId, property.id)).orderBy(desc(rentPayments.createdAt));
+      if (payments.length > 0) {
+        const tenant = await this.getUser(payments[0].userId);
+        if (tenant) results.push({tenant, property, payments});
+      }
+    }
+    return results;
+  }
+
+  async getLandlordVerifications(landlordId: string): Promise<RentPayment[]> {
+    const landlordProperties = await db.select().from(properties).where(eq(properties.userId, landlordId));
+    const propertyIds = landlordProperties.map(p => p.id);
+    if (propertyIds.length === 0) return [];
+    return db.select().from(rentPayments).where(sql`${rentPayments.propertyId} = ANY(ARRAY[${sql.join(propertyIds.map(id => sql`${id}`), sql`, `)}])`).orderBy(desc(rentPayments.createdAt));
+  }
+
+  async getLandlordPendingRequests(landlordId: string): Promise<Array<{type: string; id: number; tenant: User; property: Property; data: any}>> {
+    const pendingPayments = await this.getLandlordVerifications(landlordId);
+    const results = [];
+    for (const payment of pendingPayments.filter(p => p.status === 'pending')) {
+      const tenant = await this.getUser(payment.userId);
+      const property = await this.getPropertyById(payment.propertyId);
+      if (tenant && property) results.push({type: 'payment_verification', id: payment.id, tenant, property, data: payment});
+    }
+    return results;
+  }
+
   // Dashboard statistics
   async getUserStats(userId: string): Promise<{
     paymentStreak: number;
