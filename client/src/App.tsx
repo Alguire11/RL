@@ -102,30 +102,20 @@ function Router() {
       <Route path="/landlord-dashboard" component={LandlordDashboard} />
       <Route path="/subscribe" component={Subscribe} />
       
+      {/* Authenticated routes - always available, auth check happens inside components */}
+      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/reports" component={Reports} />
+      <Route path="/settings" component={Settings} />
+      <Route path="/onboarding" component={OnboardingPage} />
+      <Route path="/rent-tracker" component={RentTracker} />
+      <Route path="/report-generator" component={ReportGenerator} />
+      <Route path="/portfolio" component={Portfolio} />
+      
+      {/* Root route - conditional based on auth */}
       {!isAuthenticated ? (
-        <>
-          <Route path="/" component={Landing} />
-        </>
+        <Route path="/" component={Landing} />
       ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/reports" component={Reports} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/about" component={About} />
-          <Route path="/privacy" component={Privacy} />
-          <Route path="/terms" component={Terms} />
-          <Route path="/support" component={Support} />
-          <Route path="/contact" component={Contact} />
-          <Route path="/help" component={Help} />
-          <Route path="/status" component={Status} />
-          <Route path="/product" component={Product} />
-          <Route path="/landlord-verification" component={LandlordVerification} />
-          <Route path="/onboarding" component={OnboardingPage} />
-          <Route path="/rent-tracker" component={RentTracker} />
-          <Route path="/report-generator" component={ReportGenerator} />
-          <Route path="/portfolio" component={Portfolio} />
-        </>
+        <Route path="/" component={Dashboard} />
       )}
       <Route component={NotFound} />
     </Switch>

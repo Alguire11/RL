@@ -68,7 +68,7 @@ export default function AuthPage() {
         title: "Welcome back!",
         description: "You've successfully logged in.",
       });
-      navigate("/");
+      navigate("/dashboard");
     },
     onError: (error: any) => {
       toast({
@@ -94,7 +94,7 @@ export default function AuthPage() {
         title: "Account created!",
         description: "Welcome to RentLedger. Let's get you started.",
       });
-      navigate("/");
+      navigate("/dashboard");
     },
     onError: (error: any) => {
       toast({
