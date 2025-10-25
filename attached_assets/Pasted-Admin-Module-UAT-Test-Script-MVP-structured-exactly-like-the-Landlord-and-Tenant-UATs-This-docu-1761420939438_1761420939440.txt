@@ -1,0 +1,130 @@
+Admin Module UAT Test Script (MVP), structured exactly like the Landlord and Tenant UATs.
+
+This document defines how your Admin Portal will be tested in Replit (or any other environment), ensuring it covers system oversight, user management, data integrity, and compliance monitoring — all critical for MVP and future FCA/ICO readiness.
+
+🧾 RentLedger Ltd – UAT Test Script: Admin Module (MVP)
+Purpose
+
+To validate that platform administrators can manage system operations, oversee user accounts (landlords, tenants), ensure data integrity, handle reports, and enforce compliance standards for RentLedger Ltd.
+
+1. Admin MVP Feature Scope
+Feature	Description	Included in MVP
+Admin Authentication	Secure admin login (separate from user portal)	✅
+Dashboard Overview	View global system metrics: active users, pending verifications, recent activity	✅
+User Management	Search, view, deactivate, or verify users (landlords & tenants)	✅
+Property Oversight	View all listed properties and their verification statuses	✅
+Ledger Verification Audit	Access system-wide rent verification logs for audit purposes	✅
+Data Integrity Monitoring	Check for missing or inconsistent payment records	✅
+Support Ticket Management	View and respond to user support requests	✅
+Compliance Logs	View GDPR consent records, user deletions, and privacy actions	✅
+System Alerts	Receive system-level notifications for errors or breaches	✅
+Reports Export	Download CSV/PDF summaries of system activity	✅
+2. Functional Requirements (for UAT)
+ID	Requirement	Expected Behaviour	Included in MVP
+FR-A1	Admin Authentication	Admin can log in with unique credentials; users cannot access admin routes.	✅
+FR-A2	View Dashboard	Admin sees counts of total users, landlords, tenants, verified payments, and support tickets.	✅
+FR-A3	Search Users	Admin can search users by name, email, or role.	✅
+FR-A4	View User Profiles	Admin can view landlord or tenant details (no edit permissions beyond verification).	✅
+FR-A5	Deactivate/Reactivate User	Admin can temporarily deactivate or restore user access.	✅
+FR-A6	View Property Data	Admin can view a list of all properties across the system.	✅
+FR-A7	Audit Rent Verification Logs	Admin can filter logs by date, landlord, or property.	✅
+FR-A8	Data Integrity Check	System flags missing or duplicate rent entries.	✅
+FR-A9	View Support Tickets	Admin can read and respond to tenant/landlord support requests.	✅
+FR-A10	Compliance Records	Admin can view GDPR consent logs, data deletion requests.	✅
+FR-A11	System Alerts	Admin sees alerts for failed transactions or API issues.	✅
+FR-A12	Export Reports	Admin can export key data as CSV or PDF.	✅
+3. Non-Functional Requirements
+Category	Requirement	Description
+Security	Role-based access control (RBAC)	Only admins can access /admin/* routes.
+Authentication	2FA or token-based session	Optional but recommended for admin users.
+Compliance	GDPR, ICO, and FCA log retention compliance	Log all consent and data deletion actions.
+Performance	Dashboard data loads in <4 seconds	Required for MVP
+Auditability	Every admin action logged	Audit trail for accountability
+Reliability	99% uptime for admin tools	Standard for MVP
+Scalability	Handle >10,000 users	Cloud DB ready
+Usability	Simple and minimal interface	Focus on clarity, not visuals
+Accessibility	Keyboard-navigable interface	WCAG 2.1 Level A
+Data Integrity	Validation on every CRUD operation	No orphan records
+4. Admin UAT Scenarios
+Test ID	Scenario / Feature	Objective	Test Steps	Expected Result	Pass/Fail	Notes / Comments
+UAT-A01	Admin Login	Verify secure admin login	1. Navigate to /admin/login
+2. Enter valid admin credentials
+3. Submit	Redirected to admin dashboard with valid session	☐	
+UAT-A02	Unauthorized Access	Ensure role restriction	1. Log in as tenant/landlord
+2. Access /admin route	Redirects to 403 “Access Denied” page	☐	
+UAT-A03	View Dashboard Overview	Validate dashboard metrics	1. Log in as admin
+2. View “Dashboard”	Displays totals for users, verified rents, pending verifications	☐	
+UAT-A04	Search Users	Verify user search functionality	1. Go to “Users” tab
+2. Enter name or email
+3. Submit	List filters correctly with matching users	☐	
+UAT-A05	View User Details	Ensure profile data loads correctly	1. Click on user in list
+2. View detailed profile	Shows email, role, status, and associated properties	☐	
+UAT-A06	Deactivate User	Test deactivation flow	1. Click “Deactivate” on a user
+2. Confirm	User status changes to “Inactive” and access revoked	☐	
+UAT-A07	Reactivate User	Validate reactivation flow	1. Click “Reactivate”
+2. Confirm	User access restored successfully	☐	
+UAT-A08	View Property List	Verify property visibility	1. Go to “Properties” tab	Shows all registered properties with rent verification status	☐	
+UAT-A09	Audit Verification Logs	Confirm audit trail accuracy	1. Open “Audit Logs”
+2. Filter by landlord/date	Displays chronological actions with timestamps	☐	
+UAT-A10	Run Data Integrity Check	Test integrity validation	1. Click “Run Check”
+2. Wait for results	Flags duplicate or missing payments with warnings	☐	
+UAT-A11	View Support Tickets	Verify support management	1. Go to “Support” tab
+2. Open a ticket
+3. Add comment/reply	Ticket updates; tenant/landlord notified	☐	
+UAT-A12	View GDPR Logs	Ensure compliance visibility	1. Go to “Compliance” tab
+2. View consent and deletion logs	Logs display with timestamps and user IDs	☐	
+UAT-A13	System Alerts Panel	Validate system notifications	1. Simulate error (e.g., failed email API)
+2. Refresh dashboard	“System Alert: API failure” visible in notifications	☐	
+UAT-A14	Export System Report	Check report generation	1. Click “Export CSV” or “Export PDF”
+2. Download file	File downloads with correct summary data	☐	
+UAT-A15	Logout Session	Verify secure logout	1. Click “Logout”
+2. Return to /admin/dashboard	Redirects to login screen; session cleared	☐	
+5. Additional UAT Scenarios (Recommended)
+Test ID	Scenario	Objective	Expected Result
+UAT-A16	Multiple Admin Sessions	Validate session handling	Prevent concurrent logins or auto-expire old session
+UAT-A17	Admin Action Logging	Confirm activity trace	Each admin action logged in admin_audit_log table
+UAT-A18	Data Export Validation	Ensure data completeness	CSV includes correct record counts
+UAT-A19	Permission Escalation Check	Prevent unauthorized privilege changes	Attempt to modify role fails gracefully
+UAT-A20	System Performance	Test load on 500+ records	Dashboard loads in <4 seconds
+6. MVP Alignment Check
+Feature Group	Aligned with MVP?	Notes / Next Step
+Dashboard overview	✅	Core oversight tool
+User management	✅	Must handle deactivate/reactivate
+Property data view	✅	Read-only at MVP stage
+Audit log access	✅	Needed for compliance
+Support management	✅	Basic reply functionality
+Data integrity tools	✅	Minimal “Run check” function
+Role-based access control	✅	Security essential
+Multi-admin roles	❌	Add post-MVP
+System analytics dashboard	❌	Future upgrade
+2FA login	❌	Optional Phase 2 enhancement
+7. Tech Stack & UAT Environment
+Component	Stack	Purpose
+Frontend	React + TailwindCSS	Admin dashboard UI
+Backend	Node.js / Flask REST API	Admin endpoints for CRUD ops
+Database	PostgreSQL / Supabase	Store user, property, and audit data
+Auth	JWT + RBAC middleware	Role-based access control
+File Handling	Firebase / Cloudinary	Store reports, logs
+Email	SendGrid / Mailgun	For alerts and compliance notifications
+Testing	Jest / Pytest	Automated regression tests
+Deployment	Replit / Render / Vercel	Accessible admin dashboard URL
+8. Acceptance Criteria
+
+✅ Admin can log in securely (restricted route)
+✅ Dashboard loads with system metrics
+✅ Admin can search/view/deactivate/reactivate users
+✅ All landlord/tenant records accessible for audit
+✅ Logs capture actions with timestamp and actor
+✅ Reports export successfully
+✅ Compliance and data integrity logs visible
+✅ Unauthorized users blocked from admin routes
+
+🧩 Next Steps (Optional Enhancements for UAT)
+
+Add role-based mock data (Admin / Landlord / Tenant) for test accounts.
+
+Implement UAT dashboard checklist in Replit or Notion for testers to mark Pass/Fail.
+
+Connect audit logs to a simple reporting endpoint (/api/admin/reports).
+
+Conduct load testing with mock 500-user dataset.

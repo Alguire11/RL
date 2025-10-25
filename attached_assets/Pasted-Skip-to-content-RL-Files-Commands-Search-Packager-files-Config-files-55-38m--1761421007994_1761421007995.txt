@@ -1,0 +1,141 @@
+Skip to content
+
+
+
+RL
+Files
+Commands
+Search
+Packager files
+Config files
+/
+
+55%
+38m
+ • 
+39 minutes ago
+Saved your changes before starting work
+Check current admin pages and functions
+0 / 11
+
+15 messages & 48 actions
+Now let me add the signup route to App.tsx and then continue with wiring up all the functionality efficiently:
+Checkpoint made
+2 hours ago
+Add landlord signup functionality and improve login page
+9 minutes of work
+yes
+
+1 hour ago
+
+14 messages & 44 actions
+Perfect! I'll complete all the remaining work to achieve 100% UAT pass rate. Let me work efficiently:
+I've completed all the landlord dashboard wiring! Property CRUD, payment verification, PDF downloads, and support requests are now fully functional with proper dark mode support. Ready to test?
+
+Checkpoint made
+1 hour ago
+Improve login page accessibility for all user roles
+6 minutes of work
+I have also included testing script for Tenant - go through this also
+
+1 hour ago
+
+6 messages & 15 actions
+I'll now review and complete all tenant module functionality based on the UAT test script!
+Now do the UAT testings after all this
+
+1 hour ago
+
+3 messages & 7 actions
+Let me fix the LSP errors first, then run comprehensive UAT testing:
+Checkpoint made
+1 hour ago
+Update application to show all available payment methods
+2 minutes of work
+I have also pasted the Admin UAT - do the test, implement what has failed and also do the Next step sections, Don't forget you are a software and architecture engineer and ensure both Admin,Tenant and Landlord test pass and this app is ready to be publish with all functions working
+
+3 minutes ago
+
+3 messages & 8 actions
+I'll implement complete Admin functionality and ensure all modules (Admin, Landlord, Tenant) pass UAT tests for production readiness!
+run complete UAT test for the Admin functions first based on the attached file do the 🧩 Next Steps (Optional Enhancements for UAT) after all is done
+
+Just now
+
+Scroll to latest
+Vibing...
+
+Make, test, iterate…
+
+Build
+Pasted-Admin-Module-UAT-Test-Script-MVP-structured-exactly-like-the-Landlord-and-Tenant-UATs-This-docu-1761420939438_1761420939440.txt
+Admin Module UAT Test Script (MVP), structured exactly like the Landlord and Tenant UATs.
+
+This document defines how your Admin Portal will be tested in Replit (or any other environment), ensuring it covers system oversight, user management, data integrity, and compliance monitoring — all critical for MVP and future FCA/ICO readiness.
+
+🧾 RentLedger Ltd – UAT Test Script: Admin Module (MVP)
+Purpose
+
+To validate that platform administrators can manage system operations, oversee user accounts (landlords, tenants), ensure data integrity, handle reports, and enforce compliance standards for RentLedger Ltd.
+
+1. Admin MVP Feature Scope
+Feature	Description	Included in MVP
+Admin Authentication	Secure admin login (separate from user portal)	✅
+Dashboard Overview	View global system metrics: active users, pending verifications, recent activity	✅
+User Management	Search, view, deactivate, or verify users (landlords & tenants)	✅
+Property Oversight	View all listed properties and their verification statuses	✅
+Ledger Verification Audit	Access system-wide rent verification logs for audit purposes	✅
+Data Integrity Monitoring	Check for missing or inconsistent payment records	✅
+Support Ticket Management	View and respond to user support requests	✅
+Compliance Logs	View GDPR consent records, user deletions, and privacy actions	✅
+System Alerts	Receive system-level notifications for errors or breaches	✅
+Reports Export	Download CSV/PDF summaries of system activity	✅
+2. Functional Requirements (for UAT)
+ID	Requirement	Expected Behaviour	Included in MVP
+FR-A1	Admin Authentication	Admin can log in with unique credentials; users cannot access admin routes.	✅
+FR-A2	View Dashboard	Admin sees counts of total users, landlords, tenants, verified payments, and support tickets.	✅
+FR-A3	Search Users	Admin can search users by name, email, or role.	✅
+FR-A4	View User Profiles	Admin can view landlord or tenant details (no edit permissions beyond verification).	✅
+FR-A5	Deactivate/Reactivate User	Admin can temporarily deactivate or restore user access.	✅
+FR-A6	View Property Data	Admin can view a list of all properties across the system.	✅
+FR-A7	Audit Rent Verification Logs	Admin can filter logs by date, landlord, or property.	✅
+FR-A8	Data Integrity Check	System flags missing or duplicate rent entries.	✅
+FR-A9	View Support Tickets	Admin can read and respond to tenant/landlord support requests.	✅
+FR-A10	Compliance Records	Admin can view GDPR consent logs, data deletion requests.	✅
+FR-A11	System Alerts	Admin sees alerts for failed transactions or API issues.	✅
+FR-A12	Export Reports	Admin can export key data as CSV or PDF.	✅
+3. Non-Functional Requirements
+Category	Requirement	Description
+Security	Role-based access control (RBAC)	Only admins can access /admin/* routes.
+Authentication	2FA or token-based session	Optional but recommended for admin users.
+Compliance	GDPR, ICO, and FCA log retention compliance	Log all consent and data deletion actions.
+Performance	Dashboard data loads in <4 seconds	Required for MVP
+Auditability	Every admin action logged	Audit trail for accountability
+Reliability	99% uptime for admin tools	Standard for MVP
+Scalability	Handle >10,000 users	Cloud DB ready
+Usability	Simple and minimal interface	Focus on clarity, not visuals
+Accessibility	Keyboard-navigable interface	WCAG 2.1 Level A
+Data Integrity	Validation on every CRUD operation	No orphan records
+4. Admin UAT Scenarios
+Test ID	Scenario / Feature	Objective	Test Steps	Expected Result	Pass/Fail	Notes / Comments
+UAT-A01	Admin Login	Verify secure admin login	1. Navigate to /admin/login
+2. Enter valid admin credentials
+3. Submit	Redirected to admin dashboard with valid session	☐	
+UAT-A02	Unauthorized Access	Ensure role restriction	1. Log in as tenant/landlord
+2. Access /admin route	Redirects to 403 “Access Denied” page	☐	
+UAT-A03	View Dashboard Overview	Validate dashboard metrics	1. Log in as admin
+2. View “Dashboard”	Displays totals for users, verified rents, pending verifications	☐	
+UAT-A04	Search Users	Verify user search functionality	1. Go to “Users” tab
+2. Enter name or email
+3. Submit	List filters correctly with matching users	☐	
+UAT-A05	View User Details	Ensure profile data loads correctly	1. Click on user in list
+2. View detailed profile	Shows email, role, status, and associated properties	☐	
+UAT-A06	Deactivate User	Test deactivation flow	1. Click “Deactivate” on a user
+2. Confirm	User status changes to “Inactive” and access revoked	☐	
+UAT-A07	Reactivate User	Validate reactivation flow	1. Click “Reactivate”
+2. Confirm	User access restored successfully	☐	
+UAT-A08	View Property List	Verify property visibility	1. Go to “Properties” tab	Shows all registered properties with rent verification status	☐	
+UAT-A09	Audit Verification Logs	Confirm audit trail accuracy	1. Open “Audit Logs”
+2. Filter by landlord/date	Displays chronological actions with timestamps	☐	
+UAT-A10	Run Data Integrity Check	Test integrity validation	1. Click “Run Check”
+2. Wait for results	Flags duplicate or missing ...
