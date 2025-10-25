@@ -96,6 +96,85 @@ export default function LandlordDashboard() {
     setLocation('/admin-login');
   };
 
+  // Property mutations
+  const addPropertyMutation = useMutation({
+    mutationFn: async (propertyData: any) => {
+      const response = await apiRequest("POST", "/api/properties", {
+        userId: landlordId,
+        address: propertyData.address,
+        city: propertyData.city || '',
+        postcode: propertyData.postcode || '',
+        monthlyRent: propertyData.rent,
+        ...propertyData
+      });
+      if (!response.ok) throw new Error('Failed to add property');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Property Added",
+        description: `${propertyForm.address} has been added successfully.`,
+      });
+      setPropertyForm({ address: '', type: '', bedrooms: '', bathrooms: '', rent: '', description: '' });
+      setShowAddProperty(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add property. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePropertyMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const response = await apiRequest("PATCH", `/api/properties/${id}`, data);
+      if (!response.ok) throw new Error('Failed to update property');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Property Updated", description: "Property updated successfully." });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update property.", variant: "destructive" });
+    },
+  });
+
+  const deletePropertyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/properties/${id}`, {});
+      if (!response.ok) throw new Error('Failed to delete property');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Property Deleted", description: "Property deleted successfully." });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete property.", variant: "destructive" });
+    },
+  });
+
+  // Payment verification mutation
+  const verifyPaymentMutation = useMutation({
+    mutationFn: async ({ paymentId, status, notes }: { paymentId: number; status: 'approved' | 'rejected' | 'pending'; notes?: string }) => {
+      const response = await apiRequest("POST", `/api/payments/${paymentId}/verify`, { status, notes });
+      if (!response.ok) throw new Error('Failed to verify payment');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Payment Verified", description: "Payment status updated successfully." });
+      queryClient.invalidateQueries({ queryKey: ['/api/landlord', landlordId, 'verifications'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/landlord', landlordId, 'pending-requests'] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to verify payment.", variant: "destructive" });
+    },
+  });
+
   // Quick Action handlers
   const handleAddProperty = () => {
     // Check subscription limits
@@ -110,21 +189,7 @@ export default function LandlordDashboard() {
       return;
     }
     
-    // Add property and increment count
-    setPropertyCount(prev => prev + 1);
-    toast({
-      title: "Property Added",
-      description: `${propertyForm.address} has been added to your portfolio. You now have ${propertyCount + 1} ${propertyCount + 1 === 1 ? 'property' : 'properties'}.`,
-    });
-    setPropertyForm({
-      address: '',
-      type: '',
-      bedrooms: '',
-      bathrooms: '',
-      rent: '',
-      description: ''
-    });
-    setShowAddProperty(false);
+    addPropertyMutation.mutate(propertyForm);
   };
 
   const handleSendNotice = () => {
@@ -476,7 +541,7 @@ export default function LandlordDashboard() {
               <p className="text-sm mb-3">Upgrade to unlock advanced analytics, unlimited properties, and priority support.</p>
               <div className="flex items-center space-x-3">
                 <Link href="/subscribe">
-                  <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg" data-testid="button-upgrade-premium">
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white dark:text-white font-semibold shadow-lg" data-testid="button-upgrade-premium">
                     <Sparkles className="h-4 w-4 mr-2" />
                     Upgrade to Premium - £19.99/mo
                   </Button>
@@ -575,7 +640,7 @@ export default function LandlordDashboard() {
                   Get detailed trends, property performance insights, and tenant behavior analysis with Premium.
                 </p>
                 <Link href="/subscribe">
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold shadow-lg" data-testid="button-upgrade-analytics">
+                  <Button className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white dark:text-white font-semibold shadow-lg" data-testid="button-upgrade-analytics">
                     Upgrade Now <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </Link>
@@ -775,7 +840,7 @@ export default function LandlordDashboard() {
                             });
                           }}
                           disabled={inviteTenantMutation.isPending}
-                          className="bg-gradient-to-r from-blue-500 to-purple-600 text-white"
+                          className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white dark:text-white"
                         >
                           {inviteTenantMutation.isPending ? "Sending..." : "Send Invitation"}
                         </Button>
@@ -1188,7 +1253,7 @@ export default function LandlordDashboard() {
                     <span>Active Tenants</span>
                     <Dialog open={showInviteTenant} onOpenChange={setShowInviteTenant}>
                       <DialogTrigger asChild>
-                        <Button size="sm" className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white dark:text-white">
                           <Plus className="h-4 w-4 mr-2" />
                           Invite Tenant
                         </Button>
@@ -1270,7 +1335,22 @@ export default function LandlordDashboard() {
                             </div>
                             <div className="flex space-x-2">
                               <Button size="sm" variant="outline"><Mail className="h-4 w-4 mr-1" />Contact</Button>
-                              <Button size="sm" variant="outline">View Details</Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => {
+                                  // Download PDF ledger
+                                  const tenantId = tenantData.tenant?.id || 'unknown';
+                                  window.open(`/api/landlord/${landlordId}/tenant/${tenantId}/ledger-pdf`, '_blank');
+                                  toast({
+                                    title: "Downloading PDF",
+                                    description: "Rent ledger PDF is being generated...",
+                                  });
+                                }}
+                                data-testid={`button-download-ledger-${idx}`}
+                              >
+                                <Download className="h-4 w-4 mr-1" />Download Ledger
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -1309,8 +1389,26 @@ export default function LandlordDashboard() {
                             </div>
                             {payment.status === 'pending' && (
                               <div className="space-x-2">
-                                <Button size="sm" variant="outline" className="text-green-600">Approve</Button>
-                                <Button size="sm" variant="outline" className="text-red-600">Reject</Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="text-green-600 dark:text-green-400"
+                                  onClick={() => verifyPaymentMutation.mutate({ paymentId: payment.id, status: 'approved' })}
+                                  disabled={verifyPaymentMutation.isPending}
+                                  data-testid={`button-approve-payment-${payment.id}`}
+                                >
+                                  Approve
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="text-red-600 dark:text-red-400"
+                                  onClick={() => verifyPaymentMutation.mutate({ paymentId: payment.id, status: 'rejected' })}
+                                  disabled={verifyPaymentMutation.isPending}
+                                  data-testid={`button-reject-payment-${payment.id}`}
+                                >
+                                  Reject
+                                </Button>
                               </div>
                             )}
                           </div>
@@ -1352,8 +1450,33 @@ export default function LandlordDashboard() {
                               )}
                             </div>
                             <div className="space-x-2">
-                              <Button size="sm" className="bg-gradient-to-r from-green-500 to-green-600 text-white">Approve</Button>
-                              <Button size="sm" variant="outline" className="text-red-600">Decline</Button>
+                              <Button 
+                                size="sm" 
+                                className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white dark:text-white"
+                                onClick={() => {
+                                  if (request.data?.paymentId) {
+                                    verifyPaymentMutation.mutate({ paymentId: request.data.paymentId, status: 'approved' });
+                                  }
+                                }}
+                                disabled={verifyPaymentMutation.isPending}
+                                data-testid={`button-approve-request-${request.id}`}
+                              >
+                                Approve
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="text-red-600 dark:text-red-400"
+                                onClick={() => {
+                                  if (request.data?.paymentId) {
+                                    verifyPaymentMutation.mutate({ paymentId: request.data.paymentId, status: 'rejected' });
+                                  }
+                                }}
+                                disabled={verifyPaymentMutation.isPending}
+                                data-testid={`button-decline-request-${request.id}`}
+                              >
+                                Decline
+                              </Button>
                             </div>
                           </div>
                         </div>

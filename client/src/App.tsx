@@ -32,6 +32,7 @@ import RentTracker from "@/pages/rent-tracker";
 import ReportGenerator from "@/pages/report-generator";
 import Portfolio from "@/pages/portfolio";
 import Subscribe from "@/pages/subscribe";
+import SupportRequest from "@/pages/support-request";
 
 // Lazy load admin pages
 const AdminUsers = lazy(() => import("@/pages/admin-users"));
@@ -105,6 +106,7 @@ function Router() {
       )} />
       <Route path="/landlord-dashboard" component={LandlordDashboard} />
       <Route path="/subscribe" component={Subscribe} />
+      <Route path="/support-request" component={SupportRequest} />
       
       {/* Authenticated routes - always available, auth check happens inside components */}
       <Route path="/dashboard" component={Dashboard} />
