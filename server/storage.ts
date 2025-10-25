@@ -6,6 +6,7 @@ import {
   creditReports,
   reportShares,
   landlordVerifications,
+  tenantInvitations,
   notifications,
   userPreferences,
   securityLogs,
@@ -31,6 +32,8 @@ import {
   type InsertReportShare,
   type LandlordVerification,
   type InsertLandlordVerification,
+  type TenantInvitation,
+  type InsertTenantInvitation,
   type Notification,
   type InsertNotification,
   type UserPreferences,
@@ -98,6 +101,20 @@ export interface IStorage {
   createLandlordVerification(verification: InsertLandlordVerification): Promise<LandlordVerification>;
   getLandlordVerification(token: string): Promise<LandlordVerification | undefined>;
   updateLandlordVerification(id: number, verification: Partial<InsertLandlordVerification>): Promise<LandlordVerification>;
+  
+  // Tenant invitation operations
+  createTenantInvitation(invitation: InsertTenantInvitation): Promise<TenantInvitation>;
+  getTenantInvitation(token: string): Promise<TenantInvitation | undefined>;
+  getLandlordInvitations(landlordId: string): Promise<TenantInvitation[]>;
+  acceptTenantInvitation(id: number, tenantId: string): Promise<TenantInvitation>;
+  expireInvitation(id: number): Promise<void>;
+  
+  // Landlord operations
+  getPropertyById(id: number): Promise<Property | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
+  getLandlordTenants(landlordId: string): Promise<Array<{tenant: User; property: Property; payments: RentPayment[]}>>;
+  getLandlordVerifications(landlordId: string): Promise<RentPayment[]>;
+  getLandlordPendingRequests(landlordId: string): Promise<Array<{type: string; id: number; tenant: User; property: Property; data: any}>>;
   
   // Dashboard statistics
   getUserStats(userId: string): Promise<{
