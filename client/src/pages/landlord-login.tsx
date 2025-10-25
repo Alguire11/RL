@@ -6,10 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Logo } from "@/components/logo";
-import { Shield, Eye, EyeOff } from "lucide-react";
+import { Building, Eye, EyeOff } from "lucide-react";
 
-export default function AdminLogin() {
+export default function LandlordLogin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [formData, setFormData] = useState({
@@ -20,69 +19,63 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Demo credentials - ONLY for admins
-  const adminCredentials = {
-    admin: { username: 'admin', password: 'admin123', role: 'admin' }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const { username, password } = formData;
     
-    if (username === 'admin' && password === 'admin123') {
+    if (username === 'landlord' && password === 'landlord123') {
       localStorage.setItem('admin_session', JSON.stringify({
-        username: 'admin',
-        role: 'admin',
+        username: 'landlord',
+        role: 'landlord',
         loginTime: new Date().toISOString()
       }));
 
       toast({
         title: "Login Successful",
-        description: "Welcome, Administrator!",
+        description: "Welcome to the Landlord Dashboard!",
       });
 
-      setLocation('/admin');
+      setLocation('/landlord-dashboard');
     } else {
-      setError('Invalid admin credentials');
+      setError('Invalid landlord credentials');
     }
 
     setIsLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Shield className="h-6 w-6 text-blue-600" />
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Building className="h-6 w-6 text-purple-600" />
             </div>
           </div>
           <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-            Administrator Access
+            Landlord Access
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            System administration and platform management
+            Manage properties, tenants, and verifications
           </p>
           
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+          <div className="mt-4 p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
             <p className="font-medium mb-1">Demo Credentials:</p>
-            <p>Username: <code className="bg-white px-1 rounded">admin</code></p>
-            <p>Password: <code className="bg-white px-1 rounded">admin123</code></p>
+            <p>Username: <code className="bg-white px-1 rounded">landlord</code></p>
+            <p>Password: <code className="bg-white px-1 rounded">landlord123</code></p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Admin Login</CardTitle>
+            <CardTitle>Landlord Login</CardTitle>
             <CardDescription>
-              Enter administrator credentials to access the admin panel
+              Enter your landlord credentials to access the dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -96,6 +89,7 @@ export default function AdminLogin() {
                   onChange={(e) => setFormData({...formData, username: e.target.value})}
                   placeholder="Enter username"
                   required
+                  data-testid="input-landlord-username"
                 />
               </div>
 
@@ -109,6 +103,7 @@ export default function AdminLogin() {
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
                     placeholder="Enter password"
                     required
+                    data-testid="input-landlord-password"
                   />
                   <Button
                     type="button"
@@ -134,47 +129,47 @@ export default function AdminLogin() {
 
               <Button 
                 type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                 disabled={isLoading}
+                data-testid="button-landlord-login"
               >
-                {isLoading ? "Signing in..." : "Sign In"}
+                {isLoading ? "Signing in..." : "Sign In as Landlord"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Demo Credentials */}
-        <Card className="bg-purple-50 border-purple-200">
+        <Card className="bg-blue-50 border-blue-200">
           <CardContent className="pt-6">
             <div className="text-center space-y-3">
               <div>
-                <p className="text-sm font-medium text-purple-900 mb-2">Are you a landlord?</p>
+                <p className="text-sm font-medium text-blue-900 mb-2">Are you a tenant?</p>
                 <Button
                   variant="outline"
-                  onClick={() => setLocation('/landlord-login')}
-                  className="w-full border-purple-300 text-purple-700 hover:bg-purple-100"
+                  onClick={() => setLocation('/auth')}
+                  className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
                 >
-                  Go to Landlord Login
+                  Go to Tenant Sign Up/Login
                 </Button>
               </div>
               
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-purple-200" />
+                  <span className="w-full border-t border-blue-200" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-purple-50 px-2 text-purple-600">Or</span>
+                  <span className="bg-blue-50 px-2 text-blue-600">Or</span>
                 </div>
               </div>
               
               <div>
-                <p className="text-sm font-medium text-purple-900 mb-2">Are you a tenant?</p>
+                <p className="text-sm font-medium text-blue-900 mb-2">System Administrator?</p>
                 <Button
                   variant="outline"
-                  onClick={() => setLocation('/auth')}
-                  className="w-full border-purple-300 text-purple-700 hover:bg-purple-100"
+                  onClick={() => setLocation('/admin-login')}
+                  className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
                 >
-                  Go to Tenant Sign Up/Login
+                  Go to Admin Login
                 </Button>
               </div>
             </div>
@@ -185,7 +180,7 @@ export default function AdminLogin() {
           <Button
             variant="ghost"
             onClick={() => setLocation('/')}
-            className="text-blue-600 hover:text-blue-700"
+            className="text-purple-600 hover:text-purple-700"
           >
             ← Back to Home
           </Button>

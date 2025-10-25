@@ -22,6 +22,7 @@ import Product from "@/pages/product";
 import Support from "@/pages/support";
 import AdminDashboard from "@/pages/admin";
 import AdminLogin from "@/pages/admin-login";
+import LandlordLogin from "@/pages/landlord-login";
 import LandlordDashboard from "@/pages/landlord-dashboard";
 import LandlordVerification from "@/pages/landlord-verification";
 import LandlordVerify from "@/pages/landlord-verify";
@@ -62,6 +63,7 @@ function Router() {
       {/* Public routes - available when not authenticated */}
       <Route path="/auth" component={AuthPage} />
       <Route path="/admin-login" component={AdminLogin} />
+      <Route path="/landlord-login" component={LandlordLogin} />
       <Route path="/about" component={About} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />

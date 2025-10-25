@@ -227,14 +227,14 @@ export default function AuthPage() {
                     type="button"
                     variant="outline"
                     className="w-full mt-4 border-purple-200 text-purple-600 hover:bg-purple-50"
-                    onClick={() => navigate("/admin-login")}
+                    onClick={() => navigate("/landlord-login")}
                     data-testid="button-landlord-access"
                   >
                     <Building className="h-4 w-4 mr-2" />
-                    Landlord & Admin Access
+                    Landlord Access
                   </Button>
                   <p className="text-xs text-gray-500 mt-2">
-                    Access landlord dashboard or admin panel
+                    Access landlord dashboard and property management
                   </p>
                 </div>
               </CardContent>
@@ -359,7 +359,7 @@ export default function AuthPage() {
               <Button
                 variant="outline"
                 className="border-purple-200 text-purple-600 hover:bg-purple-100"
-                onClick={() => navigate("/admin-login")}
+                onClick={() => navigate("/landlord-login")}
               >
                 Landlord Dashboard Access
               </Button>
