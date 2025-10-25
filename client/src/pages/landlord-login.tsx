@@ -139,7 +139,21 @@ export default function LandlordLogin() {
           </CardContent>
         </Card>
 
-        <Card className="bg-blue-50 border-blue-200">
+        <div className="text-center">
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            Don't have a landlord account?
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => setLocation('/landlord-signup')}
+            className="w-full border-purple-300 text-purple-700 hover:bg-purple-100 dark:border-purple-600 dark:text-purple-400 dark:hover:bg-purple-900"
+            data-testid="button-goto-signup"
+          >
+            Create Landlord Account
+          </Button>
+        </div>
+
+        <Card className="bg-blue-50 dark:bg-gray-800 border-blue-200 dark:border-gray-700">
           <CardContent className="pt-6">
             <div className="text-center space-y-3">
               <div>

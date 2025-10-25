@@ -39,7 +39,7 @@ const requireAdmin = async (req: any, res: any, next: any) => {
     res.status(401).json({ message: 'Invalid admin session' });
   }
 };
-import { createHash } from "crypto";
+import bcrypt from "bcryptjs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -1934,8 +1934,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
+  const httpServer: Server = createServer(app);
   return httpServer;
+}
 
 // Helper functions
 async function calculateUserBadges(userId: string, payments: any[]) {
@@ -2093,7 +2094,8 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
       res.status(500).json({ message: 'Failed to fetch achievements' });
     }
   });
-  // Add the manual payment routes inside the registerRoutes function
+  
+  // Add manual payment routes
   addManualPaymentRoutes(app, requireAuth, storage);
 
   // Stripe payment intent endpoint
@@ -2134,11 +2136,273 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
     }
   });
 
-  const httpServer = createServer(app);
+  // Landlord signup route (UAT-01)
+  app.post('/api/landlord/signup', async (req, res) => {
+    try {
+      const { email, password, firstName, lastName, phone, businessName } = req.body;
+      
+      // Check if landlord already exists
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ message: 'Email already registered' });
+      }
+      
+      // Create landlord user with secure password hashing
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const landlord = await storage.upsertUser({
+        id: nanoid(),
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        phone,
+        role: 'landlord',
+        subscriptionPlan: 'free',
+        isOnboarded: false,
+        emailVerified: false,
+        isActive: true
+      });
+      
+      res.json({ success: true, landlord: { id: landlord.id, email: landlord.email } });
+    } catch (error) {
+      console.error("Error creating landlord account:", error);
+      res.status(500).json({ message: "Failed to create landlord account" });
+    }
+  });
+
+  // Landlord login route
+  app.post('/api/landlord/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      const user = await storage.getUserByEmail(email);
+      if (!user || user.role !== 'landlord') {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+      
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ message: 'Invalid credentials' });
+      }
+      
+      res.json({ success: true, landlord: { id: user.id, email: user.email, firstName: user.firstName } });
+    } catch (error) {
+      console.error("Error during landlord login:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  // Property CRUD routes with authentication (UAT-03, 04, 05)
+  app.put('/api/properties/:id', requireAuth, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const updateData = req.body;
+      
+      const property = await storage.updateProperty(propertyId, updateData);
+      res.json(property);
+    } catch (error) {
+      console.error("Error updating property:", error);
+      res.status(500).json({ message: "Failed to update property" });
+    }
+  });
+
+  app.delete('/api/properties/:id', requireAuth, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      await storage.deleteProperty(propertyId);
+      res.json({ success: true, message: "Property deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting property:", error);
+      res.status(500).json({ message: "Failed to delete property" });
+    }
+  });
+
+  // Payment verification routes (UAT-08, 09)
+  app.post('/api/payments/:id/verify', async (req, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const { status, notes } = req.body;
+      
+      const payment = await storage.updateRentPayment(paymentId, {
+        status: status === 'approved' ? 'paid' : status === 'rejected' ? 'missed' : 'pending',
+        isVerified: status === 'approved',
+        updatedAt: new Date()
+      });
+      
+      // Create notification for tenant
+      if (payment.userId) {
+        await storage.createNotification({
+          userId: payment.userId,
+          type: 'system',
+          title: status === 'approved' ? 'Payment Verified' : 'Payment Status Updated',
+          message: status === 'approved' 
+            ? `Your rent payment of £${payment.amount} has been verified by your landlord.`
+            : `Your rent payment status has been updated to: ${status}`,
+          isRead: false
+        });
+      }
+      
+      res.json({ success: true, payment });
+    } catch (error) {
+      console.error("Error verifying payment:", error);
+      res.status(500).json({ message: "Failed to verify payment" });
+    }
+  });
+
+  // PDF generation route (UAT-10)
+  app.get('/api/landlord/:landlordId/tenant/:tenantId/ledger-pdf', async (req, res) => {
+    try {
+      const { landlordId, tenantId } = req.params;
+      
+      // Get tenant data
+      const tenant = await storage.getUserById(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+      
+      // Get tenant's payments
+      const payments = await storage.getUserPayments(tenantId);
+      const verifiedPayments = payments.filter(p => p.isVerified);
+      
+      // Simple HTML-based PDF content
+      const verificationId = nanoid(16);
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .logo { font-size: 24px; font-weight: bold; color: #6366f1; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+            th { background-color: #6366f1; color: white; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">RentLedger</div>
+            <h2>Rent Payment Ledger</h2>
+            <p>Tenant: ${tenant.firstName} ${tenant.lastName}</p>
+            <p>Generated: ${new Date().toLocaleDateString('en-GB')}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date Paid</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Property</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${verifiedPayments.map((p: any) => `
+                <tr>
+                  <td>${p.paidDate ? new Date(p.paidDate).toLocaleDateString('en-GB') : 'N/A'}</td>
+                  <td>£${p.amount}</td>
+                  <td>${p.isVerified ? 'Verified' : 'Pending'}</td>
+                  <td>Property #${p.propertyId}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="footer">
+            <p>This is an official RentLedger verification document</p>
+            <p>Verification ID: ${verificationId}</p>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Content-Disposition', `attachment; filename="rent-ledger-${tenant.firstName}-${tenant.lastName}.html"`);
+      res.send(html);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate ledger" });
+    }
+  });
+
+  // Support request route (UAT-14)
+  app.post('/api/support/request', async (req, res) => {
+    try {
+      const { name, email, subject, message, priority } = req.body;
+      
+      // Send email to support
+      await sendEmail({
+        from: 'noreply@rentledger.co.uk',
+        to: 'support@rentledger.co.uk',
+        subject: `Support Request: ${subject}`,
+        text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+        html: `
+          <h2>New Support Request</h2>
+          <p><strong>From:</strong> ${name} (${email})</p>
+          <p><strong>Subject:</strong> ${subject}</p>
+          <p><strong>Priority:</strong> ${priority || 'Normal'}</p>
+          <p><strong>Message:</strong></p>
+          <p>${message}</p>
+        `
+      });
+      
+      res.json({ success: true, message: 'Support request submitted successfully' });
+    } catch (error) {
+      console.error("Error submitting support request:", error);
+      res.status(500).json({ message: "Failed to submit support request" });
+    }
+  });
+
+  // Landlord analytics route (UAT-15)
+  app.get('/api/landlord/:landlordId/analytics', async (req, res) => {
+    try {
+      const { landlordId } = req.params;
+      
+      // Get landlord's properties
+      const properties = await storage.getUserProperties(landlordId);
+      
+      // Get all payments for landlord's properties
+      let allPayments: any[] = [];
+      for (const property of properties) {
+        const payments = await storage.getPropertyRentPayments(property.id);
+        allPayments = allPayments.concat(payments);
+      }
+      
+      // Calculate analytics
+      const verifiedPayments = allPayments.filter((p: any) => p.isVerified);
+      const pendingPayments = allPayments.filter((p: any) => p.status === 'pending');
+      const totalRevenue = verifiedPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount.toString()), 0);
+      
+      // Monthly breakdown
+      const monthlyData = allPayments.reduce((acc: any, payment: any) => {
+        const month = payment.paidDate ? new Date(payment.paidDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Pending';
+        if (!acc[month]) {
+          acc[month] = { verified: 0, pending: 0 };
+        }
+        if (payment.isVerified) {
+          acc[month].verified += parseFloat(payment.amount.toString());
+        } else {
+          acc[month].pending += parseFloat(payment.amount.toString());
+        }
+        return acc;
+      }, {});
+      
+      res.json({
+        totalRevenue,
+        verifiedCount: verifiedPayments.length,
+        pendingCount: pendingPayments.length,
+        monthlyData,
+        properties: properties.length
+      });
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  const httpServer: Server = createServer(app);
   return httpServer;
 }
 
 function generateShareToken(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
 }
