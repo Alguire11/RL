@@ -38,7 +38,6 @@ export default function LandlordDashboard() {
   const [showSendNotice, setShowSendNotice] = useState(false);
   const [showScheduleInspection, setShowScheduleInspection] = useState(false);
   const [showInviteTenant, setShowInviteTenant] = useState(false);
-  const [inviteLink, setInviteLink] = useState("");
   const [showDocumentVault, setShowDocumentVault] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
@@ -155,25 +154,6 @@ export default function LandlordDashboard() {
       notes: ''
     });
     setShowScheduleInspection(false);
-  };
-
-  const handleGenerateInviteLink = (propertyId: string) => {
-    // Generate unique invite link
-    const uniqueCode = Math.random().toString(36).substring(2, 15);
-    const link = `${window.location.origin}/tenant/invite/${uniqueCode}`;
-    setInviteLink(link);
-    toast({
-      title: "Invite Link Generated",
-      description: "Share this link with your tenant to connect their account.",
-    });
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    toast({
-      title: "Link Copied",
-      description: "Invite link copied to clipboard",
-    });
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -742,7 +722,6 @@ export default function LandlordDashboard() {
                       <Button 
                         variant="outline" 
                         className="h-20 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200"
-                        onClick={() => handleGenerateInviteLink('property-1')}
                       >
                         <Link2 className="h-6 w-6 mb-2" />
                         <span className="text-sm">Invite Tenant</span>
@@ -752,41 +731,54 @@ export default function LandlordDashboard() {
                       <DialogHeader>
                         <DialogTitle className="flex items-center text-xl">
                           <Link2 className="h-5 w-5 mr-2 text-purple-600" />
-                          Invite Tenant to Connect
+                          Invite Tenant
                         </DialogTitle>
                         <DialogDescription>
-                          Share this unique link with your tenant to connect their account
+                          Send an invitation email with QR code to your tenant
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <Label>Invite Link</Label>
-                          <div className="flex space-x-2">
-                            <Input value={inviteLink} readOnly className="font-mono text-sm" />
-                            <Button onClick={handleCopyLink} variant="outline" size="icon">
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            This link is unique and can be used only once. Valid for 7 days.
-                          </p>
+                        <div>
+                          <Label htmlFor="quick-tenant-email">Tenant Email</Label>
+                          <Input
+                            id="quick-tenant-email"
+                            type="email"
+                            value={tenantEmail}
+                            onChange={(e) => setTenantEmail(e.target.value)}
+                            placeholder="tenant@example.com"
+                          />
                         </div>
-                        <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-center">
-                            <QrCode className="h-24 w-24 mx-auto text-gray-400 mb-2" />
-                            <p className="text-sm text-gray-600">QR Code Preview</p>
-                            <p className="text-xs text-gray-500">Tenant can scan this to connect</p>
-                          </div>
+                        <div>
+                          <Label htmlFor="quick-property-address">Property Address</Label>
+                          <Input
+                            id="quick-property-address"
+                            value={selectedPropertyForInvite}
+                            onChange={(e) => setSelectedPropertyForInvite(e.target.value)}
+                            placeholder="123 Main Street, London"
+                          />
                         </div>
-                        <div className="flex space-x-2">
-                          <Button onClick={() => setShowInviteTenant(false)} variant="outline" className="flex-1">
-                            Close
-                          </Button>
-                          <Button onClick={handleCopyLink} className="flex-1 bg-purple-600 hover:bg-purple-700">
-                            <Mail className="h-4 w-4 mr-2" />
-                            Send via Email
-                          </Button>
-                        </div>
+                      </div>
+                      <div className="flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowInviteTenant(false)}>Cancel</Button>
+                        <Button 
+                          onClick={() => {
+                            if (!tenantEmail || !selectedPropertyForInvite) {
+                              toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
+                              return;
+                            }
+                            inviteTenantMutation.mutate({
+                              landlordId,
+                              propertyId: null,
+                              tenantEmail,
+                              landlordName: adminSession.username,
+                              propertyAddress: selectedPropertyForInvite
+                            });
+                          }}
+                          disabled={inviteTenantMutation.isPending}
+                          className="bg-gradient-to-r from-blue-500 to-purple-600 text-white"
+                        >
+                          {inviteTenantMutation.isPending ? "Sending..." : "Send Invitation"}
+                        </Button>
                       </div>
                     </DialogContent>
                   </Dialog>
