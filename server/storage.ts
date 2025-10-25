@@ -176,6 +176,18 @@ export interface IStorage {
     recentUsers: User[];
     recentPayments: RentPayment[];
   }>;
+  
+  // Admin bulk operations
+  getAllUsers(): Promise<User[]>;
+  getAllProperties(): Promise<Property[]>;
+  getAllPayments(): Promise<RentPayment[]>;
+  getSecurityLogs(filters: {
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+    action?: string;
+    limit?: number;
+  }): Promise<SecurityLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -795,6 +807,56 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .orderBy(desc(users.createdAt));
   }
+  
+  // Get all properties (admin only)
+  async getAllProperties(): Promise<Property[]> {
+    return await db
+      .select()
+      .from(properties)
+      .orderBy(desc(properties.createdAt));
+  }
+  
+  // Get all payments (admin only)
+  async getAllPayments(): Promise<RentPayment[]> {
+    return await db
+      .select()
+      .from(rentPayments)
+      .orderBy(desc(rentPayments.createdAt));
+  }
+  
+  // Get security logs with filtering (admin only)
+  async getSecurityLogs(filters: {
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+    action?: string;
+    limit?: number;
+  }): Promise<SecurityLog[]> {
+    let query = db.select().from(securityLogs);
+    
+    const conditions = [];
+    if (filters.userId) {
+      conditions.push(eq(securityLogs.userId, filters.userId));
+    }
+    if (filters.action) {
+      conditions.push(eq(securityLogs.action, filters.action));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(securityLogs.timestamp, new Date(filters.startDate)));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(securityLogs.timestamp, new Date(filters.endDate)));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    query = query.orderBy(desc(securityLogs.timestamp)).limit(filters.limit || 100) as any;
+    
+    return await query;
+  }
+  
   // Badge operations
   async createUserBadge(badge: InsertUserBadge): Promise<UserBadge> {
     const [created] = await db.insert(userBadges).values(badge).returning();

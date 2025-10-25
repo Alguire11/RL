@@ -2476,6 +2476,27 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
     }
   });
 
+  // Admin Test Data Seeding Endpoint (Development only)
+  app.post('/api/admin/seed-test-data', requireAdmin, async (req, res) => {
+    try {
+      // Only allow in development
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: 'Test data seeding not allowed in production' });
+      }
+      
+      const { seedTestData } = await import('./seed-test-data');
+      const result = await seedTestData();
+      
+      res.json({
+        message: 'Test data seeding completed successfully',
+        ...result,
+      });
+    } catch (error) {
+      console.error('Error seeding test data:', error);
+      res.status(500).json({ message: 'Failed to seed test data', error: String(error) });
+    }
+  });
+
   const httpServer: Server = createServer(app);
   return httpServer;
 }
