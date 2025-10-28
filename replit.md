@@ -8,36 +8,49 @@ RentLedger is a comprehensive rent credit building platform that helps tenants a
 
 Preferred communication style: Simple, everyday language.
 
-## Admin Access System
+## Authentication & Security System
 
-The application now includes a comprehensive admin access system with role-based authentication:
+The application implements production-grade security with session-based authentication and role-based access control:
 
-### Demo Credentials
-- **Admin Access**: username: `admin`, password: `admin123`
-- **User Access**: username: `user`, password: `user123`  
-- **Landlord Access**: username: `landlord`, password: `landlord123`
+### Authentication Architecture
+- **Session Management**: Secure session-based authentication using Passport.js
+- **Role-Based Access**: Middleware protection for admin and landlord routes
+- **Environment Validation**: Server startup validation ensures all required environment variables are configured
 
-### Routes
-- `/admin-login` - Admin login page with demo credentials
-- `/admin` - Admin dashboard (requires admin role)
-- `/landlord-dashboard` - Landlord dashboard (requires landlord role)
-- `/dashboard` - Regular user dashboard (requires user role)
+### Access Control Routes
+- `/admin-login` - Admin authentication portal (requires admin credentials)
+- `/landlord-login` - Landlord authentication portal (requires landlord credentials)
+- `/auth` - Tenant signup/login page
+- `/admin` - Admin dashboard (protected by requireAdmin middleware)
+- `/landlord-dashboard` - Landlord dashboard (protected by requireLandlord middleware)
+- `/dashboard` - Tenant dashboard (requires authenticated user)
 
 ### Authentication Flow
-1. Users visit `/admin-login` to access the admin system
-2. Upon successful login, users are redirected based on their role
-3. Session is stored in localStorage for demo purposes
-4. Each dashboard checks for appropriate role access
+1. Users visit appropriate login page based on their role
+2. Credentials are validated against database using Passport.js LocalStrategy
+3. Upon successful authentication, a secure session cookie is issued
+4. All protected routes verify session and role before granting access
+5. Unauthorized access attempts redirect to appropriate login page
 
-## Recent Changes
+## Recent Changes (October 28, 2025)
 
+### Production Security Enhancements
+✓ **CRITICAL**: Replaced localStorage demo auth with secure session-based authentication
+✓ Implemented role-based middleware (requireAdmin, requireLandlord, requireRole) for route protection
+✓ Updated all login pages (admin, landlord) to use real API authentication endpoints
+✓ Added runtime environment variable validation - server will not start without required configs
+✓ Enhanced email service with detailed error handling and configuration checks
+✓ Protected all admin/landlord API routes with authentication middleware
+✓ Added getUserByUsername to storage interface for secure credential lookups
+✓ Removed all localStorage-based authentication (security vulnerability)
+
+### Previous Features (October 2025)
 ✓ Fixed critical authentication 404 issues by implementing proper custom auth system
 ✓ Created functional login/signup forms with proper validation and error handling
 ✓ Removed all placeholder data (John, Doe, john@example.com) from forms
 ✓ Fixed navigation component DOM nesting warnings
 ✓ Implemented proper logout functionality with API calls
 ✓ Enhanced button visibility with better blue color contrast
-✓ Created comprehensive admin login system with dummy credentials
 ✓ Built role-based access control (admin, user, landlord)
 ✓ Enhanced all missing pages (help center, contact, status, privacy, terms)
 ✓ Fixed Terms and Privacy Policy links throughout the application
@@ -51,12 +64,10 @@ The application now includes a comprehensive admin access system with role-based
 ✓ Added searchable knowledge base with categorized content and improved user experience
 ✓ Fixed navbar transparency issues - changed to solid white background for better readability across all pages
 ✓ Implemented admin user management: subscription plan updates with full backend API integration and database persistence
-✓ Added password reset UI for admins (demo system - production would require password hashing and email notifications)
 ✓ Enhanced landlord dashboard with visible analytics section showing key performance metrics
 ✓ Implemented subscription-based feature restrictions (Free: 1 property, Standard: 3 properties, Premium: unlimited)
 ✓ Added landlord welcome section explaining platform features and benefits
 ✓ Created upgrade prompts and feature gates for free tier landlords with clear pricing CTAs
-✓ Added subscription plan switcher in landlord dashboard header for demo testing
 ✓ Enhanced mobile responsiveness for all landlord dashboard sections
 ✓ Aligned landlord/tenant UI with landing page brand colors (clean white backgrounds, blue-purple gradients)
 ✓ Made stats cards clickable (Properties, Active Tenants, Verifications, Pending Requests)
@@ -91,10 +102,12 @@ The application now includes a comprehensive admin access system with role-based
 ## Key Components
 
 ### Authentication System
-- **Provider**: Replit OAuth with OpenID Connect
-- **Session Management**: Express sessions with PostgreSQL storage
-- **Security**: HTTPS-only cookies, secure session handling
-- **User Management**: Automatic user creation and profile management
+- **Provider**: Passport.js LocalStrategy for username/password authentication
+- **Session Management**: Express sessions with PostgreSQL storage (connect-pg-simple)
+- **Security**: Secure session cookies, role-based middleware protection
+- **Password Hashing**: Bcrypt for secure password storage
+- **Role-Based Access**: Dedicated middleware for admin and landlord routes
+- **Environment Validation**: Required environment variables checked at server startup
 
 ### Database Schema
 - **Users**: Profile information, onboarding status, contact details
