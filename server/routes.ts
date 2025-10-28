@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
@@ -18,13 +18,14 @@ import {
 } from "@shared/schema";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
+import { registerSubscriptionRoutes } from "./subscriptionRoutes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   setupAuth(app);
 
   // Middleware to check authentication
-  const requireAuth = (req: any, res: any, next: any) => {
+  const requireAuth: RequestHandler = (req, res, next) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
@@ -39,79 +40,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
           userId: req.user.id,
           action,
           ipAddress: req.ip || req.connection.remoteAddress,
-          userAgent: req.headers['user-agent'],
+          userAgent: req.headers["user-agent"],
           metadata,
         });
       } catch (error) {
-        console.error('Error logging security event:', error);
+        console.error("Error logging security event:", error);
       }
     }
   };
 
-  // Role-based middleware
-  const requireRole = (roles: string[]) => {
-    return async (req: any, res: any, next: any) => {
+  const requireRole = (roles: string[]): RequestHandler => {
+    return async (req, res, next) => {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Authentication required" });
       }
-      
+
       const user = req.user;
-      if (!user.role || !roles.includes(user.role)) {
-        await logSecurityEvent(req, 'unauthorized_access_attempt', { 
+      if (!user?.role || !roles.includes(user.role)) {
+        await logSecurityEvent(req, "unauthorized_access_attempt", {
           attemptedEndpoint: req.originalUrl,
-          userRole: user.role,
-          requiredRoles: roles
+          userRole: user?.role,
+          requiredRoles: roles,
         });
-        return res.status(403).json({ message: `Access denied. Required roles: ${roles.join(', ')}` });
+        return res.status(403).json({ message: `Access denied. Required roles: ${roles.join(", ")}` });
       }
-      
+
       next();
     };
   };
 
-  // Admin middleware
-  const requireAdmin = async (req: any, res: any, next: any) => {
+  const requireAdmin: RequestHandler = async (req, res, next) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
-    
+
     const user = req.user;
-    if (user.role !== 'admin') {
-      await logSecurityEvent(req, 'admin_access_denied', { attemptedEndpoint: req.originalUrl });
+    if (user.role !== "admin") {
+      await logSecurityEvent(req, "admin_access_denied", { attemptedEndpoint: req.originalUrl });
       return res.status(403).json({ message: "Admin access required" });
     }
-    
+
     try {
       const adminUser = await storage.getAdminUser(user.id);
       if (!adminUser || !adminUser.isActive) {
-        await logSecurityEvent(req, 'inactive_admin_access_attempt', { attemptedEndpoint: req.originalUrl });
+        await logSecurityEvent(req, "inactive_admin_access_attempt", { attemptedEndpoint: req.originalUrl });
         return res.status(403).json({ message: "Admin account is not active" });
       }
-      
-      req.adminUser = adminUser;
+
+      (req as any).adminUser = adminUser;
       next();
     } catch (error) {
-      console.error('Error checking admin status:', error);
+      console.error("Error checking admin status:", error);
       res.status(500).json({ message: "Failed to verify admin status" });
     }
   };
 
-  // Landlord middleware
-  const requireLandlord = async (req: any, res: any, next: any) => {
+  const requireLandlord: RequestHandler = async (req, res, next) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
-    
+
     const user = req.user;
-    if (user.role !== 'landlord') {
-      await logSecurityEvent(req, 'landlord_access_denied', { attemptedEndpoint: req.originalUrl });
+    if (user.role !== "landlord") {
+      await logSecurityEvent(req, "landlord_access_denied", { attemptedEndpoint: req.originalUrl });
       return res.status(403).json({ message: "Landlord access required" });
     }
-    
+
     next();
   };
 
-  // Dashboard stats
+  registerSubscriptionRoutes(app, { requireAuth, requireAdmin });
+
+  // Dashboard stats stay close to auth middleware for clarity.
   app.get('/api/dashboard/stats', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -288,16 +288,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dueDate = new Date(payment.dueDate);
         const today = new Date();
         const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        
+
         if (daysUntilDue <= 5 && daysUntilDue >= 0 && payment.status === 'pending') {
           await storage.createNotification({
             userId,
             type: 'payment_reminder',
             title: 'Rent Payment Due Soon',
             message: `Your rent payment of £${payment.amount} is due in ${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'}`,
-            priority: 'high',
             isRead: false,
-            metadata: { paymentId: payment.id, dueDate: payment.dueDate }
           });
         }
       }
@@ -323,19 +321,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Landlord routes
-  app.post('/api/landlord/invite-tenant', async (req: any, res) => {
+  app.post('/api/landlord/invite-tenant', requireLandlord, async (req: any, res) => {
     try {
-      const { landlordId, propertyId, tenantEmail, landlordName, propertyAddress } = req.body;
-      
+      const landlordId = req.user.id;
+      const { propertyId, tenantEmail, landlordName, propertyAddress } = req.body;
+
       const inviteToken = nanoid(32);
       const inviteUrl = `${req.protocol}://${req.get('host')}/tenant/accept-invite/${inviteToken}`;
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      
+
       const qrCodeDataUrl = await QRCode.toDataURL(inviteUrl);
-      
+
       const invitation = await storage.createTenantInvitation({
         landlordId,
-        propertyId: propertyId ? parseInt(propertyId) : null,
+        propertyId: propertyId ? parseInt(propertyId, 10) : null,
         tenantEmail,
         inviteToken,
         inviteUrl,
@@ -343,20 +342,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'pending',
         expiresAt
       });
-      
-      const emailParams = createTenantInviteEmail(tenantEmail, landlordName, propertyAddress, inviteUrl, qrCodeDataUrl);
-      await sendEmail(emailParams);
-      
-      res.json({ success: true, invitation, qrCodeDataUrl });
+
+      const friendlyLandlordName = landlordName || `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Your landlord';
+      const friendlyPropertyAddress = propertyAddress || 'the property you manage';
+      const emailParams = createTenantInviteEmail(tenantEmail, friendlyLandlordName, friendlyPropertyAddress, inviteUrl, qrCodeDataUrl);
+      const emailResult = await sendEmail(emailParams);
+
+      await logSecurityEvent(req, 'tenant_invite_created', {
+        tenantEmail,
+        propertyId,
+        emailSuccess: emailResult.success,
+      });
+
+      if (!emailResult.success) {
+        await storage.createNotification({
+          userId: landlordId,
+          type: 'system',
+          title: 'Invitation Created - Manual Action Needed',
+          message: `We could not email ${tenantEmail}. Share this link manually: ${inviteUrl}`,
+        });
+      }
+
+      res.status(emailResult.success ? 200 : 202).json({
+        success: emailResult.success,
+        invitation,
+        qrCodeDataUrl,
+        inviteUrl,
+        message: emailResult.success
+          ? 'Invitation email sent successfully'
+          : emailResult.error || 'Invitation created but email delivery failed',
+      });
     } catch (error) {
       console.error("Error inviting tenant:", error);
       res.status(500).json({ message: "Failed to send invitation" });
     }
   });
 
-  app.get('/api/landlord/:landlordId/tenants', async (req: any, res) => {
+  app.get('/api/landlord/:landlordId/tenants', requireLandlord, async (req: any, res) => {
     try {
-      const { landlordId } = req.params;
+      const landlordId = req.user.id;
+      if (req.params.landlordId && req.params.landlordId !== landlordId) {
+        await logSecurityEvent(req, 'landlord_access_denied', { attemptedEndpoint: req.originalUrl });
+        return res.status(403).json({ message: 'Landlord access required' });
+      }
+
       const tenants = await storage.getLandlordTenants(landlordId);
       res.json(tenants);
     } catch (error) {
@@ -365,9 +394,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/landlord/:landlordId/verifications', async (req: any, res) => {
+  app.get('/api/landlord/:landlordId/verifications', requireLandlord, async (req: any, res) => {
     try {
-      const { landlordId } = req.params;
+      const landlordId = req.user.id;
+      if (req.params.landlordId && req.params.landlordId !== landlordId) {
+        await logSecurityEvent(req, 'landlord_access_denied', { attemptedEndpoint: req.originalUrl });
+        return res.status(403).json({ message: 'Landlord access required' });
+      }
+
       const verifications = await storage.getLandlordVerifications(landlordId);
       res.json(verifications);
     } catch (error) {
@@ -376,9 +410,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/landlord/:landlordId/pending-requests', async (req: any, res) => {
+  app.get('/api/landlord/:landlordId/pending-requests', requireLandlord, async (req: any, res) => {
     try {
-      const { landlordId} = req.params;
+      const landlordId = req.user.id;
+      if (req.params.landlordId && req.params.landlordId !== landlordId) {
+        await logSecurityEvent(req, 'landlord_access_denied', { attemptedEndpoint: req.originalUrl });
+        return res.status(403).json({ message: 'Landlord access required' });
+      }
+
       const requests = await storage.getLandlordPendingRequests(landlordId);
       res.json(requests);
     } catch (error) {
@@ -420,18 +459,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting bank connection:", error);
       res.status(500).json({ message: "Failed to delete bank connection" });
-    }
-  });
-
-  // Dashboard stats
-  app.get('/api/dashboard/stats', requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const stats = await storage.getUserStats(userId);
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching dashboard stats:", error);
-      res.status(500).json({ message: "Failed to fetch dashboard stats" });
     }
   });
 
@@ -645,11 +672,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verificationUrl
       );
       
-      const emailSent = await sendEmail(emailData);
-      
-      if (!emailSent) {
+      const emailResult = await sendEmail(emailData);
+
+      if (!emailResult.success) {
         console.error('Failed to send verification email to landlord');
-        // Still create the verification but notify user of email issue
         await storage.createNotification({
           userId,
           type: 'system',
@@ -657,7 +683,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: `Verification request created but email delivery failed. Please share the link manually with ${landlordEmail}`,
         });
       } else {
-        // Create success notification for user
         await storage.createNotification({
           userId,
           type: 'system',
@@ -665,19 +690,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: `Verification email successfully sent to ${landlordEmail}`,
         });
       }
-      
-      await logSecurityEvent(req, 'landlord_verification_requested', { 
-        landlordEmail, 
+
+      await logSecurityEvent(req, 'landlord_verification_requested', {
+        landlordEmail,
         propertyId,
         verificationId: verification.id,
-        emailSent
+        emailSuccess: emailResult.success,
       });
-      
-      res.json({ 
-        message: emailSent ? 'Verification email sent successfully' : 'Verification created but email delivery failed',
+
+      res.status(emailResult.success ? 200 : 202).json({
+        message: emailResult.success ? 'Verification email sent successfully' : 'Verification created but email delivery failed',
         verificationUrl,
-        emailSent
+        emailSuccess: emailResult.success,
+        emailError: emailResult.error || undefined,
       });
+
     } catch (error) {
       console.error('Error requesting landlord verification:', error);
       res.status(500).json({ message: 'Failed to request verification' });
@@ -917,14 +944,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/system-health', requireAdmin, async (req: any, res) => {
-    try {
-      const health = {
-        database: 'healthy' as const,
-        emailService: 'healthy' as const,
-        paymentProcessor: 'healthy' as const,
-        lastChecked: new Date().toISOString(),
-      };
+    app.get('/api/admin/system-health', requireAdmin, async (req: any, res) => {
+      try {
+        type HealthStatus = 'healthy' | 'degraded' | 'down';
+        const health: {
+          database: HealthStatus;
+          emailService: HealthStatus;
+          paymentProcessor: HealthStatus;
+          lastChecked: string;
+        } = {
+          database: 'healthy',
+          emailService: 'healthy',
+          paymentProcessor: 'healthy',
+          lastChecked: new Date().toISOString(),
+        };
 
       // Perform actual health checks
       try {
@@ -945,11 +978,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/system-check', requireAdmin, async (req: any, res) => {
-    try {
-      await logSecurityEvent(req, 'admin_system_check', { adminId: req.adminUser.id });
+    app.post('/api/admin/system-check', requireAdmin, async (req: any, res) => {
+      try {
+        const adminUser = (req as any).adminUser;
+        await logSecurityEvent(req, 'admin_system_check', { adminId: adminUser.id });
       
-      const checks = {
+        const checks = {
         database: true,
         emailService: !!process.env.SENDGRID_API_KEY,
         storage: true,
@@ -971,11 +1005,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/export-all-data', requireAdmin, async (req: any, res) => {
     try {
+      // Snapshot the admin for reuse throughout the export pipeline
+      const adminUser = (req as any).adminUser;
       const exportId = nanoid();
-      
-      await logSecurityEvent(req, 'admin_data_export', { 
-        adminId: req.adminUser.id,
-        exportId 
+
+      await logSecurityEvent(req, 'admin_data_export', {
+        adminId: adminUser.id,
+        exportId
       });
 
       // In a real implementation, this would be processed in the background
@@ -990,7 +1026,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             timestamp: new Date().toISOString(),
             stats,
             userCount: users.length,
-            exportedBy: req.adminUser.id,
+            exportedBy: adminUser.id,
           };
 
           console.log('Export completed:', exportData);
@@ -1018,25 +1054,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Announcement message is required' });
       }
 
-      await logSecurityEvent(req, 'admin_announcement', { 
-        adminId: req.adminUser.id,
-        messageLength: message.length 
-      });
+        const adminUser = (req as any).adminUser;
+        await logSecurityEvent(req, 'admin_announcement', {
+          adminId: adminUser.id,
+          messageLength: message.length
+        });
 
       // Get all active users
       const users = await storage.getAllUsers();
       const activeUsers = users.filter((user: any) => user.isOnboarded);
 
       // Create notifications for all active users
-      const notifications = activeUsers.map((user: any) => 
-        storage.createNotification({
-          userId: user.id,
-          type: 'system_announcement',
-          title: 'System Announcement',
-          message: message.trim(),
-          scheduledFor: new Date(),
-        })
-      );
+        const notifications = activeUsers.map((user: any) =>
+          storage.createNotification({
+            userId: user.id,
+            type: 'system',
+            title: 'System Announcement',
+            message: message.trim(),
+            scheduledFor: new Date(),
+          })
+        );
 
       await Promise.all(notifications);
 
@@ -1148,12 +1185,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
       
-      if (type === 'email' && user?.email) {
-        await sendEmail(process.env.SENDGRID_API_KEY!, {
-          to: user.email,
-          from: 'noreply@enoikio.com',
-          subject: 'Enoíkio - Test Notification',
-          html: `
+        if (type === 'email' && user?.email) {
+          await sendEmail({
+            to: user.email,
+            from: 'noreply@enoikio.com',
+            subject: 'Enoíkio - Test Notification',
+            html: `
             <h2>Test Notification from Enoíkio</h2>
             <p>This is a test email notification to confirm your settings are working correctly.</p>
             <p>You'll receive payment reminders and updates at this email address.</p>
@@ -1203,29 +1240,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const primaryProperty = properties[0];
+      const propertyForReport = primaryProperty
+        ? {
+            address: primaryProperty.address,
+            city: primaryProperty.city ?? 'N/A',
+            postcode: primaryProperty.postcode ?? 'N/A',
+            monthlyRent: Number(primaryProperty.monthlyRent) || 0,
+          }
+        : {
+            address: 'N/A',
+            city: 'N/A',
+            postcode: 'N/A',
+            monthlyRent: 0,
+          };
+
       const reportData = {
         user: {
           id: user.id,
           firstName: user.firstName || 'N/A',
           lastName: user.lastName || 'N/A',
           email: user.email || 'N/A',
-          phone: user.phone,
+          phone: user.phone || undefined,
         },
-        property: properties[0] || {
-          address: 'N/A',
-          city: 'N/A',
-          postcode: 'N/A',
-          monthlyRent: 0,
-        },
+        property: propertyForReport,
+        // Normalise numeric/payment fields before handing them to the PDF builder
         payments: payments.map(p => ({
           id: p.id,
-          amount: p.amount,
-          dueDate: p.dueDate.toISOString(),
-          paidDate: p.paidDate?.toISOString(),
-          status: p.status,
+          amount: Number(p.amount) || 0,
+          dueDate: p.dueDate,
+          paidDate: p.paidDate ?? undefined,
+          status: p.status ?? 'pending',
         })),
         reportId: report.reportId,
-        generatedAt: report.createdAt.toISOString(),
+        generatedAt: (report.createdAt ?? new Date()).toISOString(),
         verificationStatus: 'verified' as const,
         landlordInfo: {
           name: 'Property Manager',
@@ -1509,11 +1557,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/export-all-data', requireAdmin, async (req, res) => {
     try {
       // Create data export request
-      const exportRequest = await storage.createDataExportRequest({
-        adminId: req.adminUser.id,
-        requestType: 'full_export',
-        status: 'pending'
-      });
+        const adminUser = (req as any).adminUser;
+        const exportRequest = await storage.createDataExportRequest({
+          userId: adminUser.userId,
+          dataType: 'all',
+          status: 'pending'
+        });
       res.json({ 
         message: 'Export initiated', 
         requestId: exportRequest.id,
@@ -1534,15 +1583,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeUsers = users.filter(user => user.isOnboarded);
       
       // Send notification to all active users
-      for (const user of activeUsers) {
-        await storage.createNotification({
-          userId: user.id,
-          type: 'system_announcement',
-          title: 'System Announcement',
-          message,
-          isRead: false
-        });
-      }
+        for (const user of activeUsers) {
+          await storage.createNotification({
+            userId: user.id,
+            type: 'system',
+            title: 'System Announcement',
+            message,
+            isRead: false
+          });
+        }
       
       res.json({ 
         message: 'Announcement sent successfully',
@@ -1750,14 +1799,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/resolve-moderation', requireAdmin, async (req, res) => {
     try {
+      // Pull the admin identity off the request once so TypeScript stays happy
+      const adminUser = (req as any).adminUser;
       const { itemId, resolution, action } = req.body;
-      
+
       if (!itemId || !resolution || !action) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
       // In real app, update the moderation item in database
-      console.log(`Moderation item ${itemId} ${action}d by admin ${req.adminUser.id}:`, resolution);
+      console.log(`Moderation item ${itemId} ${action}d by admin ${adminUser.id}:`, resolution);
       
       res.json({ 
         message: `Moderation item ${action}d successfully`,
@@ -1773,6 +1824,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/escalate-moderation', requireAdmin, async (req, res) => {
     try {
+      // Pull the admin identity off the request once so TypeScript stays happy
+      const adminUser = (req as any).adminUser;
       const { itemId } = req.body;
       
       if (!itemId) {
@@ -1780,7 +1833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // In real app, escalate the moderation item
-      console.log(`Moderation item ${itemId} escalated by admin ${req.adminUser.id}`);
+      console.log(`Moderation item ${itemId} escalated by admin ${adminUser.id}`);
       
       res.json({ 
         message: 'Moderation item escalated successfully',
@@ -1815,7 +1868,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/certification-portfolios', requireAuth, async (req, res) => {
     try {
       const { title, description } = req.body;
-      const userId = req.user.id;
+      // Require a hydrated session user even though the middleware already performed auth
+      const sessionUser = req.user as { id?: string } | undefined;
+      if (!sessionUser?.id) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const userId = sessionUser.id;
 
       if (!title) {
         return res.status(400).json({ message: 'Portfolio title is required' });
@@ -1866,7 +1925,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/certification-portfolios/:id', requireAuth, async (req, res) => {
     try {
       const portfolioId = parseInt(req.params.id);
-      const userId = req.user.id;
+      // Reuse the same guard pattern when mutating user-owned resources
+      const sessionUser = req.user as { id?: string } | undefined;
+      if (!sessionUser?.id) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
+
+      const userId = sessionUser.id;
 
       await storage.deleteCertificationPortfolio(portfolioId, userId);
       res.json({ message: 'Portfolio deleted successfully' });
@@ -1886,9 +1951,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Portfolio not found' });
       }
 
-      if (new Date() > new Date(portfolio.expiresAt)) {
-        return res.status(410).json({ message: 'Portfolio has expired' });
-      }
+        if (portfolio.expiresAt && new Date() > new Date(portfolio.expiresAt)) {
+          return res.status(410).json({ message: 'Portfolio has expired' });
+        }
 
       res.json(portfolio);
     } catch (error) {
@@ -1900,17 +1965,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Report generation endpoint
   app.post('/api/generate-report', requireAuth, async (req, res) => {
     try {
-      const userId = req.user.id;
-      const { reportType = 'credit', includePortfolio = false } = req.body;
+        // Defensive check protects the report pipeline when sessions expire mid-request
+        const sessionUser = req.user as { id?: string } | undefined;
+        if (!sessionUser?.id) {
+          return res.status(401).json({ message: 'Unauthorized' });
+        }
 
-      const user = await storage.getUser(userId);
-      const payments = await storage.getUserPayments(userId);
-      const properties = await storage.getUserProperties(userId);
-      
-      const report = {
-        id: Date.now().toString(),
-        userId,
-        type: reportType,
+        const userId = sessionUser.id;
+        const { reportType = 'credit', includePortfolio = false } = req.body;
+
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+        const payments = await storage.getUserPayments(userId);
+        const properties = await storage.getUserProperties(userId);
+
+        const report: {
+          id: string;
+          userId: string;
+          type: string;
+          generatedAt: string;
+          user: { name: string; email: string };
+          paymentSummary: {
+            totalPayments: number;
+            onTimePayments: number;
+            totalAmount: number;
+            averageMonthlyRent: number;
+          };
+          properties: Array<{
+            address: string;
+            monthlyRent: string;
+            tenancyStart: Date | string | null;
+            tenancyEnd: Date | string | null;
+          }>;
+          paymentHistory: Array<{
+            amount: string;
+            dueDate: string;
+            paidDate: string | null;
+            status: string;
+          }>;
+          badges?: Array<{ id: string; badgeType: string; level: number; earnedAt: string; isActive: boolean; metadata: any }>;
+        } = {
+          id: Date.now().toString(),
+          userId,
+          type: reportType,
         generatedAt: new Date().toISOString(),
         user: {
           name: `${user.firstName} ${user.lastName}`.trim() || 'User',
@@ -1932,13 +2031,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: p.amount,
           dueDate: p.dueDate,
           paidDate: p.paidDate,
-          status: p.status
+          status: p.status ?? 'pending',
         }))
       };
 
       if (includePortfolio) {
-        const badges = await calculateUserBadges(userId, payments);
-        report.badges = badges;
+          const badges = await calculateUserBadges(userId, payments);
+          report.badges = badges;
       }
 
       // In a real app, you'd generate a PDF and store it
@@ -1954,12 +2053,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer: Server = createServer(app);
-  return httpServer;
-}
-
-// Helper functions
-async function calculateUserBadges(userId: string, payments: any[]) {
+  // Helper functions
+  async function calculateUserBadges(userId: string, payments: any[]) {
   const badges = [];
 
   // Payment streak badge
@@ -2075,7 +2170,7 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
           userId,
           type: 'system',
           title: `New Badge${newBadges.length > 1 ? 's' : ''} Earned!`,
-          message: `Congratulations! You've earned: ${newBadges.map(b => b.title).join(', ')}`,
+          message: `Congratulations! You've earned: ${newBadges.map((badge: any) => badge.title).join(', ')}`,
         });
       }
       
@@ -2114,9 +2209,10 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
       res.status(500).json({ message: 'Failed to fetch achievements' });
     }
   });
-  
-  // Add manual payment routes
-  addManualPaymentRoutes(app, requireAuth, storage);
+}
+
+// Add manual payment routes
+addManualPaymentRoutes(app, requireAuth, storage);
 
   // Stripe payment intent endpoint
   app.post("/api/create-payment-intent", async (req, res) => {
@@ -2130,7 +2226,7 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
 
       const { default: Stripe } = await import('stripe');
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-        apiVersion: "2024-10-28.acacia",
+        apiVersion: "2025-06-30.basil",
       });
 
       const { amount, plan } = req.body;
@@ -2282,7 +2378,7 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
       
       // Get tenant's payments
       const payments = await storage.getUserPayments(tenantId);
-      const verifiedPayments = payments.filter(p => p.isVerified);
+      const verifiedPayments = payments.filter((p) => p.isVerified);
       
       // Simple HTML-based PDF content
       const verificationId = nanoid(16);

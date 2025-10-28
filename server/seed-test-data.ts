@@ -1,13 +1,13 @@
 import { storage } from "./storage";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "./passwords";
 import { nanoid } from "nanoid";
 
 export async function seedTestData() {
   console.log("🌱 Seeding test data for UAT testing...");
 
   try {
-    const landlordPassword = await bcrypt.hash("landlord123", 10);
-    const userPassword = await bcrypt.hash("user123", 10);
+    const landlordPassword = await hashPassword("landlord123");
+    const userPassword = await hashPassword("user123");
     
     let createdCount = 0;
     
@@ -24,7 +24,7 @@ export async function seedTestData() {
         await storage.upsertUser({
           id: nanoid(),
           username: landlord.username,
-          passwordHash: landlordPassword,
+          password: landlordPassword,
           email: landlord.email,
           firstName: landlord.firstName,
           lastName: landlord.lastName,
@@ -54,7 +54,7 @@ export async function seedTestData() {
         await storage.upsertUser({
           id: nanoid(),
           username: tenant.username,
-          passwordHash: userPassword,
+          password: userPassword,
           email: tenant.email,
           firstName: tenant.firstName,
           lastName: tenant.lastName,
@@ -87,7 +87,7 @@ export async function seedTestData() {
         await storage.upsertUser({
           id: nanoid(),
           username: `testuser${i}`,
-          passwordHash: userPassword,
+          password: userPassword,
           email: `testuser${i}@example.com`,
           firstName: `${firstName}${i}`,
           lastName: lastName,
@@ -123,11 +123,9 @@ export async function seedTestData() {
             userId: landlord.id,
             address: `${100 + propertyCount} Test Street`,
             city: ['London', 'Manchester', 'Birmingham', 'Leeds'][propertyCount % 4],
-            postalCode: `SW${Math.floor(propertyCount / 10)}${propertyCount % 10} ${Math.floor(Math.random() * 9)}AA`,
+            postcode: `SW${Math.floor(propertyCount / 10)}${propertyCount % 10} ${Math.floor(Math.random() * 9)}AA`,
+            // Only seed columns that exist in the schema to keep Drizzle happy
             monthlyRent: (800 + Math.floor(Math.random() * 1200)).toString(),
-            bedrooms: Math.floor(Math.random() * 4) + 1,
-            propertyType: ['flat', 'house', 'studio'][Math.floor(Math.random() * 3)],
-            landlordVerified: propertyCount % 3 === 0,
           });
           propertyCount++;
         } catch (e) {
@@ -196,7 +194,7 @@ export async function seedTestData() {
             action: actions[Math.floor(Math.random() * actions.length)],
             ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
             userAgent: 'Mozilla/5.0 (Test User Agent)',
-            timestamp: logDate,
+            createdAt: logDate,
             metadata: {},
           });
           logCount++;

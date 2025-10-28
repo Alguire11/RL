@@ -140,9 +140,10 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
     }
   }, [watchedValues]);
 
-  const displayRentInfo = currentRentInfo?.amount 
-    ? `£${currentRentInfo.amount}/month - Due ${currentRentInfo.dayOfMonth}${getOrdinalSuffix(currentRentInfo.dayOfMonth)}`
-    : "No rent details set";
+  const displayRentInfo =
+    currentRentInfo?.amount != null && currentRentInfo?.dayOfMonth != null
+      ? `£${currentRentInfo.amount}/month - Due ${currentRentInfo.dayOfMonth}${getOrdinalSuffix(currentRentInfo.dayOfMonth)}`
+      : "No rent details set";
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

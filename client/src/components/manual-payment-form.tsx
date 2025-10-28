@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CalendarDays, Plus, Upload, Trophy } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { ApiProperty, ManualPayment as ManualPaymentRecord } from "@/types/api";
 
 const manualPaymentSchema = z.object({
   propertyId: z.string().min(1, "Property is required"),
@@ -61,7 +62,7 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
     },
   });
 
-  const { data: properties } = useQuery({
+  const { data: properties = [] } = useQuery<ApiProperty[]>({
     queryKey: ["/api/properties"],
     retry: false,
   });
@@ -87,11 +88,11 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
       });
 
       // Show badge notification if new badges were earned
-      if (data.newBadges && data.newBadges.length > 0) {
+      if (Array.isArray(data.newBadges) && data.newBadges.length > 0) {
         setTimeout(() => {
           toast({
             title: "🏆 New Badge Earned!",
-            description: `You've earned: ${data.newBadges.map((b: any) => b.title).join(', ')}`,
+            description: `You've earned: ${data.newBadges.map((badge: { title: string }) => badge.title).join(', ')}`,
             duration: 5000,
           });
         }, 1000);
@@ -145,7 +146,7 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {(properties || []).map((property: any) => (
+                      {properties.map((property) => (
                         <SelectItem key={property.id} value={property.id.toString()}>
                           {property.address}, {property.city}
                         </SelectItem>
@@ -264,7 +265,7 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
 }
 
 export function ManualPaymentList() {
-  const { data: manualPayments, isLoading } = useQuery({
+  const { data: manualPayments = [], isLoading } = useQuery<ManualPaymentRecord[]>({
     queryKey: ["/api/manual-payments"],
     retry: false,
   });
@@ -280,7 +281,7 @@ export function ManualPaymentList() {
     );
   }
 
-  if (!manualPayments || (manualPayments || []).length === 0) {
+  if (manualPayments.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -303,22 +304,22 @@ export function ManualPaymentList() {
         <div>
           <CardTitle>Manual Payments</CardTitle>
           <CardDescription>
-            {(manualPayments || []).length} manual payment{(manualPayments || []).length !== 1 ? 's' : ''} recorded
+            {manualPayments.length} manual payment{manualPayments.length !== 1 ? 's' : ''} recorded
           </CardDescription>
         </div>
         <ManualPaymentForm />
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {(manualPayments || []).map((payment: any) => (
+          {manualPayments.map((payment) => (
             <div
               key={payment.id}
               className="flex items-center justify-between p-3 border rounded-lg"
             >
-              <div className="flex items-center space-x-3">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">£{parseFloat(payment.amount).toFixed(2)}</p>
+                <div className="flex items-center space-x-3">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">£{Number(payment.amount).toFixed(2)}</p>
                   <p className="text-sm text-muted-foreground">
                     {new Date(payment.paymentDate).toLocaleDateString()}
                   </p>

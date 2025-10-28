@@ -7,7 +7,7 @@ interface SubscriptionGuardProps {
   feature: keyof SubscriptionPlan['limits'];
   requiredPlan?: 'standard' | 'premium';
   fallback?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export function SubscriptionGuard({ 

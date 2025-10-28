@@ -1,10 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ButtonProps } from "@/components/ui/button";
+import type { ButtonProps } from "@/components/ui/button";
 
-interface GradientButtonProps extends ButtonProps {
-  variant?: "primary" | "secondary" | "accent";
-}
+type GradientVariant = "primary" | "secondary" | "accent";
+
+type GradientButtonProps = Omit<ButtonProps, "variant"> & {
+  variant?: GradientVariant;
+};
 
 export function GradientButton({ 
   children, 

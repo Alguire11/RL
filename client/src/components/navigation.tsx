@@ -26,10 +26,10 @@ export function Navigation() {
   const { data: adminUser } = useQuery({
     queryKey: ["/api/admin/stats"],
     retry: false,
-    enabled: !!user,
+    enabled: !!user && user.role === "admin",
   });
 
-  const isAdmin = !!adminUser;
+  const isAdmin = user?.role === "admin" && !!adminUser;
 
   const navItems = [
     { path: "/", label: "Dashboard", icon: BarChart3 },

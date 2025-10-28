@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling, Play, HelpCircle, Shield, Award, CreditCard } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
-import { ManualPaymentForm, ManualPaymentList } from "@/components/manual-payment-form";
+import { ManualPaymentList } from "@/components/manual-payment-form";
 import { AchievementBadges } from "@/components/achievement-badges";
 import { EnhancedDataExport } from "@/components/enhanced-data-export";
 import { DashboardTour, useDashboardTour } from "@/components/dashboard-tour";
@@ -23,6 +23,9 @@ import { AddressEditor } from "@/components/address-editor";
 import { RentDateEditor } from "@/components/rent-date-editor";
 import { PropertyForm } from "@/components/property-form";
 import { Footer } from "@/components/footer";
+import type { DashboardStats } from "@shared/dashboard";
+import type { ApiProperty, RentPayment } from "@/types/api";
+import { getQueryFn } from "@/lib/queryClient";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -40,11 +43,12 @@ export default function Dashboard() {
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/api/login";
+        // Use SPA navigation so we don't lose client state.
+        setLocation("/auth");
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, toast]);
+  }, [isAuthenticated, isLoading, setLocation, toast]);
 
   // Auto-start tour for first-time users
   useEffect(() => {
@@ -56,17 +60,34 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, shouldShowTour, startTour]);
 
-  const { data: stats = {}, isLoading: statsLoading } = useQuery({
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+  } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
+    queryFn: getQueryFn<DashboardStats>({ on401: "throw" }),
     retry: false,
   });
 
-  const { data: properties = [], isLoading: propertiesLoading } = useQuery({
+  useEffect(() => {
+    if (!statsError) {
+      return;
+    }
+    const message = statsError instanceof Error ? statsError.message : "Unable to load stats";
+    toast({
+      title: "Dashboard unavailable",
+      description: message,
+      variant: "destructive",
+    });
+  }, [statsError, toast]);
+
+  const { data: properties = [], isLoading: propertiesLoading } = useQuery<ApiProperty[]>({
     queryKey: ["/api/properties"],
     retry: false,
   });
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery<RentPayment[]>({
     queryKey: ["/api/payments"],
     retry: false,
   });
@@ -109,6 +130,49 @@ export default function Dashboard() {
     return diffDays;
   };
 
+  const actionItems = useMemo(() => {
+    const tasks: Array<{ id: string; title: string; description: string }> = [];
+
+    if (!propertiesLoading && (!properties || properties.length === 0)) {
+      tasks.push({
+        id: "add-property",
+        title: "Add your first property",
+        description: "Create a property profile so payments can be linked for verification.",
+      });
+    }
+
+    if (stats && stats.pendingVerificationCount > 0) {
+      tasks.push({
+        id: "verify-payments",
+        title: "Verify pending payments",
+        description: "Ask your landlord to confirm pending records to boost your credit score.",
+      });
+    }
+
+    if (stats && stats.verificationStatus === "unverified") {
+      tasks.push({
+        id: "connect-bank",
+        title: "Connect a bank account",
+        description: "Link your bank to automatically track rent and build verified history.",
+      });
+    }
+
+    if (plan.id !== "premium") {
+      tasks.push({
+        id: "upgrade-plan",
+        title: "Upgrade for premium insights",
+        description: "Unlock automated exports, smart alerts, and advanced analytics with Premium.",
+      });
+    }
+
+    return tasks;
+  }, [plan.id, properties, propertiesLoading, stats]);
+
+  const handleInternalNavigation = (path: string) => {
+    // Centralised navigation helper keeps future button additions consistent.
+    setLocation(path);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
       <Navigation />
@@ -128,14 +192,14 @@ export default function Dashboard() {
               Take Tour
             </Button>
             <Button
-              onClick={() => window.location.href = '/report-generator'}
+              onClick={() => handleInternalNavigation('/report-generator')}
               className="hidden sm:flex items-center bg-blue-600 hover:bg-blue-700 text-white"
             >
               <FileText className="mr-2 h-4 w-4" />
               Reports
             </Button>
             <Button
-              onClick={() => window.location.href = '/settings'}
+              onClick={() => handleInternalNavigation('/settings')}
               className="notifications hidden sm:flex items-center bg-blue-600 hover:bg-blue-700 text-white"
             >
               <HelpCircle className="mr-2 h-4 w-4" />
@@ -164,9 +228,9 @@ export default function Dashboard() {
                     <p className="text-lg font-semibold">{plan.price === 0 ? 'Free' : `£${plan.price}/mo`}</p>
                   </div>
                   {plan.id !== 'premium' && (
-                    <Button 
-                      variant="secondary" 
-                      onClick={() => setLocation('/subscribe')}
+                    <Button
+                      variant="secondary"
+                      onClick={() => handleInternalNavigation('/subscribe')}
                       className="bg-white text-blue-600 hover:bg-gray-100"
                     >
                       Upgrade
@@ -182,25 +246,25 @@ export default function Dashboard() {
         <div className="dashboard-stats grid md:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Payment Streak"
-            value={`${(stats as any)?.paymentStreak || 0} months`}
+            value={`${stats?.paymentStreak ?? 0} months`}
             icon={CheckCircle}
             color="success"
           />
           <StatCard
             title="Total Paid"
-            value={formatCurrency((stats as any)?.totalPaid || 0)}
+            value={formatCurrency(stats?.totalPaid ?? 0)}
             icon={PoundSterling}
             color="primary"
           />
           <StatCard
             title="On-Time Rate"
-            value={`${Math.round((stats as any)?.onTimePercentage || 0)}%`}
+            value={`${Math.round(stats?.onTimePercentage ?? 0)}%`}
             icon={TrendingUp}
             color="secondary"
           />
           <StatCard
             title="Next Payment"
-            value={(stats as any)?.nextPaymentDue ? `${getDaysUntilDue((stats as any).nextPaymentDue)} days` : 'No upcoming payments'}
+            value={stats?.nextPaymentDue ? `${getDaysUntilDue(stats.nextPaymentDue)} days` : 'No upcoming payments'}
             icon={Calendar}
             color="accent"
           />
@@ -220,13 +284,13 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Rent Paid This Month</span>
-                  <span className="font-semibold text-lg">{formatCurrency((stats as any)?.monthlyRentPaid || 0)}</span>
+                  <span className="font-semibold text-lg">{formatCurrency(stats?.monthlyRentPaid ?? 0)}</span>
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Verification Status</span>
-                  <Badge variant={(stats as any)?.verificationStatus === 'verified' ? 'default' : 'secondary'} className="bg-green-100 text-green-800">
-                    {(stats as any)?.verified || 0} Verified
+                  <Badge variant={stats?.verificationStatus === 'verified' ? 'default' : 'secondary'} className="bg-green-100 text-green-800">
+                    {stats?.verified ?? 0} Verified
                   </Badge>
                 </div>
                 <Separator />
@@ -234,7 +298,7 @@ export default function Dashboard() {
                   <span className="text-gray-600">Credit Growth</span>
                   <div className="flex items-center space-x-2">
                     <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="font-semibold text-green-600">+{(stats as any)?.creditGrowth || 0} points</span>
+                    <span className="font-semibold text-green-600">{stats?.creditGrowth ? `${stats.creditGrowth >= 0 ? '+' : ''}${stats.creditGrowth} points` : '+0 points'}</span>
                   </div>
                 </div>
               </div>
@@ -253,23 +317,23 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div className="text-center">
                   <div className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                    {(stats as any)?.creditScore || 0}
+                    {stats?.creditScore ?? 0}
                   </div>
                   <p className="text-sm text-gray-600">out of 1000</p>
                 </div>
-                <Progress value={((stats as any)?.creditScore || 0) / 10} className="h-3" />
+                <Progress value={(stats?.creditScore ?? 0) / 10} className="h-3" />
                 <div className="grid grid-cols-3 gap-2 text-center text-sm">
                   <div>
                     <p className="text-gray-500">On-Time</p>
-                    <p className="font-semibold">{(stats as any)?.onTimeScore || 0} pts</p>
+                    <p className="font-semibold">{stats?.onTimeScore ?? 0} pts</p>
                   </div>
                   <div>
                     <p className="text-gray-500">Verified</p>
-                    <p className="font-semibold">{(stats as any)?.verificationScore || 0} pts</p>
+                    <p className="font-semibold">{stats?.verificationScore ?? 0} pts</p>
                   </div>
                   <div>
                     <p className="text-gray-500">Ratio</p>
-                    <p className="font-semibold">{(stats as any)?.rentToIncomeScore || 0} pts</p>
+                    <p className="font-semibold">{stats?.rentToIncomeScore ?? 0} pts</p>
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 text-center">
@@ -318,8 +382,14 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {(payments as any[])?.slice(0, 3).map((payment: any) => (
-                    <div key={payment.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-l-4" style={{borderLeftColor: payment.verified ? '#10b981' : '#9ca3af'}}>
+                  {payments.slice(0, 3).map((payment) => {
+                    const isVerified = Boolean(payment.verified ?? payment.isVerified);
+                    return (
+                      <div
+                        key={payment.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-l-4"
+                        style={{ borderLeftColor: isVerified ? '#10b981' : '#9ca3af' }}
+                      >
                       <div className="flex items-center space-x-3">
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                           payment.status === 'paid' ? 'bg-success/10' : 'bg-gray-300'
@@ -333,13 +403,13 @@ export default function Dashboard() {
                         <div>
                           <div className="flex items-center space-x-2">
                             <p className="font-medium">{formatDate(payment.dueDate)}</p>
-                            {payment.verified && (
+                            {isVerified && (
                               <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
                                 <Shield className="w-3 h-3 mr-1" />
                                 Verified
                               </Badge>
                             )}
-                            {!payment.verified && payment.status === 'paid' && (
+                            {!isVerified && payment.status === 'paid' && (
                               <Badge variant="secondary" className="text-xs">Pending</Badge>
                             )}
                           </div>
@@ -349,14 +419,15 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(parseFloat(payment.amount))}</p>
+                        <p className="font-semibold">{formatCurrency(Number(payment.amount))}</p>
                         <p className="text-sm text-gray-600">
                           {payment.paidDate ? formatDate(payment.paidDate) : 'Due ' + formatDate(payment.dueDate)}
                         </p>
                       </div>
-                    </div>
-                  ))}
-                  {(!payments || (payments as any[]).length === 0) && (
+                      </div>
+                    );
+                  })}
+                  {payments.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                       <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                       <p>No payment history yet</p>
@@ -375,25 +446,25 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <GradientButton 
+                <GradientButton
                   className="w-full h-12 justify-center"
-                  onClick={() => setLocation('/rent-tracker')}
+                  onClick={() => handleInternalNavigation('/rent-tracker')}
                 >
                   <Plus className="w-5 h-5 mr-3" />
                   Add Payment Record
                 </GradientButton>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full h-12 border-2 border-primary hover:bg-primary hover:text-white bg-[#00000063] text-[#1d4ed8]"
-                  onClick={() => setLocation('/report-generator')}
+                  onClick={() => handleInternalNavigation('/report-generator')}
                 >
                   <FileText className="w-5 h-5 mr-3" />
                   Generate Report
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full h-12 border-2 border-secondary hover:bg-secondary hover:text-white bg-[#12101045] text-[#141414]"
-                  onClick={() => setLocation('/portfolio')}
+                  onClick={() => handleInternalNavigation('/portfolio')}
                 >
                   <Share2 className="w-5 h-5 mr-3" />
                   Share Portfolio
@@ -404,18 +475,18 @@ export default function Dashboard() {
         </div>
 
         {/* Properties Section */}
-        {properties && (properties as any[]).length > 0 && (
+        {properties.length > 0 && (
           <Card className="mt-8">
             <CardHeader>
               <CardTitle className="text-xl font-semibold">Your Properties</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-4">
-                {(properties as any[]).map((property: any) => (
+                {properties.map((property) => (
                   <div key={property.id} className="p-4 bg-gray-50 rounded-lg">
                     <h3 className="font-medium mb-2">{property.address}</h3>
                     <p className="text-sm text-gray-600 mb-1">{property.city}, {property.postcode}</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(parseFloat(property.monthlyRent))}/month</p>
+                    <p className="text-sm text-gray-600">{formatCurrency(Number(property.monthlyRent))}/month</p>
                   </div>
                 ))}
               </div>
@@ -432,6 +503,25 @@ export default function Dashboard() {
             </span>
           </div>
         </div>
+
+        {/* Actionable next steps keep the tenant focused on completion. */}
+        {actionItems.length > 0 && (
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold">Next best actions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {actionItems.map((item) => (
+                  <div key={item.id} className="p-4 bg-white rounded-lg border border-dashed border-primary/40">
+                    <h3 className="font-medium text-gray-900">{item.title}</h3>
+                    <p className="text-sm text-gray-600">{item.description}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Additional Features Section */}
         <div className="grid lg:grid-cols-3 gap-8 mt-8">

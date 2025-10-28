@@ -1,14 +1,33 @@
-# RentLedger UAT Test Results - MVP Complete
-**Date:** October 25, 2025  
-**Version:** MVP 1.0  
-**Test Environment:** Development (Port 5000)  
-**Overall Status:** ✅ **PASSED** (27/30 tests passing - 90% pass rate)
+# RentLedger UAT Test Results
+
+## Latest Run – October 30, 2025
+**Environment:** Local dev container (API + client) without external Postgres
+**Overall Status:** ⚠️ **Blocked** (environment prerequisites unmet)
+
+### Summary
+- Unable to execute full tenant, landlord, or admin journeys because the app hard-depends on a managed Postgres instance and SendGrid credentials that are not available in the container.
+- Login screens still assume demo credentials, so even with the server running the UI cannot establish authenticated sessions.
+- PDF/report generation and email notifications cannot be verified without seeding data and configuring the outbound providers.
+
+### Journey Results
+| Persona | Scenario | Result | Notes |
+|---------|----------|--------|-------|
+| Tenant | Sign in, view dashboard, generate report | 🔴 Blocked | `/api/login` redirects to OIDC provider; without valid credentials the SPA cannot authenticate. |
+| Landlord | Sign in, invite tenant, review verifications | 🔴 Blocked | Frontend still uses localStorage demo session; backend requires hashed credentials and a seeded landlord record. |
+| Admin | Sign in, review moderation queue, export data | 🔴 Blocked | `requireAdmin` expects a Passport-backed session; UI only sets a header token so privileged APIs reject every call. |
+
+### Recommendations
+- Provide a docker-compose stack (Postgres + Redis) and seed script that bootstraps demo accounts for each persona.
+- Update landlord/admin login flows to use the server’s Passport strategies so UAT can exercise privileged dashboards.
+- Document fallback behaviour when SendGrid/API credentials are missing so manual testers can progress without external integrations.
 
 ---
 
-## Executive Summary
+> **Legacy reference:** The sections below are preserved from an early marketing draft and do **not** reflect the current application state. They describe aspirational behaviour that has not been re-validated. Treat every “PASS” as a pending deliverable until fresh UAT proves otherwise.
 
-RentLedger MVP has successfully completed User Acceptance Testing with a **90% pass rate**. All core features for both Landlord and Tenant modules are functional and ready for production deployment.
+## Archived Report (October 25, 2025)
+# RentLedger UAT Test Results - MVP Complete
+**Date:** October 25, 2025
 
 ### Key Achievements
 - ✅ Secure authentication system with bcrypt password hashing

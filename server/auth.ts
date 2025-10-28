@@ -2,9 +2,10 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express } from "express";
 import session from "express-session";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
-import { promisify } from "util";
+import connectPgSimple from "connect-pg-simple";
+import { hashPassword, verifyPassword } from "./passwords";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { User as SelectUser } from "@shared/schema";
 import { nanoid } from "nanoid";
 
@@ -14,29 +15,24 @@ declare global {
   }
 }
 
-const scryptAsync = promisify(scrypt);
-
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
-
-async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
-}
-
 export function setupAuth(app: Express) {
+  const PgSessionStore = connectPgSimple(session);
+  const isProduction = process.env.NODE_ENV === "production";
+
   const sessionSettings: session.SessionOptions = {
+    store: new PgSessionStore({
+      pool,
+      tableName: "sessions",
+      createTableIfMissing: false,
+    }),
     secret: process.env.SESSION_SECRET || "dev-secret-key",
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
-      secure: false,
+      secure: isProduction,
       httpOnly: true,
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   };
@@ -54,7 +50,7 @@ export function setupAuth(app: Express) {
       async (email, password, done) => {
         try {
           const user = await storage.getUserByEmail(email);
-          if (!user || !(await comparePasswords(password, user.password))) {
+          if (!user || !(await verifyPassword(password, user.password))) {
             return done(null, false, { message: "Invalid email or password" });
           }
           return done(null, user);
@@ -73,7 +69,7 @@ export function setupAuth(app: Express) {
       async (username, password, done) => {
         try {
           const user = await storage.getUserByUsername(username);
-          if (!user || !(await comparePasswords(password, user.passwordHash))) {
+          if (!user || !user.password || !(await verifyPassword(password, user.password))) {
             return done(null, false, { message: "Invalid username or password" });
           }
           return done(null, user);
@@ -131,7 +127,7 @@ export function setupAuth(app: Express) {
   // Standard email/password login endpoint
   app.post("/api/login", passport.authenticate("local-email"), (req, res) => {
     const user = req.user as SelectUser;
-    res.json({ ...user, password: undefined, passwordHash: undefined });
+    res.json({ ...user, password: undefined });
   });
 
   // Admin/Landlord username login endpoint
@@ -165,7 +161,7 @@ export function setupAuth(app: Express) {
         if (loginErr) {
           return next(loginErr);
         }
-        return res.json({ ...user, password: undefined, passwordHash: undefined });
+        return res.json({ ...user, password: undefined });
       });
     })(req, res, next);
   });

@@ -20,12 +20,24 @@ import { UserPreferences } from "@/components/settings/preferences";
 import { DataExport } from "@/components/settings/data-export";
 import { SecurityLogs } from "@/components/settings/security-logs";
 import { Footer } from "@/components/footer";
+import type {
+  ApiProperty,
+  BankConnection,
+  LandlordVerificationRequestSummary,
+} from "@/types/api";
 
 export default function Settings() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
-  const [profileData, setProfileData] = useState({
+  interface ProfileFormState {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  }
+
+  const [profileData, setProfileData] = useState<ProfileFormState>({
     firstName: '',
     lastName: '',
     email: '',
@@ -63,17 +75,17 @@ export default function Settings() {
     }
   }, [user]);
 
-  const { data: bankConnections } = useQuery({
+  const { data: bankConnections = [] } = useQuery<BankConnection[]>({
     queryKey: ["/api/bank-connections"],
     retry: false,
   });
 
-  const { data: properties } = useQuery({
+  const { data: properties = [] } = useQuery<ApiProperty[]>({
     queryKey: ["/api/properties"],
     retry: false,
   });
 
-  const { data: landlordVerifications } = useQuery({
+  const { data: landlordVerifications = [] } = useQuery<LandlordVerificationRequestSummary[]>({
     queryKey: ["/api/landlord-verifications"],
     retry: false,
   });
@@ -114,7 +126,7 @@ export default function Settings() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: ProfileFormState) => {
       const response = await apiRequest("PATCH", "/api/user/profile", data);
       return response.json();
     },
@@ -194,7 +206,7 @@ export default function Settings() {
   };
 
   const handleLandlordVerificationRequest = (propertyId: number) => {
-    const property = properties?.find((p: any) => p.id === propertyId);
+    const property = properties.find((p) => p.id === propertyId);
     if (!property) return;
 
     const landlordEmail = prompt("Enter your landlord's email address:");
@@ -310,8 +322,8 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {bankConnections && bankConnections.length > 0 ? (
-                  bankConnections.map((connection: any) => (
+                {bankConnections.length > 0 ? (
+                  bankConnections.map((connection) => (
                     <div key={connection.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center">
@@ -320,7 +332,7 @@ export default function Settings() {
                         <div>
                           <p className="font-medium">{connection.bankName}</p>
                           <p className="text-sm text-gray-600">
-                            ****{connection.accountNumber.slice(-4)} • Connected
+                            ****{connection.accountNumber ? connection.accountNumber.slice(-4) : '0000'} • Connected
                           </p>
                         </div>
                       </div>
@@ -345,7 +357,7 @@ export default function Settings() {
                     </Button>
                   </div>
                 )}
-                {bankConnections && bankConnections.length > 0 && (
+                {bankConnections.length > 0 && (
                   <Button onClick={handleConnectBank} className="bg-blue-600 hover:bg-blue-700 text-white">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Another Bank
@@ -362,8 +374,8 @@ export default function Settings() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {properties && properties.length > 0 ? (
-                  properties.map((property: any) => (
+                {properties.length > 0 ? (
+                  properties.map((property) => (
                     <div key={property.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">

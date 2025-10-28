@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { CheckCircle, XCircle, Home, User, Calendar, PoundSterling, Phone, Mail, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
+import type { LandlordVerificationDetails } from "@/types/api";
 
 export default function LandlordVerification() {
   const [location, setLocation] = useLocation();
@@ -36,7 +37,7 @@ export default function LandlordVerification() {
     }
   }, []);
 
-  const { data: verificationData, isLoading } = useQuery({
+  const { data: verificationData, isLoading } = useQuery<LandlordVerificationDetails | null>({
     queryKey: ["/api/landlord-verification", verificationToken],
     enabled: !!verificationToken,
     retry: false,
@@ -63,10 +64,11 @@ export default function LandlordVerification() {
           : "You have rejected this verification request.",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const description = error instanceof Error ? error.message : "Failed to process verification. Please try again.";
       toast({
         title: "Verification Failed",
-        description: error.message || "Failed to process verification. Please try again.",
+        description,
         variant: "destructive",
       });
     },
@@ -89,10 +91,11 @@ export default function LandlordVerification() {
       setShowSignupDialog(false);
       setLocation('/landlord-dashboard');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const description = error instanceof Error ? error.message : "Failed to create account. Please try again.";
       toast({
         title: "Signup Failed",
-        description: error.message || "Failed to create account. Please try again.",
+        description,
         variant: "destructive",
       });
     },
@@ -240,15 +243,15 @@ export default function LandlordVerification() {
                   <Label className="text-sm font-medium text-gray-500">Lease Start</Label>
                   <div className="flex items-center space-x-1">
                     <Calendar className="h-4 w-4" />
-                    <span>{format(new Date(property.leaseStartDate), 'dd MMM yyyy')}</span>
+                    <span>{property.leaseStartDate ? format(new Date(property.leaseStartDate), 'dd MMM yyyy') : 'Not provided'}</span>
                   </div>
                 </div>
-                
+
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Lease End</Label>
                   <div className="flex items-center space-x-1">
                     <Calendar className="h-4 w-4" />
-                    <span>{format(new Date(property.leaseEndDate), 'dd MMM yyyy')}</span>
+                    <span>{property.leaseEndDate ? format(new Date(property.leaseEndDate), 'dd MMM yyyy') : 'Not provided'}</span>
                   </div>
                 </div>
               </div>
@@ -273,7 +276,7 @@ export default function LandlordVerification() {
             <CardContent className="space-y-4">
               <div>
                 <Label className="text-sm font-medium text-gray-500">Name</Label>
-                <p className="text-gray-900">{tenant.firstName} {tenant.lastName}</p>
+                <p className="text-gray-900">{tenant.firstName || tenant.fullName} {tenant.lastName ?? ''}</p>
               </div>
               
               <div>
