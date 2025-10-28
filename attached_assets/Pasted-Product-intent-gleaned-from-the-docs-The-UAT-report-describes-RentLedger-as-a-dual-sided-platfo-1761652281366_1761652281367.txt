@@ -1,0 +1,29 @@
+Product intent gleaned from the docs
+
+The UAT report describes “RentLedger” as a dual-sided platform: landlords manage properties, tenants, payments, analytics, and documents; tenants register, upload proof of rent, track verification-backed credit history, and download ledgers; and an admin surface handles moderation, subscriptions, and revenue analytics.
+
+Repository reality
+
+The source tree only contains a bare client folder (no backend, database schema, infrastructure, or even a package manifest), so nothing in the repo can actually build or run as delivered.
+
+The only top-level React entry point (App.tsx) attempts to route to more than twenty landlord/tenant/admin pages, yet none of those modules exist in the tree, so the app would crash immediately at runtime due to unresolved imports.
+
+Shared utilities referenced throughout the UI (e.g., @/lib/queryClient, @/lib/utils, @/hooks/useAuth, @/hooks/use-toast) are also missing entirely, which means even the available components cannot render without throwing module-resolution errors.
+
+UI/UX observations
+
+Navigation is designed for a complex, role-aware layout, but because the underlying authentication hook and admin queries are absent, the menu logic cannot determine user state and every link points to non-existent screens.
+
+Even within the existing components there are polish gaps (e.g., NotificationBell imports useEffect but never uses it), hinting that the UI layer has not been fully reviewed or tested yet.
+
+Backend/data gaps
+
+The documentation promises Express APIs, PostgreSQL storage, session handling, payment verification endpoints, and reporting engines, yet there is no server code, database migrations, or configuration anywhere in the repo; the “backend” exists only in the prose of the UAT report.
+
+Overall assessment & next steps
+
+The repository does not implement the tenant/landlord/admin experience described in the docs; it is a partially scaffolded frontend without the pages, hooks, utilities, or backend required to make the product functional.
+
+To reach the promised MVP, you would need to: add the missing React pages and shared hooks/utilities, supply a real backend (API server, auth, persistence, reporting), and then iterate on UI/UX details (navigation states, validation, typography consistency, flow screenshots) once the app actually runs.
+
+Treat the existing documentation as a requirements reference rather than evidence of implementation; every feature listed there still needs to be built and verified in code.

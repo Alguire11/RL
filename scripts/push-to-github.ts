@@ -10,13 +10,14 @@ const EXCLUDED_PATHS = [
   'node_modules',
   '.git',
   'dist',
-  '.replit',
   '.config',
   '.cache',
   '.upm',
   'replit.nix',
   '.breakpoints',
-  'scripts',
+  'scripts/push-to-github.ts',
+  'server/github-client.ts',
+  '/tmp',
 ];
 
 interface FileTree {
