@@ -13,11 +13,12 @@ import { queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Download, Share2, FileText, Calendar, Clock, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
+import type { CreditReport, Property } from "@shared/schema";
 
 export default function Reports() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
-  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [selectedReport, setSelectedReport] = useState<CreditReport | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
 
   // Redirect to login if not authenticated
@@ -35,12 +36,12 @@ export default function Reports() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: reports, isLoading: reportsLoading } = useQuery({
+  const { data: reports = [], isLoading: reportsLoading } = useQuery<CreditReport[]>({
     queryKey: ["/api/reports"],
     retry: false,
   });
 
-  const { data: properties } = useQuery({
+  const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ["/api/properties"],
     retry: false,
   });
@@ -81,19 +82,41 @@ export default function Reports() {
     generateReportMutation.mutate(propertyId);
   };
 
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMM yyyy');
+  const formatDate = (value: string | Date | null | undefined) => {
+    // Gracefully fall back when the backend has not populated a date yet
+    if (!value) {
+      return 'Pending';
+    }
+
+    const parsed = typeof value === 'string' ? new Date(value) : value;
+    return format(parsed, 'dd MMM yyyy');
   };
 
-  const getStatusColor = (isActive: boolean, expiresAt: string | null) => {
-    if (!isActive) return 'secondary';
-    if (expiresAt && new Date(expiresAt) < new Date()) return 'destructive';
-    return 'default';
+  type BadgeVariant = "default" | "secondary" | "destructive";
+
+  const getStatusColor = (isActive: boolean, expiresAt: string | Date | null): BadgeVariant => {
+    if (!isActive) return "secondary";
+    if (expiresAt) {
+      const expiry = typeof expiresAt === "string" ? new Date(expiresAt) : expiresAt;
+      if (expiry < new Date()) {
+        return "destructive";
+      }
+    }
+    return "default";
   };
 
-  const getStatusText = (isActive: boolean, expiresAt: string | null) => {
+  const getStatusText = (isActive: boolean, expiresAt: string | Date | null) => {
     if (!isActive) return 'Inactive';
-    if (expiresAt && new Date(expiresAt) < new Date()) return 'Expired';
+
+    const normalizedExpiry =
+      typeof expiresAt === 'string'
+        ? expiresAt
+        : expiresAt?.toISOString() ?? null;
+
+    if (normalizedExpiry && new Date(normalizedExpiry) < new Date()) {
+      return 'Expired';
+    }
+
     return 'Active';
   };
 
@@ -142,8 +165,8 @@ export default function Reports() {
                     <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No Report Selected</h3>
                     <p className="text-gray-600 mb-6">Select a report from the list or generate a new one</p>
-                    {properties && properties.length > 0 && (
-                      <Button 
+                    {properties.length > 0 && (
+                      <Button
                         onClick={() => handleGenerateReport(properties[0].id)}
                         disabled={generateReportMutation.isPending}
                         className="gradient-primary text-white"
@@ -165,9 +188,9 @@ export default function Reports() {
                 <CardTitle className="text-lg font-semibold">Generate Report</CardTitle>
               </CardHeader>
               <CardContent>
-                {properties && properties.length > 0 ? (
+                {properties.length > 0 ? (
                   <div className="space-y-3">
-                    {properties.map((property: any) => (
+                    {properties.map((property) => (
                       <Button
                         key={property.id}
                         onClick={() => handleGenerateReport(property.id)}
@@ -199,9 +222,9 @@ export default function Reports() {
                 <CardTitle className="text-lg font-semibold">Report History</CardTitle>
               </CardHeader>
               <CardContent>
-                {reports && reports.length > 0 ? (
+                {reports.length > 0 ? (
                   <div className="space-y-3">
-                    {reports.map((report: any) => (
+                    {reports.map((report) => (
                       <div
                         key={report.id}
                         className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
@@ -215,8 +238,8 @@ export default function Reports() {
                           <p className="font-medium text-sm">
                             {formatDate(report.generatedAt)}
                           </p>
-                          <Badge variant={getStatusColor(report.isActive, report.expiresAt) as any}>
-                            {getStatusText(report.isActive, report.expiresAt)}
+                          <Badge variant={getStatusColor(report.isActive ?? false, report.expiresAt)}>
+                            {getStatusText(report.isActive ?? false, report.expiresAt)}
                           </Badge>
                         </div>
                         <p className="text-xs text-gray-600 mb-1">

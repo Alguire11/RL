@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Users, CreditCard, FileText, Activity, Shield, TrendingUp, Download, AlertTriangle, MessageSquare, Settings2, MapPin, Check, X, Key, Edit, MoreVertical } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AdminStats {
   totalUsers: number;
@@ -48,7 +49,8 @@ interface SystemHealth {
 export default function AdminDashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const [isAuthorizing, setIsAuthorizing] = useState(true);
   const [announcementText, setAnnouncementText] = useState("");
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const queryClient = useQueryClient();
@@ -63,41 +65,32 @@ export default function AdminDashboard() {
   const [newPassword, setNewPassword] = useState("");
   const [editedPlan, setEditedPlan] = useState("");
 
-  // Check authentication on mount
+  const isAdmin = user?.role === 'admin';
+  const canLoadAdminData = isAuthenticated && isAdmin;
+
+  // Check authentication on mount/update
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/user', {
-          credentials: 'include',
-        });
-        
-        if (!response.ok) {
-          setLocation('/admin-login');
-          return;
-        }
+    if (authLoading) {
+      return;
+    }
 
-        const user = await response.json();
-        
-        // Verify user has admin role
-        if (user.role !== 'admin') {
-          toast({
-            title: "Access Denied",
-            description: "Admin privileges required",
-            variant: "destructive",
-          });
-          setLocation('/admin-login');
-          return;
-        }
+    if (!isAuthenticated || !user) {
+      setLocation('/admin-login');
+      return;
+    }
 
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Authentication check failed:', error);
-        setLocation('/admin-login');
-      }
-    };
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "Admin privileges required",
+        variant: "destructive",
+      });
+      setLocation('/dashboard');
+      return;
+    }
 
-    checkAuth();
-  }, [setLocation, toast]);
+    setIsAuthorizing(false);
+  }, [authLoading, isAuthenticated, isAdmin, setLocation, toast, user]);
 
   // Standard query function (session-based)
   const adminQuery = (url: string) => {
@@ -119,7 +112,7 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/stats"],
     queryFn: () => adminQuery("/api/admin/stats"),
     retry: false,
-    enabled: !!adminSession,
+    enabled: canLoadAdminData,
   });
 
   // Fetch users
@@ -127,7 +120,7 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/users"],
     queryFn: () => adminQuery("/api/admin/users"),
     retry: false,
-    enabled: !!adminSession,
+    enabled: canLoadAdminData,
   });
 
   // Fetch system health
@@ -135,17 +128,17 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/system-health"],
     queryFn: () => adminQuery("/api/admin/system-health"),
     retry: false,
-    enabled: !!adminSession,
+    enabled: canLoadAdminData,
     refetchInterval: 30000,
   });
 
   // Admin action mutations
   const systemCheckMutation = useMutation({
-    mutationFn: () => 
+    mutationFn: () =>
       fetch('/api/admin/system-check', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
       }).then(res => res.json()),
@@ -166,11 +159,11 @@ export default function AdminDashboard() {
   });
 
   const dataExportMutation = useMutation({
-    mutationFn: () => 
+    mutationFn: () =>
       fetch('/api/admin/export-all-data', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
       }).then(res => res.json()),
@@ -220,8 +213,8 @@ export default function AdminDashboard() {
     mutationFn: async ({ userId, planId }: { userId: string, planId: string }) => {
       const response = await fetch(`/api/admin/users/${userId}/subscription`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ planId, status: 'active' }),
@@ -250,8 +243,8 @@ export default function AdminDashboard() {
     mutationFn: async ({ userId, newPassword }: { userId: string, newPassword: string }) => {
       const response = await fetch(`/api/admin/users/${userId}/reset-password`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ newPassword }),
@@ -304,11 +297,11 @@ export default function AdminDashboard() {
   };
 
   const sendAnnouncementMutation = useMutation({
-    mutationFn: (announcement: string) => 
+    mutationFn: (announcement: string) =>
       fetch('/api/admin/send-announcement', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ message: announcement }),
@@ -330,7 +323,7 @@ export default function AdminDashboard() {
     }
   });
 
-  if (isLoading || !adminSession) {
+  if (isAuthorizing) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
         <Navigation />
@@ -414,7 +407,7 @@ export default function AdminDashboard() {
           </div>
           <div className="flex items-center space-x-4">
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-              Welcome, {adminSession?.username || 'Admin'}
+              Welcome, {user?.firstName || user?.username || 'Admin'}
             </Badge>
             <Button 
               variant="outline" 

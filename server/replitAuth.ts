@@ -7,6 +7,8 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { hashPassword } from "./passwords";
+import { randomUUID } from "crypto";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -55,11 +57,15 @@ function updateUserSession(
 }
 
 async function upsertUser(
-  claims: any,
+  claims: Record<string, any>,
 ) {
+  const passwordSource = claims["sub"] ?? randomUUID();
+  const password = await hashPassword(passwordSource);
+
   await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
+    password,
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
@@ -78,14 +84,31 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    // Claims can be absent when the provider omits an ID token, so fail fast
+    const claims = tokens.claims?.();
+    if (!claims) {
+      return verified(new Error("Missing identity claims from OIDC provider"));
+    }
+
+    await upsertUser(claims);
+
+    // The subject is our primary key; without it we cannot link the profile
+    const subject = claims["sub"];
+    if (!subject) {
+      return verified(new Error("OIDC claims missing subject identifier"));
+    }
+
+    const persistedUser = await storage.getUser(subject);
+    if (!persistedUser) {
+      return verified(new Error("Failed to load user profile"));
+    }
+
+    const sessionUser: any = { ...persistedUser };
+    updateUserSession(sessionUser, tokens);
+    verified(null, sessionUser);
   };
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
+  for (const domain of process.env.REPLIT_DOMAINS!.split(",")) {
     const strategy = new Strategy(
       {
         name: `replitauth:${domain}`,

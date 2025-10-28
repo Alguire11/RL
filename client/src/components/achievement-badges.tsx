@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Trophy, Award, Star, Target, TrendingUp } from "lucide-react";
+import type { TenantAchievementsResponse, TenantAchievementBadge } from "@/types/api";
 
 const badgeIcons = {
   Trophy: Trophy,
@@ -14,7 +15,7 @@ const badgeIcons = {
 };
 
 export function AchievementBadges() {
-  const { data: achievements, isLoading } = useQuery({
+  const { data: achievements, isLoading } = useQuery<TenantAchievementsResponse | null>({
     queryKey: ["/api/achievements"],
     retry: false,
   });
@@ -30,8 +31,8 @@ export function AchievementBadges() {
     );
   }
 
-  const badges = achievements?.badges || [];
-  const streak = achievements?.streak || { currentStreak: 0, longestStreak: 0 };
+  const badges = achievements?.badges ?? [];
+  const streak = achievements?.streak ?? { currentStreak: 0, longestStreak: 0 };
 
   return (
     <div className="space-y-6">
@@ -98,7 +99,7 @@ export function AchievementBadges() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {badges.map((badge: any) => {
+              {badges.map((badge: TenantAchievementBadge) => {
                 const IconComponent = badgeIcons[badge.iconName as keyof typeof badgeIcons] || Trophy;
                 return (
                   <div
@@ -137,7 +138,7 @@ export function AchievementBadges() {
         <CardContent>
           <div className="space-y-3">
             {/* Show upcoming badges based on current progress */}
-            {!badges.some((b: any) => b.badgeType === 'first_payment') && (
+            {!badges.some((b: TenantAchievementBadge) => b.badgeType === 'first_payment') && (
               <div className="flex items-center justify-between p-3 border rounded-lg opacity-60">
                 <div className="flex items-center space-x-3">
                   <Trophy className="h-8 w-8 text-gray-400" />
@@ -150,7 +151,7 @@ export function AchievementBadges() {
               </div>
             )}
             
-            {!badges.some((b: any) => b.badgeType === 'streak_3') && streak.currentStreak < 3 && (
+            {!badges.some((b: TenantAchievementBadge) => b.badgeType === 'streak_3') && streak.currentStreak < 3 && (
               <div className="flex items-center justify-between p-3 border rounded-lg opacity-60">
                 <div className="flex items-center space-x-3">
                   <Award className="h-8 w-8 text-gray-400" />
@@ -163,7 +164,7 @@ export function AchievementBadges() {
               </div>
             )}
 
-            {!badges.some((b: any) => b.badgeType === 'streak_6') && streak.currentStreak < 6 && (
+            {!badges.some((b: TenantAchievementBadge) => b.badgeType === 'streak_6') && streak.currentStreak < 6 && (
               <div className="flex items-center justify-between p-3 border rounded-lg opacity-60">
                 <div className="flex items-center space-x-3">
                   <Star className="h-8 w-8 text-gray-400" />
@@ -176,7 +177,7 @@ export function AchievementBadges() {
               </div>
             )}
 
-            {!badges.some((b: any) => b.badgeType === 'streak_12') && streak.currentStreak < 12 && (
+            {!badges.some((b: TenantAchievementBadge) => b.badgeType === 'streak_12') && streak.currentStreak < 12 && (
               <div className="flex items-center justify-between p-3 border rounded-lg opacity-60">
                 <div className="flex items-center space-x-3">
                   <Trophy className="h-8 w-8 text-gray-400" />

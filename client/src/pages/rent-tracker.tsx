@@ -27,13 +27,30 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { format, addDays, isAfter, isBefore } from "date-fns";
+import type { RentPayment, ApiProperty, PaymentStatus } from "@/types/api";
+import type { DashboardStats } from "@shared/dashboard";
 
 export default function RentTracker() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showAddPayment, setShowAddPayment] = useState(false);
-  const [paymentForm, setPaymentForm] = useState({
+  interface PaymentFormState {
+    amount: string;
+    dueDate: string;
+    propertyId: string;
+    description: string;
+  }
+
+  interface CreatePaymentPayload {
+    amount: string;
+    dueDate: string;
+    propertyId: number | null;
+    description: string;
+    status: PaymentStatus;
+  }
+
+  const [paymentForm, setPaymentForm] = useState<PaymentFormState>({
     amount: '',
     dueDate: '',
     propertyId: '',
@@ -41,17 +58,17 @@ export default function RentTracker() {
   });
   const { hasFeature, plan, isFreePlan } = useSubscription();
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery<RentPayment[]>({
     queryKey: ["/api/payments"],
     retry: false,
   });
 
-  const { data: properties = [] } = useQuery({
+  const { data: properties = [] } = useQuery<ApiProperty[]>({
     queryKey: ["/api/properties"],
     retry: false,
   });
 
-  const { data: stats } = useQuery({
+  const { data: stats } = useQuery<DashboardStats | undefined>({
     queryKey: ["/api/dashboard/stats"],
     retry: false,
   });
@@ -76,7 +93,7 @@ export default function RentTracker() {
   });
 
   const addPaymentMutation = useMutation({
-    mutationFn: async (paymentData: any) => {
+    mutationFn: async (paymentData: CreatePaymentPayload) => {
       const response = await apiRequest("POST", "/api/payments", paymentData);
       if (!response.ok) throw new Error("Failed to add payment");
       return response.json();
@@ -100,10 +117,12 @@ export default function RentTracker() {
     }).format(amount);
   };
 
-  const getPaymentStatus = (payment: any) => {
+  type TrackerStatus = 'paid' | 'overdue' | 'due-soon' | 'upcoming';
+
+  const getPaymentStatus = (payment: RentPayment): TrackerStatus => {
     const today = new Date();
     const dueDate = new Date(payment.dueDate);
-    
+
     if (payment.status === 'paid') return 'paid';
     if (isAfter(today, dueDate)) return 'overdue';
     if (isAfter(today, addDays(dueDate, -3))) return 'due-soon';
@@ -128,12 +147,12 @@ export default function RentTracker() {
     }
   };
 
-  const filteredPayments = payments.filter((payment: any) => {
+  const filteredPayments = payments.filter((payment) => {
     if (filterStatus === 'all') return true;
     return getPaymentStatus(payment) === filterStatus;
   });
 
-  const nextPayment = payments.find((payment: any) => 
+  const nextPayment = payments.find((payment) =>
     payment.status !== 'paid' && isAfter(new Date(payment.dueDate), new Date())
   );
 
@@ -197,7 +216,7 @@ export default function RentTracker() {
                   {nextPayment ? (
                     <>
                       <p className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(nextPayment.amount)}
+                        {formatCurrency(Number(nextPayment.amount))}
                       </p>
                       <p className="text-xs text-gray-500">
                         Due {format(new Date(nextPayment.dueDate), 'MMM dd')}
@@ -274,7 +293,7 @@ export default function RentTracker() {
                       <SelectValue placeholder="Select property" />
                     </SelectTrigger>
                     <SelectContent>
-                      {properties.map((property: any) => (
+                      {properties.map((property) => (
                         <SelectItem key={property.id} value={property.id.toString()}>
                           {property.address}
                         </SelectItem>
@@ -296,7 +315,7 @@ export default function RentTracker() {
                   <Button variant="outline" onClick={() => setShowAddPayment(false)}>
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => {
                       const propertyId = paymentForm.propertyId === 'new' ? null : parseInt(paymentForm.propertyId);
                       addPaymentMutation.mutate({
@@ -304,7 +323,7 @@ export default function RentTracker() {
                         dueDate: paymentForm.dueDate,
                         propertyId,
                         description: paymentForm.description || 'Rent payment',
-                        status: 'pending'
+                        status: 'pending' as PaymentStatus,
                       });
                     }}
                     disabled={!paymentForm.amount || !paymentForm.dueDate || addPaymentMutation.isPending}
@@ -362,9 +381,9 @@ export default function RentTracker() {
                     </Button>
                   </div>
                 ) : (
-                  filteredPayments.map((payment: any) => {
+                  filteredPayments.map((payment) => {
                     const status = getPaymentStatus(payment);
-                    const property = properties.find((p: any) => p.id === payment.propertyId);
+                    const property = properties.find((p) => p.id === payment.propertyId);
                     
                     return (
                       <div key={payment.id} className="flex items-center justify-between p-4 bg-white border rounded-lg hover:shadow-md transition-shadow">
@@ -397,7 +416,7 @@ export default function RentTracker() {
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
                             <p className="font-semibold text-gray-900">
-                              {formatCurrency(payment.amount)}
+                              {formatCurrency(Number(payment.amount))}
                             </p>
                             <Badge className={getStatusColor(status)}>
                               {getStatusText(status)}

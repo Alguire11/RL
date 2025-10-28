@@ -57,6 +57,8 @@ import {
   type EnhancedReportShare,
   type InsertEnhancedReportShare,
 } from "@shared/schema";
+import type { DashboardStats } from "@shared/dashboard";
+import { computeDashboardStats } from "./dashboardStats";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, or, isNull, gte, lte } from "drizzle-orm";
 
@@ -118,16 +120,7 @@ export interface IStorage {
   getLandlordPendingRequests(landlordId: string): Promise<Array<{type: string; id: number; tenant: User; property: Property; data: any}>>;
   
   // Dashboard statistics
-  getUserStats(userId: string): Promise<{
-    paymentStreak: number;
-    totalPaid: number;
-    onTimePercentage: number;
-    nextPaymentDue: string | null;
-    creditScore: number;
-    onTimeScore: number;
-    verificationScore: number;
-    rentToIncomeScore: number;
-  }>;
+  getUserStats(userId: string): Promise<DashboardStats>;
 
   // Notification operations
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -509,86 +502,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Dashboard statistics
-  async getUserStats(userId: string): Promise<{
-    paymentStreak: number;
-    totalPaid: number;
-    onTimePercentage: number;
-    nextPaymentDue: string | null;
-    creditScore: number;
-    onTimeScore: number;
-    verificationScore: number;
-    rentToIncomeScore: number;
-  }> {
-    // Get all payments for the user
+  async getUserStats(userId: string): Promise<DashboardStats> {
     const payments = await db
       .select()
       .from(rentPayments)
       .where(eq(rentPayments.userId, userId))
       .orderBy(desc(rentPayments.dueDate));
 
-    // Calculate total paid
-    const totalPaid = payments
-      .filter(p => p.status === 'paid')
-      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
-
-    // Calculate on-time percentage
-    const paidPayments = payments.filter(p => p.status === 'paid');
-    const onTimePayments = paidPayments.filter(p => 
-      p.paidDate && p.paidDate <= p.dueDate
-    );
-    const onTimePercentage = paidPayments.length > 0 
-      ? (onTimePayments.length / paidPayments.length) * 100 
-      : 0;
-
-    // Calculate payment streak (consecutive on-time payments)
-    let paymentStreak = 0;
-    for (const payment of payments) {
-      if (payment.status === 'paid' && payment.paidDate && payment.paidDate <= payment.dueDate) {
-        paymentStreak++;
-      } else if (payment.status === 'paid' || payment.status === 'late') {
-        break;
-      }
-    }
-
-    // Find next payment due
-    const nextPayment = payments.find(p => p.status === 'pending');
-    const nextPaymentDue = nextPayment ? nextPayment.dueDate : null;
-
-    // Calculate Credit Score (0-1000 scale)
-    // Algorithm: 60% on-time payments, 20% verification, 20% rent-to-income ratio
-    
-    // 1. On-time payment score (600 points max)
-    const onTimeScore = (onTimePercentage / 100) * 600;
-    
-    // 2. Verification frequency score (200 points max)
-    const verifiedPayments = paidPayments.filter(p => p.isVerified);
-    const verificationRate = paidPayments.length > 0 
-      ? (verifiedPayments.length / paidPayments.length) 
-      : 0;
-    const verificationScore = verificationRate * 200;
-    
-    // 3. Rent-to-income ratio score (200 points max)
-    // For MVP: Use payment consistency and streak as proxy for financial stability
-    // In production, this would use actual income data
-    const consistencyFactor = paidPayments.length > 0 
-      ? Math.min(paidPayments.length / 12, 1) // Reward up to 12 months of history
-      : 0;
-    const streakBonus = Math.min(paymentStreak / 12, 0.5); // Up to 50% bonus for good streak
-    const rentToIncomeScore = (consistencyFactor * 0.5 + streakBonus) * 200;
-    
-    // Calculate total credit score
-    const creditScore = Math.round(onTimeScore + verificationScore + rentToIncomeScore);
-
-    return {
-      paymentStreak,
-      totalPaid,
-      onTimePercentage,
-      nextPaymentDue,
-      creditScore,
-      onTimeScore: Math.round(onTimeScore),
-      verificationScore: Math.round(verificationScore),
-      rentToIncomeScore: Math.round(rentToIncomeScore),
-    };
+    // Delegate number crunching to the shared helper so tests can target the math directly.
+    return computeDashboardStats(payments);
   }
 
   // Notification operations
@@ -847,18 +769,20 @@ export class DatabaseStorage implements IStorage {
     if (filters.action) {
       conditions.push(eq(securityLogs.action, filters.action));
     }
+    const timestampColumn = securityLogs.createdAt;
+
     if (filters.startDate) {
-      conditions.push(gte(securityLogs.timestamp, new Date(filters.startDate)));
+      conditions.push(gte(timestampColumn, new Date(filters.startDate)));
     }
     if (filters.endDate) {
-      conditions.push(lte(securityLogs.timestamp, new Date(filters.endDate)));
+      conditions.push(lte(timestampColumn, new Date(filters.endDate)));
     }
     
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
     
-    query = query.orderBy(desc(securityLogs.timestamp)).limit(filters.limit || 100) as any;
+    query = query.orderBy(desc(timestampColumn)).limit(filters.limit || 100) as any;
     
     return await query;
   }

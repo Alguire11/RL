@@ -8,17 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Bell, BellRing, Mail, MessageSquare, Smartphone } from "lucide-react";
-
-interface NotificationSettings {
-  emailEnabled: boolean;
-  smsEnabled: boolean;
-  pushEnabled: boolean;
-  reminderDays: number;
-  reminderTime: string;
-  overdueReminders: boolean;
-  weeklySummary: boolean;
-  landlordUpdates: boolean;
-}
+import type { NotificationSettings } from "@/types/api";
 
 export function NotificationCenter() {
   const { toast } = useToast();
@@ -65,7 +55,7 @@ export function NotificationCenter() {
     }
   };
 
-  const { data: userPreferences } = useQuery({
+  const { data: userPreferences } = useQuery<NotificationSettings | undefined>({
     queryKey: ["/api/user/notification-preferences"],
     retry: false,
   });
@@ -106,7 +96,10 @@ export function NotificationCenter() {
     }
   }, [userPreferences]);
 
-  const handleSettingChange = (key: keyof NotificationSettings, value: any) => {
+  const handleSettingChange = <K extends keyof NotificationSettings>(
+    key: K,
+    value: NotificationSettings[K],
+  ) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
     updatePreferencesMutation.mutate(newSettings);

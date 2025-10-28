@@ -10,21 +10,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { format } from "date-fns";
-
-interface Notification {
-  id: number;
-  type: 'payment_reminder' | 'report_generated' | 'landlord_verified' | 'system';
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
-}
+import type { NotificationPayload } from "@/types/api";
 
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: notifications = [], refetch } = useQuery({
+  const { data: notifications = [], refetch } = useQuery<NotificationPayload[]>({
     queryKey: ["/api/notifications"],
     retry: false,
     refetchInterval: 60000, // Check every minute
@@ -58,7 +50,7 @@ export function NotificationBell() {
     },
   });
 
-  const unreadCount = notifications.filter((n: Notification) => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleMarkAsRead = async (notificationId: number) => {
     markAsReadMutation.mutate(notificationId);
@@ -129,7 +121,7 @@ export function NotificationBell() {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {notifications.map((notification: Notification) => (
+                  {notifications.map((notification) => (
                     <div
                       key={notification.id}
                       className={`p-3 hover:bg-gray-50 transition-colors ${
