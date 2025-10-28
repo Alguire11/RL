@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Building, Eye, EyeOff } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function LandlordLogin() {
   const [, setLocation] = useLocation();
@@ -24,28 +25,41 @@ export default function LandlordLogin() {
     setError('');
     setIsLoading(true);
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch('/api/admin-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
 
-    const { username, password } = formData;
-    
-    if (username === 'landlord' && password === 'landlord123') {
-      localStorage.setItem('admin_session', JSON.stringify({
-        username: 'landlord',
-        role: 'landlord',
-        loginTime: new Date().toISOString()
-      }));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const user = await response.json();
 
       toast({
         title: "Login Successful",
-        description: "Welcome to the Landlord Dashboard!",
+        description: `Welcome to the Landlord Dashboard, ${user.firstName || 'Landlord'}!`,
       });
 
-      setLocation('/landlord-dashboard');
-    } else {
-      setError('Invalid landlord credentials');
+      // Redirect based on role
+      if (user.role === 'landlord') {
+        setLocation('/landlord-dashboard');
+      } else if (user.role === 'admin') {
+        setLocation('/admin');
+      } else {
+        setLocation('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Invalid credentials');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -63,17 +77,11 @@ export default function LandlordLogin() {
           <p className="mt-2 text-sm text-gray-600">
             Manage properties, tenants, and verifications
           </p>
-          
-          <div className="mt-4 p-3 bg-purple-50 rounded-lg text-sm text-purple-800">
-            <p className="font-medium mb-1">Demo Credentials:</p>
-            <p>Username: <code className="bg-white px-1 rounded">landlord</code></p>
-            <p>Password: <code className="bg-white px-1 rounded">landlord123</code></p>
-          </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Landlord Login</CardTitle>
+            <CardTitle>Secure Login</CardTitle>
             <CardDescription>
               Enter your landlord credentials to access the dashboard
             </CardDescription>
@@ -133,37 +141,23 @@ export default function LandlordLogin() {
                 disabled={isLoading}
                 data-testid="button-landlord-login"
               >
-                {isLoading ? "Signing in..." : "Sign In as Landlord"}
+                {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        <div className="text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-            Don't have a landlord account?
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => setLocation('/landlord-signup')}
-            className="w-full border-purple-300 text-purple-700 hover:bg-purple-100 dark:border-purple-600 dark:text-purple-400 dark:hover:bg-purple-900"
-            data-testid="button-goto-signup"
-          >
-            Create Landlord Account
-          </Button>
-        </div>
-
-        <Card className="bg-blue-50 dark:bg-gray-800 border-blue-200 dark:border-gray-700">
+        <Card className="bg-blue-50 border-blue-200">
           <CardContent className="pt-6">
             <div className="text-center space-y-3">
               <div>
-                <p className="text-sm font-medium text-blue-900 mb-2">Are you a tenant?</p>
+                <p className="text-sm font-medium text-blue-900 mb-2">Are you an administrator?</p>
                 <Button
                   variant="outline"
-                  onClick={() => setLocation('/auth')}
+                  onClick={() => setLocation('/admin-login')}
                   className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
                 >
-                  Go to Tenant Sign Up/Login
+                  Go to Admin Login
                 </Button>
               </div>
               
@@ -177,13 +171,13 @@ export default function LandlordLogin() {
               </div>
               
               <div>
-                <p className="text-sm font-medium text-blue-900 mb-2">System Administrator?</p>
+                <p className="text-sm font-medium text-blue-900 mb-2">Are you a tenant?</p>
                 <Button
                   variant="outline"
-                  onClick={() => setLocation('/admin-login')}
+                  onClick={() => setLocation('/auth')}
                   className="w-full border-blue-300 text-blue-700 hover:bg-blue-100"
                 >
-                  Go to Admin Login
+                  Go to Tenant Sign Up/Login
                 </Button>
               </div>
             </div>

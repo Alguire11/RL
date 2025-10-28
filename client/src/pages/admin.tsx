@@ -48,7 +48,6 @@ interface SystemHealth {
 export default function AdminDashboard() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [adminSession, setAdminSession] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [announcementText, setAnnouncementText] = useState("");
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
@@ -64,42 +63,51 @@ export default function AdminDashboard() {
   const [newPassword, setNewPassword] = useState("");
   const [editedPlan, setEditedPlan] = useState("");
 
-  // Check for admin session
+  // Check authentication on mount
   useEffect(() => {
-    try {
-      const session = localStorage.getItem('admin_session');
-      if (session) {
-        const parsedSession = JSON.parse(session);
-        if (parsedSession.role === 'admin') {
-          setAdminSession(parsedSession);
-        } else {
-          if (parsedSession.role === 'landlord') {
-            setLocation('/landlord-dashboard');
-          } else {
-            setLocation('/dashboard');
-          }
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/user', {
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          setLocation('/admin-login');
           return;
         }
-      } else {
-        setLocation('/admin-login');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking admin session:', error);
-      setLocation('/admin-login');
-      return;
-    }
-    setIsLoading(false);
-  }, [setLocation]);
 
-  // Custom query function with admin headers
+        const user = await response.json();
+        
+        // Verify user has admin role
+        if (user.role !== 'admin') {
+          toast({
+            title: "Access Denied",
+            description: "Admin privileges required",
+            variant: "destructive",
+          });
+          setLocation('/admin-login');
+          return;
+        }
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        setLocation('/admin-login');
+      }
+    };
+
+    checkAuth();
+  }, [setLocation, toast]);
+
+  // Standard query function (session-based)
   const adminQuery = (url: string) => {
     return fetch(url, {
-      headers: {
-        'x-admin-session': JSON.stringify(adminSession),
-      },
+      credentials: 'include',
     }).then(res => {
       if (!res.ok) {
+        if (res.status === 401) {
+          setLocation('/admin-login');
+        }
         throw new Error(`${res.status}: ${res.statusText}`);
       }
       return res.json();

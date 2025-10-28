@@ -17,28 +17,6 @@ import {
   insertTenantInvitationSchema
 } from "@shared/schema";
 import { nanoid } from "nanoid";
-
-// Define requireAdmin middleware
-const requireAdmin = async (req: any, res: any, next: any) => {
-  try {
-    // For demo purposes, we'll check localStorage data sent in headers
-    const adminSession = req.headers['x-admin-session'];
-    if (!adminSession) {
-      return res.status(401).json({ message: 'Admin authentication required' });
-    }
-    
-    const session = JSON.parse(adminSession);
-    if (session.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
-    
-    req.adminUser = session;
-    next();
-  } catch (error) {
-    console.error('Error in requireAdmin middleware:', error);
-    res.status(401).json({ message: 'Invalid admin session' });
-  }
-};
 import bcrypt from "bcryptjs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -70,17 +48,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  // Role-based middleware
+  const requireRole = (roles: string[]) => {
+    return async (req: any, res: any, next: any) => {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const user = req.user;
+      if (!user.role || !roles.includes(user.role)) {
+        await logSecurityEvent(req, 'unauthorized_access_attempt', { 
+          attemptedEndpoint: req.originalUrl,
+          userRole: user.role,
+          requiredRoles: roles
+        });
+        return res.status(403).json({ message: `Access denied. Required roles: ${roles.join(', ')}` });
+      }
+      
+      next();
+    };
+  };
+
   // Admin middleware
   const requireAdmin = async (req: any, res: any, next: any) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
     
+    const user = req.user;
+    if (user.role !== 'admin') {
+      await logSecurityEvent(req, 'admin_access_denied', { attemptedEndpoint: req.originalUrl });
+      return res.status(403).json({ message: "Admin access required" });
+    }
+    
     try {
-      const adminUser = await storage.getAdminUser(req.user.id);
+      const adminUser = await storage.getAdminUser(user.id);
       if (!adminUser || !adminUser.isActive) {
-        await logSecurityEvent(req, 'admin_access_denied', { attemptedEndpoint: req.originalUrl });
-        return res.status(403).json({ message: "Admin access required" });
+        await logSecurityEvent(req, 'inactive_admin_access_attempt', { attemptedEndpoint: req.originalUrl });
+        return res.status(403).json({ message: "Admin account is not active" });
       }
       
       req.adminUser = adminUser;
@@ -89,6 +94,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error checking admin status:', error);
       res.status(500).json({ message: "Failed to verify admin status" });
     }
+  };
+
+  // Landlord middleware
+  const requireLandlord = async (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    
+    const user = req.user;
+    if (user.role !== 'landlord') {
+      await logSecurityEvent(req, 'landlord_access_denied', { attemptedEndpoint: req.originalUrl });
+      return res.status(403).json({ message: "Landlord access required" });
+    }
+    
+    next();
   };
 
   // Dashboard stats

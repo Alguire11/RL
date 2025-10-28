@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Logo } from "@/components/logo";
 import { Shield, Eye, EyeOff } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function AdminLogin() {
   const [, setLocation] = useLocation();
@@ -20,39 +20,46 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Demo credentials - ONLY for admins
-  const adminCredentials = {
-    admin: { username: 'admin', password: 'admin123', role: 'admin' }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await fetch('/api/admin-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
 
-    const { username, password } = formData;
-    
-    if (username === 'admin' && password === 'admin123') {
-      localStorage.setItem('admin_session', JSON.stringify({
-        username: 'admin',
-        role: 'admin',
-        loginTime: new Date().toISOString()
-      }));
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+
+      const user = await response.json();
 
       toast({
         title: "Login Successful",
-        description: "Welcome, Administrator!",
+        description: `Welcome back, ${user.firstName || 'Administrator'}!`,
       });
 
-      setLocation('/admin');
-    } else {
-      setError('Invalid admin credentials');
+      // Redirect based on role
+      if (user.role === 'admin') {
+        setLocation('/admin');
+      } else if (user.role === 'landlord') {
+        setLocation('/landlord-dashboard');
+      } else {
+        setLocation('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Invalid credentials');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -70,19 +77,13 @@ export default function AdminLogin() {
           <p className="mt-2 text-sm text-gray-600">
             System administration and platform management
           </p>
-          
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-            <p className="font-medium mb-1">Demo Credentials:</p>
-            <p>Username: <code className="bg-white px-1 rounded">admin</code></p>
-            <p>Password: <code className="bg-white px-1 rounded">admin123</code></p>
-          </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Admin Login</CardTitle>
+            <CardTitle>Secure Login</CardTitle>
             <CardDescription>
-              Enter administrator credentials to access the admin panel
+              Enter your admin credentials to access the platform
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -96,6 +97,7 @@ export default function AdminLogin() {
                   onChange={(e) => setFormData({...formData, username: e.target.value})}
                   placeholder="Enter username"
                   required
+                  data-testid="input-username"
                 />
               </div>
 
@@ -109,6 +111,7 @@ export default function AdminLogin() {
                     onChange={(e) => setFormData({...formData, password: e.target.value})}
                     placeholder="Enter password"
                     required
+                    data-testid="input-password"
                   />
                   <Button
                     type="button"
@@ -136,6 +139,7 @@ export default function AdminLogin() {
                 type="submit" 
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 disabled={isLoading}
+                data-testid="button-login"
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
@@ -143,7 +147,6 @@ export default function AdminLogin() {
           </CardContent>
         </Card>
 
-        {/* Demo Credentials */}
         <Card className="bg-purple-50 border-purple-200">
           <CardContent className="pt-6">
             <div className="text-center space-y-3">

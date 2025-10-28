@@ -1,6 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { printEnvironmentStatus, validateEnvironment } from "./env-validation";
+
+// Validate environment variables before starting
+const envValidation = printEnvironmentStatus();
+if (!envValidation.isValid) {
+  console.error('\n❌ FATAL: Required environment variables are missing.');
+  console.error('   Please set all required environment variables before starting the server.');
+  console.error('   See PRODUCTION_DEPLOYMENT_GUIDE.md for details.\n');
+  process.exit(1);
+}
 
 const app = express();
 app.use(express.json());

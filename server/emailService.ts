@@ -17,10 +17,11 @@ interface EmailParams {
   html?: string;
 }
 
-export async function sendEmail(params: EmailParams): Promise<boolean> {
+export async function sendEmail(params: EmailParams): Promise<{ success: boolean; error?: string }> {
   if (!apiKey) {
-    console.warn(`Email sending skipped (no API key configured) - would have sent to ${params.to}`);
-    return false;
+    const message = `Email service not configured - SENDGRID_API_KEY is missing. Would have sent to ${params.to}`;
+    console.warn(`⚠️  ${message}`);
+    return { success: false, error: message };
   }
   
   try {
@@ -31,12 +32,18 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       text: params.text || '',
       html: params.html || params.text || '',
     });
-    console.log(`Email sent successfully to ${params.to}`);
-    return true;
-  } catch (error) {
-    console.error('SendGrid email error:', error);
-    return false;
+    console.log(`✅ Email sent successfully to ${params.to}`);
+    return { success: true };
+  } catch (error: any) {
+    const errorMessage = error.response?.body?.errors?.[0]?.message || error.message || 'Unknown error';
+    console.error(`❌ SendGrid email error: ${errorMessage}`);
+    console.error('Full error:', error);
+    return { success: false, error: errorMessage };
   }
+}
+
+export function isEmailServiceEnabled(): boolean {
+  return !!apiKey;
 }
 
 export function createTenantInviteEmail(
