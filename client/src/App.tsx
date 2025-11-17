@@ -40,6 +40,8 @@ const AdminSettings = lazy(() => import("@/pages/admin-settings"));
 const AdminSubscriptions = lazy(() => import("@/pages/admin-subscriptions"));
 const AdminRevenue = lazy(() => import("@/pages/admin-revenue"));
 const AdminModeration = lazy(() => import("@/pages/admin-moderation"));
+const AdminProperties = lazy(() => import("@/pages/admin-properties"));
+const AdminAuditLogs = lazy(() => import("@/pages/admin-audit-logs"));
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -102,6 +104,16 @@ function Router() {
       <Route path="/admin/moderation" component={() => (
         <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
           <AdminModeration />
+        </Suspense>
+      )} />
+      <Route path="/admin/properties" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminProperties />
+        </Suspense>
+      )} />
+      <Route path="/admin/audit-logs" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminAuditLogs />
         </Suspense>
       )} />
       <Route path="/landlord-dashboard" component={LandlordDashboard} />

@@ -9,6 +9,25 @@ import { pool } from "./db";
 import { User as SelectUser } from "@shared/schema";
 import { nanoid } from "nanoid";
 
+// Helper function to generate unique RLID (RentLedger ID)
+async function generateRLID(role: string): Promise<string> {
+  const prefix = role === 'landlord' ? 'LRLID-' : 'TRLID-';
+  let rlid: string;
+  let exists = true;
+  
+  // Keep generating until we find a unique ID
+  while (exists) {
+    const randomNum = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+    rlid = `${prefix}${randomNum}`;
+    
+    // Check if this RLID already exists
+    const allUsers = await storage.getAllUsers();
+    exists = allUsers.some(user => user.rlid === rlid);
+  }
+  
+  return rlid!;
+}
+
 declare global {
   namespace Express {
     interface User extends SelectUser {}
@@ -84,9 +103,15 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
+      if (!user) {
+        // User not found - session is stale, return null to force re-login
+        return done(null, null);
+      }
       done(null, user);
     } catch (error) {
-      done(error);
+      console.error("Error deserializing user:", error);
+      // On error, return null instead of propagating error to force re-login
+      done(null, null);
     }
   });
 
@@ -105,9 +130,12 @@ export function setupAuth(app: Express) {
       }
 
       const hashedPassword = await hashPassword(password);
+      const rlid = await generateRLID('user'); // Generate TRLID for tenants
       const user = await storage.upsertUser({
         id: nanoid(),
+        rlid,
         email,
+        username: email, // Use email as username for consistency
         password: hashedPassword,
         firstName,
         lastName,

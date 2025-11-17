@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings, ArrowLeft, Mail, Shield, Globe, Database, Bell } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { getQueryFn } from "@/lib/queryClient";
 
 interface SystemSettings {
   maintenanceMode: boolean;
@@ -31,7 +33,7 @@ interface SystemSettings {
 export default function AdminSettings() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [adminSession, setAdminSession] = useState<any>(null);
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [settings, setSettings] = useState<SystemSettings>({
     maintenanceMode: false,
     allowNewRegistrations: true,
@@ -50,53 +52,32 @@ export default function AdminSettings() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    try {
-      const session = localStorage.getItem('admin_session');
-      if (session) {
-        const parsedSession = JSON.parse(session);
-        if (parsedSession.role === 'admin') {
-          setAdminSession(parsedSession);
-        } else {
-          setLocation('/admin-login');
-          return;
-        }
-      } else {
-        setLocation('/admin-login');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking admin session:', error);
+    if (authLoading) return;
+    if (!isAuthenticated || user?.role !== 'admin') {
       setLocation('/admin-login');
     }
-  }, [setLocation]);
-
-  const adminQuery = (url: string) => {
-    return fetch(url, {
-      headers: { 'x-admin-session': JSON.stringify(adminSession) },
-    }).then(res => {
-      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
-      return res.json();
-    });
-  };
+  }, [authLoading, isAuthenticated, user, setLocation]);
 
   const { data: currentSettings, isLoading } = useQuery<SystemSettings>({
     queryKey: ["/api/admin/settings"],
-    queryFn: () => adminQuery("/api/admin/settings"),
+    queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
-    enabled: !!adminSession,
-
+    enabled: isAuthenticated && user?.role === 'admin',
   });
 
   const updateSettingsMutation = useMutation({
     mutationFn: (newSettings: SystemSettings) => 
-      fetch('/api/admin/update-settings', {
+      fetch('/api/admin/settings', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(newSettings),
-      }).then(res => res.json()),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to update settings');
+        return res.json();
+      }),
     onSuccess: () => {
       toast({
         title: "Settings Updated",
@@ -117,12 +98,15 @@ export default function AdminSettings() {
     mutationFn: () => 
       fetch('/api/admin/test-email', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email: settings.supportEmail }),
-      }).then(res => res.json()),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to send test email');
+        return res.json();
+      }),
     onSuccess: () => {
       toast({
         title: "Test Email Sent",
@@ -146,7 +130,7 @@ export default function AdminSettings() {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  if (!adminSession) {
+  if (authLoading) {
     return <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30"><Navigation /></div>;
   }
 

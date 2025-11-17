@@ -12,6 +12,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Plus, Save, X, Mail } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const propertySchema = z.object({
   address: z.string().min(1, "Property address is required"),
@@ -22,6 +23,8 @@ const propertySchema = z.object({
   landlordPhone: z.string().optional(),
   monthlyRent: z.string().min(1, "Monthly rent is required"),
   leaseStartDate: z.string().min(1, "Lease start date is required"),
+  leaseType: z.string().min(1, "Lease type is required"),
+  contractDuration: z.string().min(1, "Contract duration is required"),
   leaseEndDate: z.string().min(1, "Lease end date is required"),
   depositAmount: z.string().optional(),
   notes: z.string().optional(),
@@ -56,11 +59,29 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
       landlordPhone: "",
       monthlyRent: "",
       leaseStartDate: "",
+      leaseType: "",
+      contractDuration: "",
       leaseEndDate: "",
       depositAmount: "",
       notes: "",
     },
   });
+
+  // Auto-calculate lease end date based on start date and contract duration
+  const leaseStartDate = form.watch("leaseStartDate");
+  const contractDuration = form.watch("contractDuration");
+
+  useEffect(() => {
+    if (leaseStartDate && contractDuration) {
+      const startDate = new Date(leaseStartDate);
+      const durationMonths = parseInt(contractDuration);
+      if (!isNaN(durationMonths) && durationMonths > 0) {
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + durationMonths);
+        form.setValue('leaseEndDate', endDate.toISOString().split('T')[0]);
+      }
+    }
+  }, [leaseStartDate, contractDuration, form]);
 
   // Pre-fill address fields when user data is available
   useEffect(() => {
@@ -152,7 +173,7 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-dashed border-2 border-gray-300">
+        <Card className="property-form cursor-pointer hover:shadow-md transition-shadow border-dashed border-2 border-gray-300">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
               <Plus className="h-6 w-6 text-blue-600" />
@@ -272,11 +293,44 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
             </div>
 
             <div>
-              <Label htmlFor="leaseEndDate">Lease End Date</Label>
+              <Label htmlFor="leaseType">Lease Type</Label>
+              <Select onValueChange={(value) => form.setValue("leaseType", value)} value={form.watch("leaseType")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select lease type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed_term">Fixed Term</SelectItem>
+                  <SelectItem value="periodic">Periodic</SelectItem>
+                  <SelectItem value="month_to_month">Month-to-Month</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.formState.errors.leaseType && (
+                <p className="text-sm text-red-500">{form.formState.errors.leaseType.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="contractDuration">Contract Duration (Months)</Label>
+              <Input
+                id="contractDuration"
+                type="number"
+                min="1"
+                placeholder="e.g., 12"
+                {...form.register("contractDuration")}
+              />
+              {form.formState.errors.contractDuration && (
+                <p className="text-sm text-red-500">{form.formState.errors.contractDuration.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="leaseEndDate">Lease End Date (Auto-calculated)</Label>
               <Input
                 id="leaseEndDate"
                 type="date"
                 {...form.register("leaseEndDate")}
+                readOnly
+                className="bg-gray-50"
               />
               {form.formState.errors.leaseEndDate && (
                 <p className="text-sm text-red-500">{form.formState.errors.leaseEndDate.message}</p>

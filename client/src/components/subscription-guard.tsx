@@ -35,7 +35,8 @@ export function SubscriptionGuard({
     prioritySupport: 'Priority Support',
     openBankingIntegration: 'Open Banking',
     customReminders: 'Custom Reminders',
-    landlordVerification: 'Landlord Verification'
+    landlordVerification: 'Landlord Verification',
+    enhancedExports: 'Enhanced Data Export'
   };
 
   return (

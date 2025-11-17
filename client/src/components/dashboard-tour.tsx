@@ -179,8 +179,8 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
   };
 
   const handleSkip = () => {
-    // Mark tour as skipped in localStorage to prevent reshowing
-    localStorage.setItem('enoikio_tour_skipped', 'true');
+    // Mark tour as skipped in sessionStorage to hide for current session only
+    sessionStorage.setItem('enoikio_tour_skipped', 'true');
     document.body.classList.remove('tour-active');
     document.querySelectorAll('.tour-highlight').forEach(el => {
       el.classList.remove('tour-highlight');
@@ -403,7 +403,10 @@ export function useDashboardTour() {
   };
 
   const shouldShowTour = () => {
-    return !localStorage.getItem('enoikio_tour_completed') && !localStorage.getItem('enoikio_tour_skipped');
+    // Check sessionStorage first (current session), then localStorage (permanent completion)
+    const skippedThisSession = sessionStorage.getItem('enoikio_tour_skipped');
+    const completedPermanently = localStorage.getItem('enoikio_tour_completed');
+    return !completedPermanently && !skippedThisSession;
   };
 
   return {

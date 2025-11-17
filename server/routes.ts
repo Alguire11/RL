@@ -2,7 +2,8 @@ import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { sendEmail, createLandlordVerificationEmail, createTenantInviteEmail } from "./emailService";
+import passport from "passport";
+import { sendEmail, createLandlordVerificationEmail, createTenantInviteEmail, emailService } from "./emailService";
 import QRCode from "qrcode";
 import { z } from "zod";
 import { 
@@ -19,6 +20,25 @@ import {
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { registerSubscriptionRoutes } from "./subscriptionRoutes";
+
+// Helper function to generate unique RLID (RentLedger ID)
+async function generateRLID(role: string): Promise<string> {
+  const prefix = role === 'landlord' ? 'LRLID-' : 'TRLID-';
+  let rlid: string;
+  let exists = true;
+  
+  // Keep generating until we find a unique ID
+  while (exists) {
+    const randomNum = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+    rlid = `${prefix}${randomNum}`;
+    
+    // Check if this RLID already exists
+    const allUsers = await storage.getAllUsers();
+    exists = allUsers.some(user => user.rlid === rlid);
+  }
+  
+  return rlid!;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -243,7 +263,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const payments = await storage.getUserRentPayments(userId);
-      res.json(payments);
+      const manualPayments = await storage.getUserManualPayments(userId);
+      
+      // Combine manual payments with rent payments
+      const allPayments = [
+        ...payments,
+        ...manualPayments.map(mp => ({
+          id: mp.id,
+          userId: mp.userId,
+          propertyId: mp.propertyId,
+          amount: mp.amount,
+          dueDate: mp.paymentDate,
+          paidDate: mp.paymentDate,
+          status: mp.needsVerification ? 'pending' : 'paid',
+          paymentMethod: mp.paymentMethod || 'manual',
+          transactionId: null,
+          isVerified: !mp.needsVerification,
+          createdAt: mp.createdAt,
+          updatedAt: mp.updatedAt,
+          isManualPayment: true, // Flag to identify manual payments
+          description: mp.description,
+          receiptUrl: mp.receiptUrl,
+        }))
+      ].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+      
+      res.json(allPayments);
     } catch (error) {
       console.error("Error fetching rent payments:", error);
       res.status(500).json({ message: "Failed to fetch rent payments" });
@@ -477,47 +521,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/reports/generate', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { propertyId } = req.body;
+      const { propertyId, reportType = 'credit' } = req.body;
       
       // Get user data
       const user = await storage.getUser(userId);
       const properties = await storage.getUserProperties(userId);
       const property = properties.find(p => p.id === propertyId);
       const payments = await storage.getPropertyRentPayments(propertyId);
+      const allPayments = await storage.getUserRentPayments(userId);
       
       if (!user || !property) {
         return res.status(404).json({ message: "User or property not found" });
       }
       
-      // Generate report data
-      const reportData = {
-        user: {
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          phone: user.phone,
-        },
-        property: {
-          address: property.address,
-          city: property.city,
-          postcode: property.postcode,
-          rent: property.monthlyRent,
-        },
-        payments: payments.map(p => ({
-          date: p.dueDate,
-          amount: p.amount,
-          status: p.status,
-          paidDate: p.paidDate,
-        })),
-        stats: await storage.getUserStats(userId),
-        generatedAt: new Date().toISOString(),
+      // Get user badges (achievements)
+      const badges = await storage.getUserBadges(userId);
+      
+      // Calculate payment stats
+      const verifiedPayments = allPayments.filter(p => p.isVerified);
+      const totalPayments = allPayments.length;
+      const verificationRate = totalPayments > 0 ? (verifiedPayments.length / totalPayments) * 100 : 0;
+      
+      // Calculate on-time rate
+      const onTimePayments = allPayments.filter(p => {
+        if (!p.paidDate) return false;
+        const paidDate = new Date(p.paidDate);
+        const dueDate = new Date(p.dueDate);
+        const diffDays = Math.ceil((paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        return diffDays <= 5; // Within 5 days grace period
+      });
+      const onTimeRate = totalPayments > 0 ? (onTimePayments.length / totalPayments) * 100 : 0;
+      
+      // Calculate payment streak
+      const sortedPayments = [...allPayments].sort((a, b) => 
+        new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+      );
+      let paymentStreak = 0;
+      for (const payment of sortedPayments) {
+        if (!payment.paidDate) break;
+        const paidDate = new Date(payment.paidDate);
+        const dueDate = new Date(payment.dueDate);
+        const diffDays = Math.ceil((paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 5) {
+          paymentStreak++;
+        } else {
+          break;
+        }
+      }
+      
+      // Calculate Rent Score (0-1000)
+      // Payment History Score (60%): Based on on-time rate
+      const paymentHistoryScore = (onTimeRate / 100) * 600;
+      // Verification Score (20%): Based on verification rate  
+      const verificationScore = (verificationRate / 100) * 200;
+      // Streak Score (20%): Based on payment streak (capped at 12 months = max 200)
+      const streakScore = Math.min((paymentStreak / 12) * 200, 200);
+      const rentScore = Math.round(paymentHistoryScore + verificationScore + streakScore);
+      
+      // Total paid
+      const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
+      // Common data for all report types
+      const userInfo = {
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
+        rlid: user.rlid || 'N/A',
+        email: user.email || 'N/A',
+        phone: user.phone || 'N/A',
       };
+      
+      const currentAddress = {
+        fullAddress: property.address || 'N/A',
+        city: property.city || 'N/A',
+        postcode: property.postcode || 'N/A',
+        moveInDate: property.tenancyStartDate || undefined,
+      };
+      
+      const landlordInfo = {
+        name: property.landlordName || 'N/A',
+        email: property.landlordEmail || 'N/A',
+        phone: property.landlordPhone || 'N/A',
+        verificationStatus: verifiedPayments.length > 0 ? 'verified' : 'unverified' as const,
+      };
+      
+      const paymentHistory = payments.slice(0, 12).map(p => ({
+        date: p.dueDate,
+        amount: parseFloat(p.amount),
+        status: (p.isVerified ? 'verified' : (p.paidDate ? 'awaiting-verification' : 'overdue')) as 'verified' | 'awaiting-verification' | 'overdue',
+        dueDate: p.dueDate,
+        paidDate: p.paidDate || undefined,
+      }));
+      
+      const earnedBadges = badges.map(b => ({
+        type: b.badgeType,
+        level: b.level || 1,
+        name: b.badgeType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        earnedAt: b.earnedAt?.toISOString() || new Date().toISOString(),
+        description: JSON.stringify(b.metadata) !== '{}' ? JSON.stringify(b.metadata) : undefined,
+      }));
+      
+      // Generate report based on type
+      let reportData: any;
+      
+      if (reportType === 'credit') {
+        reportData = {
+          reportType: 'credit',
+          reportId: `${user.rlid}-${Date.now()}`,
+          generatedDate: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          userInfo,
+          currentAddress,
+          rentScore,
+          rentScoreBreakdown: {
+            paymentHistory: Math.round(paymentHistoryScore),
+            verification: Math.round(verificationScore),
+            streak: Math.round(streakScore),
+          },
+          paymentStreak,
+          totalPayments,
+          totalPaid,
+          onTimeRate: Math.round(onTimeRate),
+          paymentHistory,
+          earnedBadges,
+          landlordVerification: landlordInfo,
+          tenantSince: property.tenancyStartDate || undefined,
+        };
+      } else if (reportType === 'rental') {
+        reportData = {
+          reportType: 'rental',
+          reportId: `${user.rlid}-${Date.now()}`,
+          generatedDate: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          userInfo,
+          currentProperty: {
+            ...currentAddress,
+            monthlyRent: parseFloat(property.monthlyRent),
+            tenancyStartDate: property.tenancyStartDate || 'N/A',
+            tenancyEndDate: property.tenancyEndDate || undefined,
+          },
+          landlordInfo,
+          paymentSummary: {
+            totalPaid,
+            paymentStreak,
+            onTimeRate: Math.round(onTimeRate),
+            averageMonthlyRent: totalPayments > 0 ? totalPaid / totalPayments : 0,
+            firstPaymentDate: allPayments[allPayments.length - 1]?.dueDate || 'N/A',
+            lastPaymentDate: allPayments[0]?.dueDate || 'N/A',
+          },
+          paymentHistory,
+          rentScore,
+          badges: earnedBadges,
+        };
+      } else { // landlord verification
+        reportData = {
+          reportType: 'landlord',
+          reportId: `${user.rlid}-${Date.now()}`,
+          generatedDate: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          tenantInfo: userInfo,
+          propertyDetails: {
+            ...currentAddress,
+            monthlyRent: parseFloat(property.monthlyRent),
+            tenancyStartDate: property.tenancyStartDate || 'N/A',
+            tenancyEndDate: property.tenancyEndDate || undefined,
+          },
+          verificationRequest: {
+            landlordName: property.landlordName || 'N/A',
+            landlordEmail: property.landlordEmail || 'N/A',
+            status: landlordInfo.verificationStatus,
+            requestedDate: property.createdAt?.toISOString() || new Date().toISOString(),
+            verifiedDate: verifiedPayments.length > 0 ? verifiedPayments[0].updatedAt?.toISOString() : undefined,
+          },
+          paymentRecords: paymentHistory,
+          reliabilityMetrics: {
+            rentScore,
+            paymentStreak,
+            totalPayments,
+            totalPaid,
+            onTimeRate: Math.round(onTimeRate),
+            verificationRate: Math.round(verificationRate),
+          },
+          paymentStreak,
+        };
+      }
       
       const report = await storage.createCreditReport({
         userId,
         propertyId,
         reportData,
-        verificationId: `ENO-${Date.now()}`,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        verificationId: reportData.reportId,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
       
       res.json(report);
@@ -567,8 +759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.incrementShareAccess(share.id);
       
       // Get the actual report
-      const reports = await storage.getUserCreditReports(''); // This needs to be updated for public access
-      const report = reports.find(r => r.id === share.reportId);
+      const report = await storage.getCreditReportByReportId(share.reportId.toString());
       
       if (!report) {
         return res.status(404).json({ message: "Report not found" });
@@ -1003,46 +1194,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /**
+   * POST /api/admin/export-all-data
+   * Exports all system data (users, properties, payments, reports, security logs)
+   * Supports both JSON and CSV formats via query parameter: ?format=json or ?format=csv
+   */
   app.post('/api/admin/export-all-data', requireAdmin, async (req: any, res) => {
     try {
-      // Snapshot the admin for reuse throughout the export pipeline
       const adminUser = (req as any).adminUser;
       const exportId = nanoid();
+      const format = req.query.format || 'json'; // Support json or csv format
 
+      // Log the export request
       await logSecurityEvent(req, 'admin_data_export', {
         adminId: adminUser.id,
-        exportId
-      });
-
-      // In a real implementation, this would be processed in the background
-      setTimeout(async () => {
-        try {
-          const stats = await storage.getSystemStats();
-          const users = await storage.getAllUsers();
-          
-          // Create export record
-          const exportData = {
-            exportId,
-            timestamp: new Date().toISOString(),
-            stats,
-            userCount: users.length,
-            exportedBy: adminUser.id,
-          };
-
-          console.log('Export completed:', exportData);
-        } catch (error) {
-          console.error('Error completing export:', error);
-        }
-      }, 5000);
-
-      res.json({ 
-        message: 'Data export initiated',
         exportId,
-        estimatedCompletion: new Date(Date.now() + 30000).toISOString()
+        format,
       });
+
+      // Fetch all system data in parallel for efficiency
+      const [stats, users, properties, payments, securityLogs] = await Promise.all([
+        storage.getSystemStats(),
+        storage.getAllUsers(),
+        storage.getAllProperties(),
+        storage.getAllPayments(),
+        storage.getSecurityLogs({ limit: 10000 }), // Get up to 10k security logs
+      ]);
+
+      // Get credit reports for all users (batch approach - limit to first 100 users to avoid timeout)
+      const allReports: any[] = [];
+      for (const user of users.slice(0, 100)) {
+        try {
+          const userReports = await storage.getUserCreditReports(user.id);
+          allReports.push(...userReports);
+        } catch (error) {
+          console.error(`Error fetching reports for user ${user.id}:`, error);
+        }
+      }
+
+      // Create comprehensive export data object
+      const exportData = {
+        exportId,
+        timestamp: new Date().toISOString(),
+        exportedBy: adminUser.id,
+        exportedByEmail: adminUser.email || adminUser.username,
+        stats,
+        summary: {
+          totalUsers: users.length,
+          totalProperties: properties.length,
+          totalPayments: payments.length,
+          totalReports: allReports.length,
+          totalSecurityLogs: securityLogs.length,
+        },
+        data: {
+          users: users.map(u => ({
+            id: u.id,
+            email: u.email,
+            username: u.username,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            role: u.role,
+            subscriptionPlan: u.subscriptionPlan,
+            subscriptionStatus: u.subscriptionStatus,
+            isActive: u.isActive,
+            isOnboarded: u.isOnboarded,
+            emailVerified: u.emailVerified,
+            createdAt: u.createdAt,
+          })),
+          properties: properties.map(p => ({
+            id: p.id,
+            userId: p.userId,
+            address: p.address,
+            city: p.city,
+            postcode: p.postcode,
+            monthlyRent: p.monthlyRent,
+            isActive: p.isActive,
+            createdAt: p.createdAt,
+          })),
+          payments: payments.map(p => ({
+            id: p.id,
+            userId: p.userId,
+            propertyId: p.propertyId,
+            amount: p.amount,
+            dueDate: p.dueDate,
+            paidDate: p.paidDate,
+            status: p.status,
+            createdAt: p.createdAt,
+          })),
+          reports: allReports.map(r => ({
+            id: r.id,
+            userId: r.userId,
+            propertyId: r.propertyId,
+            reportId: r.reportId,
+            generatedAt: r.generatedAt,
+            createdAt: r.createdAt,
+          })),
+          securityLogs: securityLogs.map(l => ({
+            id: l.id,
+            userId: l.userId,
+            action: l.action,
+            ipAddress: l.ipAddress,
+            createdAt: l.createdAt,
+            metadata: l.metadata,
+          })),
+        },
+      };
+
+      // Set appropriate headers based on format
+      if (format === 'csv') {
+        // Convert to CSV format (simplified - in production, use a proper CSV library)
+        const csvRows: string[] = [];
+        
+        // Users CSV
+        csvRows.push('=== USERS ===');
+        csvRows.push('ID,Email,Username,Role,Plan,Status,Created');
+        users.forEach(u => {
+          csvRows.push(`${u.id},${u.email || ''},${u.username || ''},${u.role || ''},${u.subscriptionPlan || ''},${u.isActive ? 'active' : 'inactive'},${u.createdAt || ''}`);
+        });
+        
+        // Properties CSV
+        csvRows.push('\n=== PROPERTIES ===');
+        csvRows.push('ID,User ID,Address,City,Monthly Rent,Status');
+        properties.forEach(p => {
+          csvRows.push(`${p.id},${p.userId},${p.address || ''},${p.city || ''},${p.monthlyRent || ''},${p.isActive ? 'active' : 'inactive'}`);
+        });
+        
+        // Payments CSV
+        csvRows.push('\n=== PAYMENTS ===');
+        csvRows.push('ID,User ID,Property ID,Amount,Due Date,Paid Date,Status');
+        payments.forEach(p => {
+          csvRows.push(`${p.id},${p.userId},${p.propertyId},${p.amount || ''},${p.dueDate || ''},${p.paidDate || ''},${p.status || ''}`);
+        });
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="rentledger-export-${exportId}.csv"`);
+        res.send(csvRows.join('\n'));
+      } else {
+        // JSON format (default)
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="rentledger-export-${exportId}.json"`);
+        res.json(exportData);
+      }
     } catch (error) {
-      console.error('Error initiating data export:', error);
-      res.status(500).json({ message: 'Failed to initiate data export' });
+      console.error('Error exporting data:', error);
+      res.status(500).json({ message: 'Failed to export data' });
     }
   });
 
@@ -1471,11 +1766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin password reset
-  app.post('/api/admin/users/:userId/reset-password', requireAuth, async (req: any, res) => {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
-
+  app.post('/api/admin/users/:userId/reset-password', requireAdmin, async (req: any, res) => {
     try {
       const { userId } = req.params;
       const { newPassword } = req.body;
@@ -1484,18 +1775,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Password must be at least 8 characters long' });
       }
 
-      // Note: This is a demo system using Replit OAuth authentication
-      // In a production system with traditional username/password auth:
-      // 1. Hash the password using bcrypt or similar
-      // 2. Update the user's password in the database
-      // 3. Invalidate existing sessions
-      // For MVP demo purposes, we log the action for admin tracking
-      console.log(`Admin initiated password reset for user ${userId}`);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      await storage.upsertUser({
+        ...existingUser,
+        password: hashedPassword,
+        updatedAt: new Date(),
+      });
+
+      await logSecurityEvent(req, 'admin_password_reset', {
+        targetUserId: userId,
+        adminId: (req as any).adminUser.id,
+      });
 
       res.json({ 
-        message: 'Password reset recorded', 
-        newPassword,
-        note: 'Demo system: This would trigger a password reset email in production'
+        message: 'Password reset successfully',
+        note: 'New password has been set. Share securely with user.'
       });
     } catch (error) {
       console.error('Error resetting password:', error);
@@ -1503,109 +1802,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin routes - all require admin authentication
-  app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+  // Duplicate admin routes removed - using the ones defined earlier at lines 927-1088
+  // User update endpoint
+  app.patch('/api/admin/users/:userId', requireAdmin, async (req: any, res) => {
     try {
-      const stats = await storage.getSystemStats();
-      res.json(stats);
-    } catch (error) {
-      console.error('Error fetching admin stats:', error);
-      res.status(500).json({ message: 'Failed to fetch stats' });
-    }
-  });
-
-  app.get('/api/admin/users', requireAdmin, async (req, res) => {
-    try {
-      const users = await storage.getAllUsers();
-      res.json(users);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      res.status(500).json({ message: 'Failed to fetch users' });
-    }
-  });
-
-  app.get('/api/admin/system-health', requireAdmin, async (req, res) => {
-    try {
-      const health = {
-        database: 'healthy',
-        emailService: 'healthy', 
-        paymentProcessor: 'healthy',
-        lastChecked: new Date().toISOString()
-      };
-      res.json(health);
-    } catch (error) {
-      console.error('Error checking system health:', error);
-      res.status(500).json({ message: 'Failed to check system health' });
-    }
-  });
-
-  app.post('/api/admin/system-check', requireAdmin, async (req, res) => {
-    try {
-      // Perform system checks
-      const results = {
-        database: 'healthy',
-        services: 'operational',
-        timestamp: new Date().toISOString()
-      };
-      res.json({ message: 'System check completed', results });
-    } catch (error) {
-      console.error('Error performing system check:', error);
-      res.status(500).json({ message: 'System check failed' });
-    }
-  });
-
-  app.post('/api/admin/export-all-data', requireAdmin, async (req, res) => {
-    try {
-      // Create data export request
-        const adminUser = (req as any).adminUser;
-        const exportRequest = await storage.createDataExportRequest({
-          userId: adminUser.userId,
-          dataType: 'all',
-          status: 'pending'
-        });
-      res.json({ 
-        message: 'Export initiated', 
-        requestId: exportRequest.id,
-        estimatedTime: '5-10 minutes'
+      const { userId } = req.params;
+      const updates = req.body;
+      
+      // Validate updates
+      const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'role', 'subscriptionPlan', 'subscriptionStatus', 'isActive', 'isOnboarded', 'emailVerified'];
+      const filteredUpdates = Object.keys(updates)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updates[key];
+          return obj;
+        }, {} as any);
+      
+      const user = await storage.upsertUser({
+        id: userId,
+        ...filteredUpdates,
+        updatedAt: new Date(),
       });
+      
+      await logSecurityEvent(req, 'admin_user_updated', {
+        targetUserId: userId,
+        updates: filteredUpdates,
+      });
+      
+      res.json(user);
     } catch (error) {
-      console.error('Error initiating data export:', error);
-      res.status(500).json({ message: 'Export initiation failed' });
+      console.error('Error updating user:', error);
+      res.status(500).json({ message: 'Failed to update user' });
     }
   });
 
-  app.post('/api/admin/send-announcement', requireAdmin, async (req, res) => {
+  // User suspend endpoint
+  app.post('/api/admin/users/:userId/suspend', requireAdmin, async (req: any, res) => {
     try {
-      const { message } = req.body;
+      const { userId } = req.params;
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
       
-      // Get all active users
-      const users = await storage.getAllUsers();
-      const activeUsers = users.filter(user => user.isOnboarded);
-      
-      // Send notification to all active users
-        for (const user of activeUsers) {
-          await storage.createNotification({
-            userId: user.id,
-            type: 'system',
-            title: 'System Announcement',
-            message,
-            isRead: false
-          });
-        }
-      
-      res.json({ 
-        message: 'Announcement sent successfully',
-        recipients: activeUsers.length
+      await storage.upsertUser({
+        ...existingUser,
+        isActive: false,
+        updatedAt: new Date(),
       });
+      
+      await logSecurityEvent(req, 'admin_user_suspended', {
+        targetUserId: userId,
+      });
+      
+      res.json({ message: 'User suspended successfully' });
     } catch (error) {
-      console.error('Error sending announcement:', error);
-      res.status(500).json({ message: 'Failed to send announcement' });
+      console.error('Error suspending user:', error);
+      res.status(500).json({ message: 'Failed to suspend user' });
+    }
+  });
+
+  // User reactivate endpoint
+  app.post('/api/admin/users/:userId/reactivate', requireAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      
+      await storage.upsertUser({
+        ...existingUser,
+        isActive: true,
+        updatedAt: new Date(),
+      });
+      
+      await logSecurityEvent(req, 'admin_user_reactivated', {
+        targetUserId: userId,
+      });
+      
+      res.json({ message: 'User reactivated successfully' });
+    } catch (error) {
+      console.error('Error reactivating user:', error);
+      res.status(500).json({ message: 'Failed to reactivate user' });
     }
   });
 
   app.get('/api/admin/settings', requireAdmin, async (req, res) => {
     try {
-      const settings = {
+      // Retrieve settings from database, with defaults if not set
+      const dbSettings = await storage.getSystemSettings();
+      
+      // Default settings (used if not in database)
+      const defaultSettings = {
         maintenanceMode: false,
         allowNewRegistrations: true,
         requireEmailVerification: true,
@@ -1620,10 +1909,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dataRetentionDays: 365,
         sessionTimeoutMinutes: 60,
       };
+      
+      // Merge database settings with defaults (database takes precedence)
+      const settings = { ...defaultSettings, ...dbSettings };
+      
       res.json(settings);
     } catch (error) {
       console.error('Error fetching settings:', error);
       res.status(500).json({ message: 'Failed to fetch settings' });
+    }
+  });
+
+  // Settings update endpoint
+  app.post('/api/admin/settings', requireAdmin, async (req: any, res) => {
+    try {
+      const settings = req.body;
+      const adminUser = (req as any).adminUser;
+      
+      // Validate settings object
+      if (!settings || typeof settings !== 'object') {
+        return res.status(400).json({ message: 'Invalid settings format' });
+      }
+      
+      // Persist settings to database
+      await storage.updateSystemSettings(settings, adminUser.id || adminUser.userId);
+      
+      // Log the security event
+      await logSecurityEvent(req, 'admin_settings_updated', {
+        settings: Object.keys(settings),
+        adminId: adminUser.id,
+      });
+      
+      res.json({ 
+        message: 'Settings updated successfully',
+        settings 
+      });
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      res.status(500).json({ message: 'Failed to update settings' });
+    }
+  });
+
+  // Test email endpoint
+  app.post('/api/admin/test-email', requireAdmin, async (req: any, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: 'Email address is required' });
+      }
+      
+      const emailResult = await sendEmail({
+        to: email,
+        from: 'noreply@enoikio.co.uk',
+        subject: 'Enoíkio - Test Email',
+        html: `
+          <h2>Test Email from Enoíkio Admin</h2>
+          <p>This is a test email to verify email configuration is working correctly.</p>
+          <p>If you received this email, the email service is properly configured.</p>
+          <p>Sent at: ${new Date().toISOString()}</p>
+        `,
+      });
+      
+      await logSecurityEvent(req, 'admin_test_email_sent', {
+        recipientEmail: email,
+        success: emailResult.success,
+      });
+      
+      if (emailResult.success) {
+        res.json({ message: 'Test email sent successfully' });
+      } else {
+        res.status(500).json({ 
+          message: 'Failed to send test email',
+          error: emailResult.error 
+        });
+      }
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      res.status(500).json({ message: 'Failed to send test email' });
     }
   });
 
@@ -1672,6 +2035,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
       res.status(500).json({ message: 'Failed to fetch subscriptions' });
+    }
+  });
+
+  // Subscription update endpoint
+  app.patch('/api/admin/subscriptions/:subscriptionId', requireAdmin, async (req: any, res) => {
+    try {
+      const { subscriptionId } = req.params;
+      const updates = req.body;
+      
+      // Extract userId from subscriptionId (format: sub_userId)
+      const userId = subscriptionId.replace('sub_', '');
+      
+      const allowedFields = ['subscriptionPlan', 'subscriptionStatus', 'subscriptionEndDate'];
+      const filteredUpdates = Object.keys(updates)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updates[key];
+          return obj;
+        }, {} as any);
+      
+      const currentUser = await storage.getUser(userId);
+      if (!currentUser) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      await storage.updateUserSubscription(userId, {
+        subscriptionPlan: filteredUpdates.subscriptionPlan || currentUser.subscriptionPlan || 'free',
+        subscriptionStatus: filteredUpdates.subscriptionStatus || currentUser.subscriptionStatus || 'active',
+        subscriptionEndDate: filteredUpdates.subscriptionEndDate ? new Date(filteredUpdates.subscriptionEndDate) : currentUser.subscriptionEndDate || undefined,
+      });
+      
+      await logSecurityEvent(req, 'admin_subscription_updated', {
+        userId,
+        updates: filteredUpdates,
+      });
+      
+      res.json({ message: 'Subscription updated successfully' });
+    } catch (error) {
+      console.error('Error updating subscription:', error);
+      res.status(500).json({ message: 'Failed to update subscription' });
     }
   });
 
@@ -1737,69 +2140,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Moderation endpoints
-  app.get('/api/admin/moderation', requireAdmin, async (req, res) => {
+  app.get('/api/admin/moderation', requireAdmin, async (req: any, res) => {
     try {
-      // Mock moderation data - in real app this would come from reports and violations
-      const mockModerationItems = [
-        {
-          id: 'mod_001',
-          type: 'user_report',
-          userId: 'user_001',
-          reporterId: 'user_002',
-          subject: 'Inappropriate behavior in messages',
-          description: 'User has been sending inappropriate messages to other tenants through the platform.',
-          status: 'pending',
-          priority: 'high',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'mod_002',
-          type: 'payment_dispute',
-          userId: 'user_003',
-          subject: 'Disputed rent payment amount',
-          description: 'User is disputing the calculated rent amount for their property.',
-          status: 'reviewing',
-          priority: 'medium',
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          assignedTo: 'admin_001',
-        },
-        {
-          id: 'mod_003',
-          type: 'spam',
-          userId: 'user_004',
-          subject: 'Multiple spam reports created',
-          description: 'User has been creating multiple fake credit reports, potentially for spam purposes.',
-          status: 'resolved',
-          priority: 'low',
-          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          resolution: 'Account suspended for 30 days. User educated about proper platform usage.',
-        },
-        {
-          id: 'mod_004',
-          type: 'content_violation',
-          userId: 'user_005',
-          subject: 'Inappropriate profile information',
-          description: 'User has uploaded inappropriate content to their profile section.',
-          status: 'pending',
-          priority: 'urgent',
-          createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-          updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-        }
-      ];
-      
-      res.json(mockModerationItems);
+      const { status, type, priority } = req.query;
+      const items = await storage.getModerationItems({
+        status: status as string,
+        type: type as string,
+        priority: priority as string,
+      });
+      res.json(items);
     } catch (error) {
       console.error('Error fetching moderation items:', error);
       res.status(500).json({ message: 'Failed to fetch moderation items' });
     }
   });
 
-  app.post('/api/admin/resolve-moderation', requireAdmin, async (req, res) => {
+  app.post('/api/admin/resolve-moderation', requireAdmin, async (req: any, res) => {
     try {
-      // Pull the admin identity off the request once so TypeScript stays happy
       const adminUser = (req as any).adminUser;
       const { itemId, resolution, action } = req.body;
 
@@ -1807,8 +2164,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
-      // In real app, update the moderation item in database
-      console.log(`Moderation item ${itemId} ${action}d by admin ${adminUser.id}:`, resolution);
+      await storage.updateModerationItem(parseInt(itemId), {
+        status: action === 'resolve' ? 'resolved' : 'dismissed',
+        resolution,
+        assignedTo: adminUser.userId || adminUser.id,
+        updatedAt: new Date(),
+      });
+      
+      await logSecurityEvent(req, 'admin_moderation_resolved', {
+        itemId,
+        action,
+        adminId: adminUser.id,
+      });
       
       res.json({ 
         message: `Moderation item ${action}d successfully`,
@@ -1822,9 +2189,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/escalate-moderation', requireAdmin, async (req, res) => {
+  /**
+   * POST /api/admin/escalate-moderation
+   * Escalates a moderation item by setting priority to urgent and status to reviewing
+   * Also assigns it to the admin who escalated it
+   */
+  app.post('/api/admin/escalate-moderation', requireAdmin, async (req: any, res) => {
     try {
-      // Pull the admin identity off the request once so TypeScript stays happy
       const adminUser = (req as any).adminUser;
       const { itemId } = req.body;
       
@@ -1832,17 +2203,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Item ID is required' });
       }
 
-      // In real app, escalate the moderation item
-      console.log(`Moderation item ${itemId} escalated by admin ${adminUser.id}`);
+      // Update moderation item: set priority to urgent, status to reviewing, and assign to admin
+      await storage.updateModerationItem(parseInt(itemId), {
+        priority: 'urgent',
+        status: 'reviewing',
+        assignedTo: adminUser.userId || adminUser.id,
+        updatedAt: new Date(),
+      });
+
+      // Log the escalation action
+      await logSecurityEvent(req, 'admin_moderation_escalated', {
+        itemId,
+        adminId: adminUser.id,
+        priority: 'urgent',
+      });
       
       res.json({ 
         message: 'Moderation item escalated successfully',
         itemId,
-        escalatedAt: new Date().toISOString()
+        escalatedAt: new Date().toISOString(),
+        priority: 'urgent',
+        assignedTo: adminUser.userId || adminUser.id,
       });
     } catch (error) {
       console.error('Error escalating moderation item:', error);
       res.status(500).json({ message: 'Failed to escalate moderation item' });
+    }
+  });
+
+  // Disputes endpoints
+  /**
+   * GET /api/admin/disputes
+   * Retrieves all disputes with optional filtering
+   * Query params: status, type, priority
+   */
+  app.get('/api/admin/disputes', requireAdmin, async (req: any, res) => {
+    try {
+      const { status, type, priority } = req.query;
+      
+      // Fetch disputes with filters
+      const disputesList = await storage.getDisputes({
+        status: status as string,
+        type: type as string,
+        priority: priority as string,
+      });
+      
+      res.json(disputesList);
+    } catch (error) {
+      console.error('Error fetching disputes:', error);
+      res.status(500).json({ message: 'Failed to fetch disputes' });
+    }
+  });
+
+  /**
+   * POST /api/admin/disputes
+   * Creates a new dispute (can be used by users or admins)
+   */
+  app.post('/api/admin/disputes', requireAdmin, async (req: any, res) => {
+    try {
+      const { userId, propertyId, paymentId, type, subject, description, priority } = req.body;
+      
+      // Validate required fields
+      if (!userId || !type || !subject || !description) {
+        return res.status(400).json({ 
+          message: 'Missing required fields: userId, type, subject, description' 
+        });
+      }
+
+      // Create the dispute
+      const dispute = await storage.createDispute({
+        userId,
+        propertyId: propertyId || null,
+        paymentId: paymentId || null,
+        type: type as "payment" | "verification" | "property" | "other",
+        subject,
+        description,
+        priority: (priority || 'medium') as "low" | "medium" | "high" | "urgent",
+        status: 'open',
+      });
+
+      // Log the creation
+      await logSecurityEvent(req, 'dispute_created', {
+        disputeId: dispute.id,
+        userId,
+        type,
+        adminId: (req as any).adminUser?.id,
+      });
+
+      res.status(201).json(dispute);
+    } catch (error) {
+      console.error('Error creating dispute:', error);
+      res.status(500).json({ message: 'Failed to create dispute' });
+    }
+  });
+
+  /**
+   * PATCH /api/admin/disputes/:id
+   * Updates an existing dispute (assign, resolve, etc.)
+   */
+  app.patch('/api/admin/disputes/:id', requireAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      const adminUser = (req as any).adminUser;
+
+      // Build update object with only allowed fields
+      const allowedFields = ['status', 'priority', 'assignedTo', 'resolution'];
+      const filteredUpdates = Object.keys(updates)
+        .filter(key => allowedFields.includes(key))
+        .reduce((obj, key) => {
+          obj[key] = updates[key];
+          return obj;
+        }, {} as any);
+
+      // If resolving, set resolvedAt timestamp
+      if (filteredUpdates.status === 'resolved' || filteredUpdates.status === 'closed') {
+        filteredUpdates.resolvedAt = new Date();
+      }
+
+      // Update the dispute
+      const updatedDispute = await storage.updateDispute(parseInt(id), filteredUpdates);
+
+      // Log the update
+      await logSecurityEvent(req, 'dispute_updated', {
+        disputeId: id,
+        updates: filteredUpdates,
+        adminId: adminUser.id,
+      });
+
+      res.json(updatedDispute);
+    } catch (error) {
+      console.error('Error updating dispute:', error);
+      res.status(500).json({ message: 'Failed to update dispute' });
+    }
+  });
+
+  // Regional activity endpoint
+  app.get('/api/admin/regional-activity', requireAdmin, async (req: any, res) => {
+    try {
+      const properties = await storage.getAllProperties();
+      
+      // Group by city and calculate activity
+      const regionalMap = new Map<string, { users: number; activity: number }>();
+      
+      for (const property of properties) {
+        const city = property.city || 'Unknown';
+        const existing = regionalMap.get(city) || { users: 0, activity: 0 };
+        existing.users += 1;
+        regionalMap.set(city, existing);
+      }
+      
+      const regionalData = Array.from(regionalMap.entries()).map(([region, data]) => ({
+        region,
+        users: data.users,
+        activity: properties.length > 0 ? Math.min((data.users / properties.length) * 100, 100) : 0,
+      })).sort((a, b) => b.users - a.users).slice(0, 5);
+      
+      res.json(regionalData);
+    } catch (error) {
+      console.error('Error fetching regional activity:', error);
+      res.status(500).json({ message: 'Failed to fetch regional activity' });
+    }
+  });
+
+  // Properties endpoint
+  app.get('/api/admin/properties', requireAdmin, async (req: any, res) => {
+    try {
+      const properties = await storage.getAllProperties();
+      // Join with users to get landlord info
+      const propertiesWithLandlord = await Promise.all(properties.map(async (prop) => {
+        const user = await storage.getUser(prop.userId);
+        return {
+          ...prop,
+          landlordName: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : null,
+          landlordEmail: user?.email || null,
+        };
+      }));
+      res.json(propertiesWithLandlord);
+    } catch (error) {
+      console.error('Error fetching properties:', error);
+      res.status(500).json({ message: 'Failed to fetch properties' });
     }
   });
 
@@ -2144,16 +2684,49 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
   app.post('/api/manual-payments', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { propertyId, amount, paymentDate, description, receiptUrl } = req.body;
+      const { propertyId, amount, paymentDate, paymentMethod, description, receiptUrl } = req.body;
+      
+      // Get property and landlord info for notifications
+      const property = await storage.getPropertyById(parseInt(propertyId));
+      const tenant = await storage.getUser(userId);
       
       const manualPayment = await storage.createManualPayment({
         userId,
         propertyId: parseInt(propertyId),
         amount: parseFloat(amount).toFixed(2),
         paymentDate: new Date(paymentDate),
+        paymentMethod,
         description,
         receiptUrl,
         needsVerification: true,
+      });
+      
+      // Send notification to landlord if landlord email exists
+      if (property.landlordEmail) {
+        try {
+          await emailService.sendLandlordVerificationRequest({
+            landlordEmail: property.landlordEmail,
+            landlordName: property.landlordName || 'Landlord',
+            tenantName: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.email,
+            tenantEmail: tenant.email,
+            propertyAddress: `${property.address}, ${property.city}`,
+            amount: parseFloat(amount),
+            paymentDate: new Date(paymentDate).toLocaleDateString(),
+            paymentMethod: paymentMethod.replace('_', ' ').toUpperCase(),
+            receiptUrl,
+          });
+        } catch (emailError) {
+          console.error('Failed to send landlord notification email:', emailError);
+          // Don't fail the whole request if email fails
+        }
+      }
+      
+      // Create in-app notification for tenant
+      await storage.createNotification({
+        userId,
+        type: 'system',
+        title: 'Payment Logged Successfully',
+        message: `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} is awaiting landlord verification.`,
       });
       
       // Update payment streak and check for badges
@@ -2178,7 +2751,7 @@ function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
         manualPayment,
         newBadges,
         currentStreak,
-        message: 'Manual payment logged successfully' 
+        message: 'Manual payment logged successfully and landlord has been notified for verification' 
       });
     } catch (error) {
       console.error('Error creating manual payment:', error);
@@ -2264,10 +2837,14 @@ addManualPaymentRoutes(app, requireAuth, storage);
       }
       
       // Create landlord user with secure password hashing
+      // Use email as username for login compatibility
       const hashedPassword = await bcrypt.hash(password, 10);
+      const rlid = await generateRLID('landlord'); // Generate LRLID for landlords
       const landlord = await storage.upsertUser({
         id: nanoid(),
+        rlid,
         email,
+        username: email, // Use email as username for login
         password: hashedPassword,
         firstName,
         lastName,
@@ -2286,26 +2863,39 @@ addManualPaymentRoutes(app, requireAuth, storage);
     }
   });
 
-  // Landlord login route
-  app.post('/api/landlord/login', async (req, res) => {
-    try {
-      const { email, password } = req.body;
-      
-      const user = await storage.getUserByEmail(email);
-      if (!user || user.role !== 'landlord') {
-        return res.status(401).json({ message: 'Invalid credentials' });
+  // Landlord login route - uses Passport session authentication
+  app.post('/api/landlord/login', async (req, res, next) => {
+    // Use email-based authentication for landlords
+    passport.authenticate("local-email", async (err: any, user: any, info: any) => {
+      if (err) {
+        return next(err);
       }
-      
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
-      
-      res.json({ success: true, landlord: { id: user.id, email: user.email, firstName: user.firstName } });
-    } catch (error) {
-      console.error("Error during landlord login:", error);
-      res.status(500).json({ message: "Login failed" });
-    }
+
+      // Verify user is a landlord
+      if (user.role !== "landlord") {
+        return res.status(403).json({ message: "Landlord access required" });
+      }
+
+      // Verify user is active
+      if (!user.isActive) {
+        return res.status(403).json({ message: "Account is inactive" });
+      }
+
+      // Create session
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return next(loginErr);
+        }
+        return res.json({ 
+          success: true, 
+          ...user, 
+          password: undefined 
+        });
+      });
+    })(req, res, next);
   });
 
   // Property CRUD routes with authentication (UAT-03, 04, 05)
@@ -2313,9 +2903,62 @@ addManualPaymentRoutes(app, requireAuth, storage);
     try {
       const propertyId = parseInt(req.params.id);
       const updateData = req.body;
+      const userId = req.user.id;
+      
+      // Get existing property to check if rent is being updated
+      const existingProperties = await storage.getUserProperties(userId);
+      const existingProperty = existingProperties.find(p => p.id === propertyId);
+      
+      if (!existingProperty) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      
+      // Check if rent amount is being updated
+      const isRentUpdate = updateData.rentInfo?.amount || updateData.monthlyRent;
+      const newRentAmount = updateData.rentInfo?.amount || updateData.monthlyRent;
+      
+      if (isRentUpdate && newRentAmount !== undefined) {
+        const currentRent = parseFloat(String(existingProperty.monthlyRent));
+        const newRent = parseFloat(String(newRentAmount));
+        
+        // Only enforce limit if rent is actually changing
+        if (currentRent !== newRent) {
+          const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+          const lastUpdateMonth = existingProperty.lastRentUpdateMonth;
+          const updateCount = existingProperty.rentUpdateCount || 0;
+          
+          // Check if we're in the same month as the last update
+          if (lastUpdateMonth === currentMonth) {
+            if (updateCount >= 3) {
+              return res.status(429).json({ 
+                message: 'Rent price update limit reached. You can only update rent prices 3 times per month.',
+                remainingUpdates: 0,
+                resetDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString()
+              });
+            }
+            // Same month, increment counter
+            updateData.rentUpdateCount = updateCount + 1;
+            updateData.lastRentUpdateMonth = currentMonth;
+          } else {
+            // New month, reset counter
+            updateData.rentUpdateCount = 1;
+            updateData.lastRentUpdateMonth = currentMonth;
+          }
+        }
+      }
       
       const property = await storage.updateProperty(propertyId, updateData);
-      res.json(property);
+      
+      // Calculate remaining updates for this month
+      const remainingUpdates = 3 - (property.rentUpdateCount || 0);
+      
+      res.json({ 
+        ...property,
+        _meta: {
+          remainingRentUpdates: Math.max(0, remainingUpdates),
+          rentUpdateCount: property.rentUpdateCount || 0
+        }
+      });
     } catch (error) {
       console.error("Error updating property:", error);
       res.status(500).json({ message: "Failed to update property" });
@@ -2532,13 +3175,12 @@ addManualPaymentRoutes(app, requireAuth, storage);
       // Format for admin reporting
       const formattedLogs = logs.map((log: any) => ({
         id: log.id,
-        timestamp: log.timestamp,
         userId: log.userId,
         action: log.action,
         ipAddress: log.ipAddress,
         userAgent: log.userAgent,
         metadata: log.metadata,
-        success: true,
+        createdAt: log.timestamp || log.createdAt || new Date().toISOString(),
       }));
       
       res.json({
@@ -2589,6 +3231,49 @@ addManualPaymentRoutes(app, requireAuth, storage);
     } catch (error) {
       console.error('Error fetching performance metrics:', error);
       res.status(500).json({ message: 'Failed to fetch performance metrics' });
+    }
+  });
+
+  // Admin Account Creation Endpoint (Admin only)
+  app.post('/api/admin/create-admin-account', requireAdmin, async (req: any, res) => {
+    try {
+      const { username, password, email, firstName, lastName } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+      }
+
+      // Import the createAdminAccount function
+      const { createAdminAccount } = await import('./create-admin');
+      
+      const user = await createAdminAccount(
+        username,
+        password,
+        email,
+        firstName,
+        lastName
+      );
+
+      await logSecurityEvent(req, 'admin_account_created', {
+        createdUsername: username,
+        createdBy: req.user.id,
+      });
+
+      res.json({
+        message: 'Admin account created successfully',
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error creating admin account:', error);
+      res.status(500).json({ 
+        message: 'Failed to create admin account',
+        error: error.message 
+      });
     }
   });
 

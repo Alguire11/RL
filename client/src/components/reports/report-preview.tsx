@@ -19,8 +19,15 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMM yyyy');
+  const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return format(date, 'dd MMM yyyy');
+    } catch (error) {
+      return 'N/A';
+    }
   };
 
   const handleDownload = () => {
@@ -35,13 +42,47 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
   };
 
   const generateReportHtml = (report: any) => {
-    const reportData = report.reportData;
+    const reportData = report.reportData || {};
+    const userInfo = reportData.userInfo || reportData.user || {};
+    const currentAddress = reportData.currentAddress || reportData.property || {};
+    const stats = reportData.stats || {};
+    
+    // Safe date formatting for HTML generation
+    const safeFormatDate = (dateValue: any) => {
+      if (!dateValue) return 'N/A';
+      try {
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) return 'N/A';
+        return format(date, 'dd MMM yyyy');
+      } catch {
+        return 'N/A';
+      }
+    };
+    
+    // Safe currency formatting
+    const safeFormatCurrency = (amount: any) => {
+      if (amount === null || amount === undefined || isNaN(Number(amount))) return '£0.00';
+      return formatCurrency(Number(amount));
+    };
+    
+    const generatedDate = safeFormatDate(reportData.generatedDate || reportData.generatedAt || report.createdAt);
+    const userName = userInfo.name || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() || 'N/A';
+    const userEmail = userInfo.email || 'N/A';
+    const userPhone = userInfo.phone || 'Not provided';
+    const address = currentAddress.fullAddress || currentAddress.address || 'N/A';
+    const city = currentAddress.city || 'N/A';
+    const postcode = currentAddress.postcode || 'N/A';
+    const rent = safeFormatCurrency(reportData.rentScore || currentAddress.monthlyRent || stats.totalPaid || 0);
+    const onTimeRate = Math.round(stats.onTimePercentage || reportData.onTimeRate || 0);
+    const paymentStreak = stats.paymentStreak || reportData.paymentStreak || 0;
+    const totalPaid = safeFormatCurrency(stats.totalPaid || reportData.totalPaid || 0);
+    const verificationId = report.verificationId || report.reportId || reportData.reportId || 'N/A';
     
     return `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Rental Credit Report - ${reportData.user.name}</title>
+        <title>Rental Credit Report - ${userName}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
           .header { text-align: center; margin-bottom: 30px; }
@@ -57,23 +98,23 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
         <div class="header">
           <div class="logo">Enoíkio</div>
           <h1>Rental Credit Report</h1>
-          <p>Generated on ${formatDate(reportData.generatedAt)}</p>
+          <p>Generated on ${generatedDate}</p>
         </div>
         
         <div class="grid">
           <div class="section">
             <h3>Tenant Information</h3>
-            <p><strong>Name:</strong> ${reportData.user.name}</p>
-            <p><strong>Email:</strong> ${reportData.user.email}</p>
-            <p><strong>Phone:</strong> ${reportData.user.phone || 'Not provided'}</p>
+            <p><strong>Name:</strong> ${userName}</p>
+            <p><strong>Email:</strong> ${userEmail}</p>
+            <p><strong>Phone:</strong> ${userPhone}</p>
           </div>
           
           <div class="section">
             <h3>Property Details</h3>
-            <p><strong>Address:</strong> ${reportData.property.address}</p>
-            <p><strong>City:</strong> ${reportData.property.city}</p>
-            <p><strong>Postcode:</strong> ${reportData.property.postcode}</p>
-            <p><strong>Monthly Rent:</strong> ${formatCurrency(parseFloat(reportData.property.rent))}</p>
+            <p><strong>Address:</strong> ${address}</p>
+            <p><strong>City:</strong> ${city}</p>
+            <p><strong>Postcode:</strong> ${postcode}</p>
+            <p><strong>Monthly Rent:</strong> ${rent}</p>
           </div>
         </div>
         
@@ -81,15 +122,15 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
           <h3>Payment Summary</h3>
           <div class="stats">
             <div class="stat-card">
-              <div style="font-size: 24px; font-weight: bold; color: #10B981;">${Math.round(reportData.stats.onTimePercentage)}%</div>
+              <div style="font-size: 24px; font-weight: bold; color: #10B981;">${onTimeRate}%</div>
               <div>On-time Rate</div>
             </div>
             <div class="stat-card">
-              <div style="font-size: 24px; font-weight: bold; color: #3B82F6;">${reportData.stats.paymentStreak}</div>
+              <div style="font-size: 24px; font-weight: bold; color: #3B82F6;">${paymentStreak}</div>
               <div>Months Tracked</div>
             </div>
             <div class="stat-card">
-              <div style="font-size: 24px; font-weight: bold; color: #8B5CF6;">${formatCurrency(reportData.stats.totalPaid)}</div>
+              <div style="font-size: 24px; font-weight: bold; color: #8B5CF6;">${totalPaid}</div>
               <div>Total Paid</div>
             </div>
           </div>
@@ -97,7 +138,7 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
         
         <div class="verification">
           <p>This report has been verified and generated by Enoíkio</p>
-          <p>Verification ID: ${report.verificationId}</p>
+          <p>Verification ID: ${verificationId}</p>
         </div>
       </body>
       </html>

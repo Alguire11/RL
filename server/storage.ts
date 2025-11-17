@@ -56,6 +56,15 @@ import {
   type InsertPaymentStreak,
   type EnhancedReportShare,
   type InsertEnhancedReportShare,
+  moderationItems,
+  type ModerationItem,
+  type InsertModerationItem,
+  systemSettings,
+  type SystemSetting,
+  type InsertSystemSetting,
+  disputes,
+  type Dispute,
+  type InsertDispute,
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
@@ -175,6 +184,29 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getAllProperties(): Promise<Property[]>;
   getAllPayments(): Promise<RentPayment[]>;
+  
+  // Moderation operations
+  getModerationItems(filters?: {
+    status?: string;
+    type?: string;
+    priority?: string;
+  }): Promise<ModerationItem[]>;
+  updateModerationItem(id: number, updates: Partial<ModerationItem>): Promise<ModerationItem>;
+  
+  // System settings operations
+  getSystemSettings(): Promise<Record<string, any>>;
+  updateSystemSettings(settings: Record<string, any>, updatedBy: string): Promise<void>;
+  getSystemSetting(key: string): Promise<any>;
+  
+  // Disputes operations
+  getDisputes(filters?: {
+    status?: string;
+    type?: string;
+    priority?: string;
+  }): Promise<Dispute[]>;
+  createDispute(dispute: InsertDispute): Promise<Dispute>;
+  updateDispute(id: number, updates: Partial<Dispute>): Promise<Dispute>;
+  
   getSecurityLogs(filters: {
     startDate?: string;
     endDate?: string;
@@ -509,8 +541,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(rentPayments.userId, userId))
       .orderBy(desc(rentPayments.dueDate));
 
+    const manualPaymentsData = await this.getUserManualPayments(userId);
+    
+    // Combine manual payments with rent payments for stats calculation
+    const allPayments = [
+      ...payments,
+      ...manualPaymentsData.map(mp => ({
+        id: mp.id,
+        userId: mp.userId,
+        propertyId: mp.propertyId,
+        amount: mp.amount,
+        dueDate: mp.paymentDate,
+        paidDate: mp.paymentDate,
+        status: mp.needsVerification ? 'pending' as const : 'paid' as const,
+        paymentMethod: mp.paymentMethod || 'manual',
+        transactionId: null,
+        isVerified: !mp.needsVerification,
+        createdAt: mp.createdAt,
+        updatedAt: mp.updatedAt,
+      }))
+    ];
+
     // Delegate number crunching to the shared helper so tests can target the math directly.
-    return computeDashboardStats(payments);
+    return computeDashboardStats(allPayments);
   }
 
   // Notification operations
@@ -1045,6 +1098,154 @@ export class DatabaseStorage implements IStorage {
     }
 
     return streak;
+  }
+
+  // Moderation operations
+  async getModerationItems(filters?: {
+    status?: string;
+    type?: string;
+    priority?: string;
+  }): Promise<ModerationItem[]> {
+    let query = db.select().from(moderationItems);
+    const conditions = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(moderationItems.status, filters.status as "pending" | "reviewing" | "resolved" | "dismissed"));
+    }
+    if (filters?.type) {
+      conditions.push(eq(moderationItems.type, filters.type as "user_report" | "content_violation" | "payment_dispute" | "spam"));
+    }
+    if (filters?.priority) {
+      conditions.push(eq(moderationItems.priority, filters.priority as "low" | "medium" | "high" | "urgent"));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(moderationItems.createdAt));
+  }
+
+  async updateModerationItem(id: number, updates: Partial<ModerationItem>): Promise<ModerationItem> {
+    const [updated] = await db
+      .update(moderationItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(moderationItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  // System settings operations
+  /**
+   * Retrieves all system settings as a key-value object
+   * @returns Promise resolving to a record of setting keys and their values
+   */
+  async getSystemSettings(): Promise<Record<string, any>> {
+    const settings = await db.select().from(systemSettings);
+    return settings.reduce((acc, s) => {
+      acc[s.key] = s.value;
+      return acc;
+    }, {} as Record<string, any>);
+  }
+
+  /**
+   * Gets a single system setting by key
+   * @param key - The setting key to retrieve
+   * @returns Promise resolving to the setting value or undefined
+   */
+  async getSystemSetting(key: string): Promise<any> {
+    const [setting] = await db
+      .select()
+      .from(systemSettings)
+      .where(eq(systemSettings.key, key))
+      .limit(1);
+    return setting?.value;
+  }
+
+  /**
+   * Updates multiple system settings atomically
+   * @param settings - Object with key-value pairs of settings to update
+   * @param updatedBy - User ID of the admin making the update
+   */
+  async updateSystemSettings(settings: Record<string, any>, updatedBy: string): Promise<void> {
+    // Update each setting individually (upsert pattern)
+    for (const [key, value] of Object.entries(settings)) {
+      await db
+        .insert(systemSettings)
+        .values({
+          key,
+          value,
+          updatedBy,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: systemSettings.key,
+          set: {
+            value,
+            updatedBy,
+            updatedAt: new Date(),
+          },
+        });
+    }
+  }
+
+  // Disputes operations
+  /**
+   * Retrieves disputes with optional filtering
+   * @param filters - Optional filters for status, type, and priority
+   * @returns Promise resolving to array of disputes
+   */
+  async getDisputes(filters?: {
+    status?: string;
+    type?: string;
+    priority?: string;
+  }): Promise<Dispute[]> {
+    let query = db.select().from(disputes);
+    const conditions = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(disputes.status, filters.status as "open" | "in_progress" | "resolved" | "closed"));
+    }
+    if (filters?.type) {
+      conditions.push(eq(disputes.type, filters.type as "payment" | "verification" | "property" | "other"));
+    }
+    if (filters?.priority) {
+      conditions.push(eq(disputes.priority, filters.priority as "low" | "medium" | "high" | "urgent"));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(disputes.createdAt));
+  }
+
+  /**
+   * Creates a new dispute record
+   * @param dispute - Dispute data to insert
+   * @returns Promise resolving to the created dispute
+   */
+  async createDispute(dispute: InsertDispute): Promise<Dispute> {
+    const [created] = await db
+      .insert(disputes)
+      .values(dispute)
+      .returning();
+    return created;
+  }
+
+  /**
+   * Updates an existing dispute
+   * @param id - Dispute ID to update
+   * @param updates - Partial dispute data to update
+   * @returns Promise resolving to the updated dispute
+   */
+  async updateDispute(id: number, updates: Partial<Dispute>): Promise<Dispute> {
+    const [updated] = await db
+      .update(disputes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(disputes.id, id))
+      .returning();
+    return updated;
   }
 }
 

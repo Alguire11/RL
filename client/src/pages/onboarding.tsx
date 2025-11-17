@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { OpenBankingSimulator } from "@/components/open-banking-simulator";
 import { Footer } from "@/components/footer";
+import { SubscriptionGuard } from "@/components/subscription-guard";
 
 const rentDetailsSchema = z.object({
   monthlyRent: z.string().min(1, "Monthly rent is required"),
@@ -299,16 +300,18 @@ export default function OnboardingPage() {
 
         {currentStep === 2 && (
           <div className="max-w-4xl mx-auto">
-            <OpenBankingSimulator 
-              mode="onboarding"
-              onConnectionSuccess={() => {
-                toast({
-                  title: "Bank Connected Successfully",
-                  description: "Your bank account has been connected. Let's set up your rent details.",
-                });
-                setCurrentStep(3);
-              }}
-            />
+            <SubscriptionGuard feature="openBankingIntegration">
+              <OpenBankingSimulator 
+                mode="onboarding"
+                onConnectionSuccess={() => {
+                  toast({
+                    title: "Bank Connected Successfully",
+                    description: "Your bank account has been connected. Let's set up your rent details.",
+                  });
+                  setCurrentStep(3);
+                }}
+              />
+            </SubscriptionGuard>
             <div className="flex justify-between pt-6">
               <Button 
                 type="button" 

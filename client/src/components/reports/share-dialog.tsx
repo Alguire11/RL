@@ -10,7 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Share2, Copy, Mail, Building, CreditCard, Link2 } from "lucide-react";
+import { Share2, Copy, Mail, Building, CreditCard, Link2, MessageSquare } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
+import { SubscriptionGuard } from "@/components/subscription-guard";
+import { WhatsAppShare } from "@/components/whatsapp-share";
 
 interface ShareDialogProps {
   report: any;
@@ -19,6 +22,7 @@ interface ShareDialogProps {
 
 export function ShareDialog({ report, onClose }: ShareDialogProps) {
   const { toast } = useToast();
+  const { hasFeature } = useSubscription();
   const [recipientEmail, setRecipientEmail] = useState("");
   const [recipientType, setRecipientType] = useState<"landlord" | "lender" | "agency">("landlord");
   const [shareUrl, setShareUrl] = useState("");
@@ -171,6 +175,26 @@ export function ShareDialog({ report, onClose }: ShareDialogProps) {
                   Cancel
                 </Button>
               </div>
+
+              {/* WhatsApp Share Option (Standard+ only) - shown after sharing */}
+              {shareUrl && (
+                <div className="border-t pt-4">
+                  <SubscriptionGuard feature="whatsappSharing">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Or share via WhatsApp</Label>
+                      <WhatsAppShare 
+                        reportUrl={shareUrl}
+                        reportTitle={`Rent Credit Report - ${new Date().toLocaleDateString()}`}
+                      >
+                        <Button variant="outline" className="w-full justify-start">
+                          <MessageSquare className="w-4 h-4 mr-2 text-green-600" />
+                          Share via WhatsApp
+                        </Button>
+                      </WhatsAppShare>
+                    </div>
+                  </SubscriptionGuard>
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -222,6 +246,24 @@ export function ShareDialog({ report, onClose }: ShareDialogProps) {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* WhatsApp Share Option (Standard+ only) */}
+              <div className="border-t pt-4">
+                <SubscriptionGuard feature="whatsappSharing">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Or share via WhatsApp</Label>
+                    <WhatsAppShare 
+                      reportUrl={shareUrl}
+                      reportTitle={`Rent Credit Report - ${new Date().toLocaleDateString()}`}
+                    >
+                      <Button variant="outline" className="w-full justify-start">
+                        <MessageSquare className="w-4 h-4 mr-2 text-green-600" />
+                        Share via WhatsApp
+                      </Button>
+                    </WhatsAppShare>
+                  </div>
+                </SubscriptionGuard>
               </div>
 
               {/* Close Button */}

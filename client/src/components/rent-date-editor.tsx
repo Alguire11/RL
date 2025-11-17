@@ -92,30 +92,48 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
       };
 
       if (propertyId) {
-        return apiRequest("PUT", `/api/properties/${propertyId}`, {
-          rentInfo: rentData
+        const response = await apiRequest("PUT", `/api/properties/${propertyId}`, {
+          rentInfo: rentData,
+          monthlyRent: data.amount
         });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw error;
+        }
+        
+        return response.json();
       } else {
         return apiRequest("PUT", "/api/user/rent-info", rentData);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const remainingUpdates = data?._meta?.remainingRentUpdates;
+      
       toast({
         title: "Rent details updated",
-        description: "Your rent payment details have been successfully updated.",
+        description: remainingUpdates !== undefined 
+          ? `Your rent payment details have been updated. You have ${remainingUpdates} rent update${remainingUpdates !== 1 ? 's' : ''} remaining this month.`
+          : "Your rent payment details have been successfully updated.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       setIsOpen(false);
       if (onRentUpdate) {
         onRentUpdate(form.getValues());
       }
     },
     onError: (error: any) => {
+      const errorMessage = error.message || "Failed to update rent details. Please try again.";
+      const isLimitReached = error.remainingUpdates === 0;
+      
       toast({
-        title: "Error updating rent details",
-        description: error.message || "Failed to update rent details. Please try again.",
+        title: isLimitReached ? "Rent Update Limit Reached" : "Error updating rent details",
+        description: isLimitReached 
+          ? `${errorMessage} The limit will reset next month.`
+          : errorMessage,
         variant: "destructive",
       });
     },

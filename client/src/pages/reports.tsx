@@ -153,11 +153,30 @@ export default function Reports() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Report Preview */}
           <div className="lg:col-span-2">
-            {selectedReport ? (
-              <ReportPreview 
-                report={selectedReport} 
+            {selectedReport && selectedReport.reportData ? (
+              <ReportPreview
+                report={selectedReport}
                 onShare={() => setShowShareDialog(true)}
               />
+            ) : selectedReport && !selectedReport.reportData ? (
+              <Card>
+                <CardContent className="p-8">
+                  <div className="text-center py-12">
+                    <FileText className="w-16 h-16 text-yellow-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">Report Data Unavailable</h3>
+                    <p className="text-gray-600 mb-6">This report does not have complete data. Try generating a new one.</p>
+                    {properties.length > 0 && (
+                      <Button
+                        onClick={() => handleGenerateReport(properties[0].id)}
+                        disabled={generateReportMutation.isPending}
+                        className="gradient-primary text-white"
+                      >
+                        {generateReportMutation.isPending ? 'Generating...' : 'Generate New Report'}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardContent className="p-8">

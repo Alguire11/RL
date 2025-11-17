@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Users, CreditCard, FileText, Activity, Shield, TrendingUp, Download, AlertTriangle, MessageSquare, Settings2, MapPin, Check, X, Key, Edit, MoreVertical } from "lucide-react";
+import { Users, CreditCard, FileText, Activity, Shield, TrendingUp, Download, AlertTriangle, MessageSquare, Settings2, MapPin, Check, X, Key, Edit, MoreVertical, Building } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,11 +54,6 @@ export default function AdminDashboard() {
   const [announcementText, setAnnouncementText] = useState("");
   const [showAnnouncementDialog, setShowAnnouncementDialog] = useState(false);
   const queryClient = useQueryClient();
-  const [disputes, setDisputes] = useState([
-    { id: 1, user: "John Smith", type: "Payment Dispute", status: "pending", date: "2024-01-20" },
-    { id: 2, user: "Emma Wilson", type: "Verification Issue", status: "resolved", date: "2024-01-19" },
-    { id: 3, user: "Michael Brown", type: "Account Access", status: "pending", date: "2024-01-18" },
-  ]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
@@ -132,6 +127,22 @@ export default function AdminDashboard() {
     refetchInterval: 30000,
   });
 
+  // Fetch disputes
+  const { data: disputes = [] } = useQuery({
+    queryKey: ["/api/admin/disputes"],
+    queryFn: () => adminQuery("/api/admin/disputes"),
+    retry: false,
+    enabled: canLoadAdminData,
+  });
+
+  // Fetch regional activity
+  const { data: regionalData = [] } = useQuery<Array<{ region: string; users: number; activity: number }>>({
+    queryKey: ["/api/admin/regional-activity"],
+    queryFn: () => adminQuery("/api/admin/regional-activity"),
+    retry: false,
+    enabled: canLoadAdminData,
+  });
+
   // Admin action mutations
   const systemCheckMutation = useMutation({
     mutationFn: () =>
@@ -183,18 +194,12 @@ export default function AdminDashboard() {
   });
 
   const handleDisputeAction = (disputeId: number, action: 'approve' | 'reject') => {
-    // Update dispute status in state
-    setDisputes(prev => prev.map(dispute => 
-      dispute.id === disputeId 
-        ? { ...dispute, status: action === 'approve' ? 'resolved' : 'rejected' }
-        : dispute
-    ));
-    
     // In production, this would make an API call to update the dispute
     toast({
       title: action === 'approve' ? "Dispute Approved" : "Dispute Rejected",
       description: `Dispute #${disputeId} has been ${action === 'approve' ? 'resolved' : 'rejected'}.`,
     });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/disputes"] });
   };
 
   const handleEditUser = (user: AdminUser) => {
@@ -383,13 +388,21 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_session');
-    toast({
-      title: "Logged Out",
-      description: "You have been logged out successfully.",
-    });
-    setLocation('/admin-login');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      toast({
+        title: "Logged Out",
+        description: "You have been logged out successfully.",
+      });
+      setLocation('/admin-login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      setLocation('/admin-login');
+    }
   };
 
   return (
@@ -617,18 +630,18 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {disputes.map((dispute) => (
+                {Array.isArray(disputes) && disputes.length > 0 ? disputes.map((dispute: any) => (
                   <div key={dispute.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">
-                        <p className="font-medium text-sm">{dispute.user}</p>
+                        <p className="font-medium text-sm">{dispute.user || dispute.userName || 'Unknown'}</p>
                         <Badge variant={dispute.status === 'pending' ? 'secondary' : 'default'} 
                                className={dispute.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}>
                           {dispute.status}
                         </Badge>
                       </div>
                       <p className="text-xs text-gray-600">{dispute.type}</p>
-                      <p className="text-xs text-gray-500">Opened: {dispute.date}</p>
+                      <p className="text-xs text-gray-500">Opened: {dispute.date || dispute.createdAt}</p>
                     </div>
                     <div className="flex space-x-1">
                       {dispute.status === 'pending' && (
@@ -655,7 +668,9 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-gray-500 text-center py-4">No disputes found</p>
+                )}
                 <Button variant="outline" className="w-full mt-2">
                   <MessageSquare className="h-4 w-4 mr-2" />
                   View All Disputes
@@ -674,13 +689,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { region: "London", users: 245, activity: 95 },
-                  { region: "Manchester", users: 142, activity: 78 },
-                  { region: "Birmingham", users: 98, activity: 65 },
-                  { region: "Edinburgh", users: 76, activity: 54 },
-                  { region: "Bristol", users: 63, activity: 42 },
-                ].map((region) => (
+                {regionalData.map((region) => (
                   <div key={region.region}>
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center space-x-2">
@@ -778,6 +787,24 @@ export default function AdminDashboard() {
               >
                 <Shield className="w-4 h-4 mr-2" />
                 Moderation
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setLocation('/admin/properties')}
+              >
+                <Building className="w-4 h-4 mr-2" />
+                Properties
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => setLocation('/admin/audit-logs')}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Audit Logs
               </Button>
               
               <Dialog open={showAnnouncementDialog} onOpenChange={setShowAnnouncementDialog}>

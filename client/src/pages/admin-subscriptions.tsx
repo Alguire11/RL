@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CreditCard, ArrowLeft, TrendingUp, Users, DollarSign, Calendar, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { getQueryFn } from "@/lib/queryClient";
 
 interface SubscriptionData {
   id: string;
@@ -43,66 +45,46 @@ interface SubscriptionStats {
 export default function AdminSubscriptions() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [adminSession, setAdminSession] = useState<any>(null);
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    try {
-      const session = localStorage.getItem('admin_session');
-      if (session) {
-        const parsedSession = JSON.parse(session);
-        if (parsedSession.role === 'admin') {
-          setAdminSession(parsedSession);
-        } else {
-          setLocation('/admin-login');
-          return;
-        }
-      } else {
-        setLocation('/admin-login');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking admin session:', error);
+    if (authLoading) return;
+    if (!isAuthenticated || user?.role !== 'admin') {
       setLocation('/admin-login');
     }
-  }, [setLocation]);
-
-  const adminQuery = (url: string) => {
-    return fetch(url, {
-      headers: { 'x-admin-session': JSON.stringify(adminSession) },
-    }).then(res => {
-      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
-      return res.json();
-    });
-  };
+  }, [authLoading, isAuthenticated, user, setLocation]);
 
   const { data: stats, isLoading: statsLoading } = useQuery<SubscriptionStats>({
     queryKey: ["/api/admin/subscription-stats"],
-    queryFn: () => adminQuery("/api/admin/subscription-stats"),
+    queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
-    enabled: !!adminSession,
+    enabled: isAuthenticated && user?.role === 'admin',
   });
 
   const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery<SubscriptionData[]>({
     queryKey: ["/api/admin/subscriptions"],
-    queryFn: () => adminQuery("/api/admin/subscriptions"),
+    queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
-    enabled: !!adminSession,
+    enabled: isAuthenticated && user?.role === 'admin',
   });
 
   const updateSubscriptionMutation = useMutation({
     mutationFn: (data: { subscriptionId: string; updates: any }) => 
-      fetch('/api/admin/update-subscription', {
-        method: 'POST',
+      fetch(`/api/admin/subscriptions/${data.subscriptionId}`, {
+        method: 'PATCH',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
-      }).then(res => res.json()),
+        body: JSON.stringify(data.updates),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to update subscription');
+        return res.json();
+      }),
     onSuccess: () => {
       toast({
         title: "Subscription Updated",
@@ -172,7 +154,7 @@ export default function AdminSubscriptions() {
     }
   };
 
-  if (!adminSession) {
+  if (authLoading) {
     return <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30"><Navigation /></div>;
   }
 
@@ -392,11 +374,12 @@ export default function AdminSubscriptions() {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              toast({
-                                title: "Feature Coming Soon",
-                                description: "Subscription editing will be available soon",
+                              updateSubscriptionMutation.mutate({
+                                subscriptionId: subscription.id,
+                                updates: { /* subscription updates */ }
                               });
                             }}
+                            disabled={updateSubscriptionMutation.isPending}
                           >
                             Edit
                           </Button>

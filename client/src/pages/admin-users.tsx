@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Users, Search, UserCheck, UserX, Crown, ArrowLeft, Mail, Phone, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { getQueryFn } from "@/lib/queryClient";
 
 interface AdminUser {
   id: string;
@@ -31,7 +33,7 @@ interface AdminUser {
 export default function AdminUsers() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [adminSession, setAdminSession] = useState<any>(null);
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
@@ -40,52 +42,46 @@ export default function AdminUsers() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    try {
-      const session = localStorage.getItem('admin_session');
-      if (session) {
-        const parsedSession = JSON.parse(session);
-        if (parsedSession.role === 'admin') {
-          setAdminSession(parsedSession);
-        } else {
-          setLocation('/admin-login');
-          return;
-        }
-      } else {
-        setLocation('/admin-login');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking admin session:', error);
+    if (authLoading) return;
+    if (!isAuthenticated || user?.role !== 'admin') {
       setLocation('/admin-login');
     }
-  }, [setLocation]);
+  }, [authLoading, isAuthenticated, user, setLocation]);
 
   const adminQuery = (url: string) => {
     return fetch(url, {
-      headers: { 'x-admin-session': JSON.stringify(adminSession) },
+      credentials: 'include', // Use session cookies
     }).then(res => {
-      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
+      if (!res.ok) {
+        if (res.status === 401) {
+          setLocation('/admin-login');
+        }
+        throw new Error(`${res.status}: ${res.statusText}`);
+      }
       return res.json();
     });
   };
 
   const { data: users = [], isLoading, refetch } = useQuery<AdminUser[]>({
     queryKey: ["/api/admin/users"],
-    queryFn: () => adminQuery("/api/admin/users"),
+    queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
-    enabled: !!adminSession,
+    enabled: isAuthenticated && user?.role === 'admin',
   });
 
   const updateUserMutation = useMutation({
     mutationFn: (userData: { userId: string; updates: any }) => 
-      fetch('/api/admin/update-user', {
-        method: 'POST',
+      fetch(`/api/admin/users/${userData.userId}`, {
+        method: 'PATCH',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(userData),
-      }).then(res => res.json()),
+        body: JSON.stringify(userData.updates),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to update user');
+        return res.json();
+      }),
     onSuccess: () => {
       toast({
         title: "User Updated",
@@ -106,14 +102,16 @@ export default function AdminUsers() {
 
   const suspendUserMutation = useMutation({
     mutationFn: (userId: string) => 
-      fetch('/api/admin/suspend-user', {
+      fetch(`/api/admin/users/${userId}/suspend`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId }),
-      }).then(res => res.json()),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to suspend user');
+        return res.json();
+      }),
     onSuccess: () => {
       toast({
         title: "User Suspended",
@@ -176,7 +174,7 @@ export default function AdminUsers() {
     }
   };
 
-  if (!adminSession) {
+  if (authLoading) {
     return <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30"><Navigation /></div>;
   }
 
@@ -329,7 +327,11 @@ export default function AdminUsers() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => suspendUserMutation.mutate(user.id)}
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to suspend ${user.email}?`)) {
+                                  suspendUserMutation.mutate(user.id);
+                                }
+                              }}
                               disabled={suspendUserMutation.isPending}
                             >
                               <UserX className="w-3 h-3" />
@@ -382,7 +384,7 @@ export default function AdminUsers() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="plan">Subscription Plan</Label>
-                    <Select defaultValue={selectedUser.subscriptionPlan}>
+                    <Select defaultValue={selectedUser.subscriptionPlan} data-plan-select>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -395,7 +397,7 @@ export default function AdminUsers() {
                   </div>
                   <div>
                     <Label htmlFor="role">Role</Label>
-                    <Select defaultValue={selectedUser.role}>
+                    <Select defaultValue={selectedUser.role} data-role-select>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -413,10 +415,17 @@ export default function AdminUsers() {
                   </Button>
                   <Button
                     onClick={() => {
-                      // Implementation would collect form data and call updateUserMutation
-                      toast({
-                        title: "Feature Coming Soon",
-                        description: "User editing functionality will be available soon",
+                      const formData = {
+                        firstName: (document.getElementById('firstName') as HTMLInputElement)?.value || selectedUser.firstName,
+                        lastName: (document.getElementById('lastName') as HTMLInputElement)?.value || selectedUser.lastName,
+                        email: (document.getElementById('email') as HTMLInputElement)?.value || selectedUser.email,
+                        subscriptionPlan: (document.querySelector('[data-plan-select]') as HTMLSelectElement)?.value || selectedUser.subscriptionPlan,
+                        role: (document.querySelector('[data-role-select]') as HTMLSelectElement)?.value || selectedUser.role,
+                      };
+                      
+                      updateUserMutation.mutate({
+                        userId: selectedUser.id,
+                        updates: formData,
                       });
                     }}
                   >

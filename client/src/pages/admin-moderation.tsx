@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Shield, ArrowLeft, AlertTriangle, CheckCircle, XCircle, Flag, User, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { getQueryFn } from "@/lib/queryClient";
 
 interface ModerationItem {
   id: string;
@@ -33,7 +35,7 @@ interface ModerationItem {
 export default function AdminModeration() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [adminSession, setAdminSession] = useState<any>(null);
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -43,52 +45,32 @@ export default function AdminModeration() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    try {
-      const session = localStorage.getItem('admin_session');
-      if (session) {
-        const parsedSession = JSON.parse(session);
-        if (parsedSession.role === 'admin') {
-          setAdminSession(parsedSession);
-        } else {
-          setLocation('/admin-login');
-          return;
-        }
-      } else {
-        setLocation('/admin-login');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking admin session:', error);
+    if (authLoading) return;
+    if (!isAuthenticated || user?.role !== 'admin') {
       setLocation('/admin-login');
     }
-  }, [setLocation]);
-
-  const adminQuery = (url: string) => {
-    return fetch(url, {
-      headers: { 'x-admin-session': JSON.stringify(adminSession) },
-    }).then(res => {
-      if (!res.ok) throw new Error(`${res.status}: ${res.statusText}`);
-      return res.json();
-    });
-  };
+  }, [authLoading, isAuthenticated, user, setLocation]);
 
   const { data: moderationItems = [], isLoading, refetch } = useQuery<ModerationItem[]>({
     queryKey: ["/api/admin/moderation"],
-    queryFn: () => adminQuery("/api/admin/moderation"),
+    queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
-    enabled: !!adminSession,
+    enabled: isAuthenticated && user?.role === 'admin',
   });
 
   const resolveModerationMutation = useMutation({
     mutationFn: (data: { itemId: string; resolution: string; action: 'resolve' | 'dismiss' }) => 
       fetch('/api/admin/resolve-moderation', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
-      }).then(res => res.json()),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to resolve moderation item');
+        return res.json();
+      }),
     onSuccess: () => {
       toast({
         title: "Item Resolved",
@@ -112,12 +94,15 @@ export default function AdminModeration() {
     mutationFn: (itemId: string) => 
       fetch('/api/admin/escalate-moderation', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'x-admin-session': JSON.stringify(adminSession),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ itemId }),
-      }).then(res => res.json()),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to escalate moderation item');
+        return res.json();
+      }),
     onSuccess: () => {
       toast({
         title: "Item Escalated",
@@ -204,7 +189,7 @@ export default function AdminModeration() {
     });
   };
 
-  if (!adminSession) {
+  if (authLoading) {
     return <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30"><Navigation /></div>;
   }
 

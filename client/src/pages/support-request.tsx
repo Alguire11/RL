@@ -10,10 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 import { MessageSquare, Send } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export default function SupportRequest() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { hasFeature } = useSubscription();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -124,8 +126,20 @@ export default function SupportRequest() {
                   <SelectContent>
                     <SelectItem value="low">Low - General inquiry</SelectItem>
                     <SelectItem value="normal">Normal - Standard support</SelectItem>
-                    <SelectItem value="high">High - Important issue</SelectItem>
-                    <SelectItem value="urgent">Urgent - Critical problem</SelectItem>
+                    <SelectItem 
+                      value="high" 
+                      disabled={!hasFeature('prioritySupport')}
+                      className={!hasFeature('prioritySupport') ? 'opacity-50' : ''}
+                    >
+                      High - Important issue {!hasFeature('prioritySupport') && '(Premium only)'}
+                    </SelectItem>
+                    <SelectItem 
+                      value="urgent" 
+                      disabled={!hasFeature('prioritySupport')}
+                      className={!hasFeature('prioritySupport') ? 'opacity-50' : ''}
+                    >
+                      Urgent - Critical problem {!hasFeature('prioritySupport') && '(Premium only)'}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -14,6 +14,7 @@ export interface SubscriptionPlan {
     openBankingIntegration?: boolean;
     customReminders?: boolean;
     landlordVerification?: boolean;
+    enhancedExports?: boolean;
   };
 }
 
@@ -49,6 +50,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
       openBankingIntegration: false,
       customReminders: false,
       landlordVerification: false,
+      enhancedExports: false,
     }
   },
   standard: {
@@ -74,6 +76,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
       openBankingIntegration: false,
       customReminders: true,
       landlordVerification: true,
+      enhancedExports: false,
     }
   },
   premium: {
@@ -100,6 +103,7 @@ export const SUBSCRIPTION_PLANS: Record<string, SubscriptionPlan> = {
       openBankingIntegration: true,
       customReminders: true,
       landlordVerification: true,
+      enhancedExports: true,
     }
   }
 };

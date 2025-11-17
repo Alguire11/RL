@@ -30,6 +30,7 @@ export const sessions = pgTable(
 // User storage table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
+  rlid: varchar("rlid", { length: 20 }).unique(),
   email: varchar("email").unique().notNull(),
   username: varchar("username").unique(),
   password: varchar("password").notNull(),
@@ -63,7 +64,11 @@ export const properties = pgTable("properties", {
   landlordPhone: varchar("landlord_phone"),
   tenancyStartDate: date("tenancy_start_date"),
   tenancyEndDate: date("tenancy_end_date"),
+  leaseType: varchar("lease_type"), // fixed_term, periodic, month_to_month
+  contractDuration: integer("contract_duration"), // Duration in months
   isActive: boolean("is_active").default(true),
+  rentUpdateCount: integer("rent_update_count").default(0),
+  lastRentUpdateMonth: varchar("last_rent_update_month"), // Format: YYYY-MM
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -388,6 +393,7 @@ export const manualPayments = pgTable("manual_payments", {
   propertyId: integer("property_id").references(() => properties.id).notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   paymentDate: date("payment_date").notNull(),
+  paymentMethod: varchar("payment_method"), // bank_transfer, cash, cheque, etc.
   description: varchar("description"),
   receiptUrl: varchar("receipt_url"), // For uploaded receipt images
   needsVerification: boolean("needs_verification").default(true),
@@ -436,3 +442,55 @@ export type UserBadge = typeof userBadges.$inferSelect;
 export type InsertUserBadge = typeof userBadges.$inferInsert;
 export type CertificationPortfolio = typeof certificationPortfolios.$inferSelect;
 export type InsertCertificationPortfolio = typeof certificationPortfolios.$inferInsert;
+
+// Moderation items table
+export const moderationItems = pgTable("moderation_items", {
+  id: serial("id").primaryKey(),
+  type: varchar("type", { enum: ["user_report", "content_violation", "payment_dispute", "spam"] }).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  reporterId: varchar("reporter_id").references(() => users.id),
+  subject: varchar("subject").notNull(),
+  description: text("description").notNull(),
+  status: varchar("status", { enum: ["pending", "reviewing", "resolved", "dismissed"] }).default("pending"),
+  priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium"),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  resolution: text("resolution"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ModerationItem = typeof moderationItems.$inferSelect;
+export type InsertModerationItem = typeof moderationItems.$inferInsert;
+
+// System settings table for persisting admin configuration
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  key: varchar("key").unique().notNull(), // Setting key (e.g., 'maintenanceMode', 'allowNewRegistrations')
+  value: jsonb("value").notNull(), // Setting value (can be any JSON type)
+  updatedBy: varchar("updated_by").references(() => users.id), // Admin who last updated this setting
+  updatedAt: timestamp("updated_at").defaultNow(),
+  description: text("description"), // Optional description of what this setting does
+});
+
+// Disputes table for tracking payment and verification disputes
+export const disputes = pgTable("disputes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(), // User who created the dispute
+  propertyId: integer("property_id").references(() => properties.id), // Related property (if applicable)
+  paymentId: integer("payment_id").references(() => rentPayments.id), // Related payment (if applicable)
+  type: varchar("type", { enum: ["payment", "verification", "property", "other"] }).notNull(), // Dispute type
+  subject: varchar("subject").notNull(), // Short subject line
+  description: text("description").notNull(), // Detailed description
+  status: varchar("status", { enum: ["open", "in_progress", "resolved", "closed"] }).default("open"), // Current status
+  priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium"), // Priority level
+  assignedTo: varchar("assigned_to").references(() => users.id), // Admin assigned to handle this dispute
+  resolution: text("resolution"), // Resolution notes when closed
+  createdAt: timestamp("created_at").defaultNow(), // When dispute was created
+  updatedAt: timestamp("updated_at").defaultNow(), // Last update timestamp
+  resolvedAt: timestamp("resolved_at"), // When dispute was resolved
+});
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = typeof systemSettings.$inferInsert;
+export type Dispute = typeof disputes.$inferSelect;
+export type InsertDispute = typeof disputes.$inferInsert;

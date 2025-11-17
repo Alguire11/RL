@@ -36,6 +36,7 @@ const manualPaymentSchema = z.object({
   propertyId: z.string().min(1, "Property is required"),
   amount: z.string().min(1, "Amount is required").refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Amount must be a positive number"),
   paymentDate: z.string().min(1, "Payment date is required"),
+  paymentMethod: z.string().min(1, "Payment method is required"),
   description: z.string().optional(),
   receiptUrl: z.string().optional(),
 });
@@ -51,12 +52,16 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const form = useForm<ManualPaymentFormData>({
     resolver: zodResolver(manualPaymentSchema),
     defaultValues: {
       propertyId: "",
       amount: "",
       paymentDate: "",
+      paymentMethod: "",
       description: "",
       receiptUrl: "",
     },
@@ -67,18 +72,45 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
     retry: false,
   });
 
+  const handleFileUpload = async (file: File): Promise<string> => {
+    // For now, create a data URL. In production, this should upload to cloud storage
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const manualPaymentMutation = useMutation({
     mutationFn: async (data: ManualPaymentFormData) => {
+      let receiptUrl = data.receiptUrl;
+      
+      // Upload file if exists
+      if (uploadedFile) {
+        setIsUploading(true);
+        try {
+          receiptUrl = await handleFileUpload(uploadedFile);
+        } catch (error) {
+          throw new Error("Failed to upload receipt");
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
       const response = await apiRequest("POST", "/api/manual-payments", {
         ...data,
         amount: parseFloat(data.amount),
         paymentDate: new Date(data.paymentDate).toISOString(),
+        receiptUrl,
       });
       if (!response.ok) throw new Error("Failed to log payment");
       return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/manual-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/achievements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/stats"] });
       
@@ -123,7 +155,7 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
           Log Manual Payment
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Log Manual Payment</DialogTitle>
           <DialogDescription>
@@ -204,6 +236,35 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
 
             <FormField
               control={form.control}
+              name="paymentMethod"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Method</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="standing_order">Standing Order</SelectItem>
+                      <SelectItem value="direct_debit">Direct Debit</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    How did you make this payment?
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
@@ -211,7 +272,7 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
                   <FormControl>
                     <Textarea
                       {...field}
-                      placeholder="e.g., Bank transfer, cash payment, etc."
+                      placeholder="e.g., Monthly rent for January, includes utilities, etc."
                       rows={2}
                     />
                   </FormControl>
@@ -220,25 +281,33 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="receiptUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Receipt/Proof (Optional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Upload receipt or proof of payment"
-                    />
-                  </FormControl>
-                  <FormDescription className="text-xs">
-                    Upload a receipt or screenshot for verification
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormItem>
+              <FormLabel>Receipt/Proof (Optional)</FormLabel>
+              <FormControl>
+                <div className="space-y-2">
+                  <Input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setUploadedFile(file);
+                      }
+                    }}
+                    className="cursor-pointer"
+                  />
+                  {uploadedFile && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <Upload className="h-4 w-4" />
+                      <span>{uploadedFile.name}</span>
+                    </div>
+                  )}
+                </div>
+              </FormControl>
+              <FormDescription className="text-xs">
+                Upload a receipt, screenshot, or proof of payment (images or PDF)
+              </FormDescription>
+            </FormItem>
 
             <div className="flex gap-2 pt-4">
               <Button

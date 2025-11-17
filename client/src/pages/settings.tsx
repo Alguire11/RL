@@ -20,6 +20,7 @@ import { UserPreferences } from "@/components/settings/preferences";
 import { DataExport } from "@/components/settings/data-export";
 import { SecurityLogs } from "@/components/settings/security-logs";
 import { Footer } from "@/components/footer";
+import { SubscriptionGuard } from "@/components/subscription-guard";
 import type {
   ApiProperty,
   BankConnection,
@@ -198,7 +199,7 @@ export default function Settings() {
   };
 
   const handleConnectBank = () => {
-    // Mock Open Banking connection
+    // Open Banking is Premium only - this should be gated by SubscriptionGuard
     toast({
       title: "Connect Bank",
       description: "Open Banking connection would be initiated here",
@@ -351,17 +352,21 @@ export default function Settings() {
                   <div className="text-center py-8">
                     <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <p className="text-gray-600 mb-4">No bank connections yet</p>
-                    <Button onClick={handleConnectBank} className="bg-blue-600 hover:bg-blue-700 text-white">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Connect Bank Account
-                    </Button>
+                    <SubscriptionGuard feature="openBankingIntegration">
+                      <Button onClick={handleConnectBank} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Connect Bank Account
+                      </Button>
+                    </SubscriptionGuard>
                   </div>
                 )}
                 {bankConnections.length > 0 && (
-                  <Button onClick={handleConnectBank} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Another Bank
-                  </Button>
+                  <SubscriptionGuard feature="openBankingIntegration">
+                    <Button onClick={handleConnectBank} className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Another Bank
+                    </Button>
+                  </SubscriptionGuard>
                 )}
               </div>
             </CardContent>

@@ -12,6 +12,7 @@ export function computeDashboardStats(
   });
 
   const paidPayments = sorted.filter((p) => p.status === "paid");
+  const awaitingVerification = sorted.filter((p) => p.paidDate && !p.isVerified);
   const onTimePayments = paidPayments.filter((p) => {
     if (!p.paidDate) return false;
     return new Date(p.paidDate).getTime() <= new Date(p.dueDate).getTime();
@@ -19,6 +20,7 @@ export function computeDashboardStats(
 
   // Running totals for quick calculations.
   const totalPaid = paidPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+  const totalAwaiting = awaitingVerification.reduce((sum, p) => sum + Number(p.amount), 0);
   const onTimePercentage = paidPayments.length
     ? (onTimePayments.length / paidPayments.length) * 100
     : 0;
@@ -98,6 +100,8 @@ export function computeDashboardStats(
   return {
     paymentStreak,
     totalPaid,
+    totalAwaiting,
+    awaitingVerificationCount: awaitingVerification.length,
     onTimePercentage,
     nextPaymentDue,
     creditScore,

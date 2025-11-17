@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,12 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield, Lock, Info, Sparkles, ArrowRight } from "lucide-react";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export default function LandlordDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [adminSession, setAdminSession] = useState<any>(null);
-  const [subscriptionPlan, setSubscriptionPlan] = useState<'free' | 'standard' | 'premium'>('free');
   const [propertyCount, setPropertyCount] = useState(0);
   
   // Refs for scroll navigation
@@ -73,27 +74,41 @@ export default function LandlordDashboard() {
     notes: ''
   });
 
-  useEffect(() => {
-    const session = localStorage.getItem('admin_session');
-    if (session) {
-      const parsed = JSON.parse(session);
-      if (parsed.role === 'landlord') {
-        setAdminSession(parsed);
-      } else {
-        setLocation('/admin-login');
-      }
-    } else {
-      setLocation('/admin-login');
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { plan, hasFeature, isFreePlan, isStandardPlan, isPremiumPlan } = useSubscription();
+  const planDisplayName = plan?.name ?? "Free";
+  const maxPropertiesLimit = useMemo(() => {
+    const limit = plan?.limits?.maxProperties;
+    if (typeof limit === "number" || limit === Infinity) {
+      return limit;
     }
-  }, [setLocation]);
+    return Infinity;
+  }, [plan]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('admin_session');
-    toast({
-      title: "Logged Out",
-      description: "You have been logged out successfully.",
-    });
-    setLocation('/admin-login');
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated || user?.role !== 'landlord') {
+      setLocation('/landlord-login');
+    } else {
+      setAdminSession({ username: user.username || user.email || 'landlord', role: user.role });
+    }
+  }, [authLoading, isAuthenticated, user, setLocation]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      toast({
+        title: "Logged Out",
+        description: "You have been logged out successfully.",
+      });
+      setLocation('/landlord-login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      setLocation('/landlord-login');
+    }
   };
 
   // Property mutations
@@ -177,13 +192,13 @@ export default function LandlordDashboard() {
 
   // Quick Action handlers
   const handleAddProperty = () => {
-    // Check subscription limits
-    const maxProperties = subscriptionPlan === 'free' ? 1 : subscriptionPlan === 'standard' ? 3 : Infinity;
+    // Check subscription limits based on active subscription plan
+    const maxProperties = maxPropertiesLimit;
     
     if (propertyCount >= maxProperties) {
       toast({
         title: "Property Limit Reached",
-        description: `Your ${subscriptionPlan} plan allows ${maxProperties} ${maxProperties === 1 ? 'property' : 'properties'}. Upgrade to add more.`,
+        description: `Your ${planDisplayName} plan allows ${maxProperties === Infinity ? 'unlimited' : maxProperties} ${maxProperties === 1 ? 'property' : 'properties'}. Upgrade to add more.`,
         variant: "destructive",
       });
       return;
@@ -474,17 +489,9 @@ export default function LandlordDashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              {/* Demo: Subscription Plan Switcher */}
-              <Select value={subscriptionPlan} onValueChange={(value: 'free' | 'standard' | 'premium') => setSubscriptionPlan(value)}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">Free Plan</SelectItem>
-                  <SelectItem value="standard">Standard Plan</SelectItem>
-                  <SelectItem value="premium">Premium Plan</SelectItem>
-                </SelectContent>
-              </Select>
+              <Badge variant="outline" className="bg-white text-blue-700 border-blue-200 font-semibold">
+                {plan?.name ?? "Free"} Plan
+              </Badge>
               <Button 
                 variant="outline" 
                 onClick={handleLogout}
@@ -530,7 +537,7 @@ export default function LandlordDashboard() {
         )}
 
         {/* Subscription Status & Upgrade Prompt */}
-        {subscriptionPlan === 'free' && (
+        {isFreePlan && (
           <Alert className="mb-6 border-yellow-200 bg-yellow-50">
             <Sparkles className="h-5 w-5 text-yellow-600" />
             <AlertTitle className="text-lg font-semibold flex items-center justify-between">
@@ -576,9 +583,7 @@ export default function LandlordDashboard() {
               </div>
               <div className="flex items-center space-x-2">
                 <Badge variant="outline" className="text-sm">
-                  {subscriptionPlan === 'free' && 'Free Plan'}
-                  {subscriptionPlan === 'standard' && 'Standard Plan'}
-                  {subscriptionPlan === 'premium' && 'Premium Plan'}
+                  {plan?.name ?? 'Free'} Plan
                 </Badge>
               </div>
             </div>
@@ -593,7 +598,7 @@ export default function LandlordDashboard() {
                 <CardTitle className="flex items-center text-xl">
                   <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
                   Performance Analytics
-                  {subscriptionPlan === 'free' && (
+                  {!hasFeature('advancedAnalytics') && (
                     <Badge variant="outline" className="ml-3 text-xs">
                       <Lock className="h-3 w-3 mr-1" />
                       Limited in Free Plan
@@ -632,7 +637,7 @@ export default function LandlordDashboard() {
               </Card>
             </div>
             
-            {subscriptionPlan === 'free' ? (
+            {!hasFeature('advancedAnalytics') ? (
               <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
                 <Lock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                 <h3 className="text-lg font-semibold mb-2">Unlock Advanced Analytics</h3>
@@ -853,9 +858,9 @@ export default function LandlordDashboard() {
                       <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200 relative">
                         <Building className="h-6 w-6 mb-2" />
                         <span className="text-sm">Add Property</span>
-                        {subscriptionPlan !== 'premium' && (
+                        {maxPropertiesLimit !== Infinity && (
                           <Badge variant="outline" className="absolute -top-2 -right-2 text-[10px] px-1">
-                            {subscriptionPlan === 'free' ? '1 max' : '3 max'}
+                            {maxPropertiesLimit} max
                           </Badge>
                         )}
                       </Button>
@@ -865,14 +870,19 @@ export default function LandlordDashboard() {
                         <DialogTitle>Add New Property</DialogTitle>
                         <DialogDescription>
                           Add a new property to your portfolio
-                          {subscriptionPlan === 'free' && (
+                          {isFreePlan && (
                             <Badge variant="outline" className="ml-2 text-xs">
                               Free: 1 property max
                             </Badge>
                           )}
-                          {subscriptionPlan === 'standard' && (
+                          {isStandardPlan && (
                             <Badge variant="outline" className="ml-2 text-xs">
                               Standard: 3 properties max
+                            </Badge>
+                          )}
+                          {isPremiumPlan && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              Premium: Unlimited properties
                             </Badge>
                           )}
                         </DialogDescription>

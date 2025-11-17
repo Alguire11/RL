@@ -13,7 +13,7 @@ export default function LandlordLogin() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -26,13 +26,16 @@ export default function LandlordLogin() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/admin-login', {
+      const response = await fetch('/api/landlord/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password
+        }),
       });
 
       if (!response.ok) {
@@ -89,15 +92,15 @@ export default function LandlordLogin() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="email">Email Address</Label>
                 <Input
-                  id="username"
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
-                  placeholder="Enter username"
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder="Enter your email"
                   required
-                  data-testid="input-landlord-username"
+                  data-testid="input-landlord-email"
                 />
               </div>
 

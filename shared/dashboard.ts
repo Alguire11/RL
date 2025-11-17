@@ -4,6 +4,8 @@ export type VerificationStatus = "verified" | "partially_verified" | "unverified
 export interface DashboardStats {
   paymentStreak: number;
   totalPaid: number;
+  totalAwaiting: number;
+  awaitingVerificationCount: number;
   onTimePercentage: number;
   nextPaymentDue: string | null;
   creditScore: number;

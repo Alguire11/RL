@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Navigation } from "@/components/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { FileText, Download, Calendar, Award, DollarSign, CheckCircle, ArrowLeft } from "lucide-react";
+import { FileText, Download, Calendar, Award, DollarSign, CheckCircle, ArrowLeft, AlertCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useLocation } from "wouter";
+import { useSubscription } from "@/hooks/useSubscription";
+import { SubscriptionGuard } from "@/components/subscription-guard";
 
 interface GeneratedReport {
   reportId: string;
@@ -26,9 +28,17 @@ export default function ReportGenerator() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
   const [, setLocation] = useLocation();
+  const { plan, hasFeature } = useSubscription();
   const [reportType, setReportType] = useState("credit");
   const [includePortfolio, setIncludePortfolio] = useState(false);
   const [generatedReport, setGeneratedReport] = useState<GeneratedReport | null>(null);
+
+  // Fetch existing reports to check count limits
+  const { data: existingReports = [] } = useQuery<any[]>({
+    queryKey: ["/api/reports"],
+    retry: false,
+    enabled: isAuthenticated,
+  });
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -45,8 +55,30 @@ export default function ReportGenerator() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
+  // Check report count limits based on subscription plan
+  const canGenerateReport = () => {
+    const maxReports = plan.limits.maxReports ?? 1; // Default to 1 if undefined
+    if (maxReports === Infinity) return true; // Premium: unlimited
+    return existingReports.length < maxReports;
+  };
+
+  const getReportLimitMessage = () => {
+    const maxReports = plan.limits.maxReports ?? 1; // Default to 1 if undefined
+    if (maxReports === Infinity) return null;
+    const remaining = maxReports - existingReports.length;
+    if (remaining <= 0) {
+      return `You've reached your ${plan.name} plan limit of ${maxReports} report${maxReports > 1 ? 's' : ''}. Upgrade to generate more reports.`;
+    }
+    return `You can generate ${remaining} more report${remaining > 1 ? 's' : ''} on your ${plan.name} plan (${maxReports} total).`;
+  };
+
   const generateReportMutation = useMutation({
     mutationFn: async () => {
+      // Check report count limit before generating
+      if (!canGenerateReport()) {
+        throw new Error(getReportLimitMessage() || "Report limit reached");
+      }
+
       return apiRequest("POST", "/api/generate-report", {
         reportType,
         includePortfolio,
@@ -220,11 +252,43 @@ export default function ReportGenerator() {
                 </div>
               </div>
 
+              {/* Report Limit Warning */}
+              {!canGenerateReport() && (
+                <div className="border-t pt-6">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-yellow-900 mb-1">Report Limit Reached</h4>
+                        <p className="text-sm text-yellow-800 mb-3">{getReportLimitMessage()}</p>
+                        <Button
+                          onClick={() => setLocation('/subscribe')}
+                          variant="outline"
+                          size="sm"
+                          className="bg-yellow-100 hover:bg-yellow-200 text-yellow-900 border-yellow-300"
+                        >
+                          Upgrade Plan
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Report Limit Info */}
+              {canGenerateReport() && getReportLimitMessage() && (
+                <div className="border-t pt-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">{getReportLimitMessage()}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Generate Button */}
               <div className="border-t pt-6">
                 <Button
                   onClick={() => generateReportMutation.mutate()}
-                  disabled={generateReportMutation.isPending}
+                  disabled={generateReportMutation.isPending || !canGenerateReport()}
                   className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
                   size="lg"
                 >

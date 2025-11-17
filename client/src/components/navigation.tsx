@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown } from "lucide-react";
+import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,7 +33,6 @@ export function Navigation() {
 
   const navItems = [
     { path: "/", label: "Dashboard", icon: BarChart3 },
-    { path: "/reports", label: "Reports", icon: FileText },
     { path: "/settings", label: "Settings", icon: Settings },
     ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: Shield }] : []),
   ];
@@ -90,6 +89,38 @@ export function Navigation() {
                 </Link>
               );
             })}
+            
+            {/* Reports Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    location === '/report-generator' || location === '/reports'
+                      ? "text-primary bg-primary/10"
+                      : "text-gray-600 hover:text-primary hover:bg-primary/5"
+                  }`}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Reports</span>
+                  <ChevronDown className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/report-generator">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    <span>Generate New Report</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/reports">
+                    <History className="mr-2 h-4 w-4" />
+                    <span>My Report History</span>
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* User Menu */}
@@ -192,6 +223,28 @@ export function Navigation() {
                       </Link>
                     );
                   })}
+                  
+                  {/* Reports Section */}
+                  <div className="space-y-1">
+                    <Link href="/report-generator">
+                      <a
+                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary hover:bg-primary/5"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <PlusCircle className="w-5 h-5" />
+                        <span>Generate Report</span>
+                      </a>
+                    </Link>
+                    <Link href="/reports">
+                      <a
+                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary hover:bg-primary/5"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <History className="w-5 h-5" />
+                        <span>Report History</span>
+                      </a>
+                    </Link>
+                  </div>
                   
                   <div className="pt-4 border-t">
                     <Button
