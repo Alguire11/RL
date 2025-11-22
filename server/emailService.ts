@@ -23,7 +23,7 @@ export async function sendEmail(params: EmailParams): Promise<{ success: boolean
     console.warn(`⚠️  ${message}`);
     return { success: false, error: message };
   }
-  
+
   try {
     await mailService.send({
       to: params.to,
@@ -54,7 +54,7 @@ export function createTenantInviteEmail(
   qrCodeDataUrl: string
 ): EmailParams {
   const subject = `You're invited to join RentLedger - ${landlordName}`;
-  
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -115,7 +115,7 @@ export function createTenantInviteEmail(
     </body>
     </html>
   `;
-  
+
   return {
     to: tenantEmail,
     from: 'noreply@rentledger.co.uk',
@@ -131,7 +131,7 @@ export function createLandlordVerificationEmail(
   verificationUrl: string
 ): EmailParams {
   const subject = `Tenant Verification Request - ${tenantName}`;
-  
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -184,7 +184,7 @@ export function createLandlordVerificationEmail(
     </body>
     </html>
   `;
-  
+
   const text = `
     RentLedger - Landlord Verification Request
     
@@ -223,6 +223,7 @@ interface LandlordVerificationRequestParams {
   tenantEmail: string;
   propertyAddress: string;
   amount: number;
+  rentAmount: number;
   paymentDate: string;
   paymentMethod: string;
   receiptUrl?: string;
@@ -232,7 +233,7 @@ export function createLandlordPaymentVerificationEmail(
   params: LandlordVerificationRequestParams
 ): EmailParams {
   const subject = `Payment Verification Request - ${params.tenantName}`;
-  
+
   const html = `
     <!DOCTYPE html>
     <html>
@@ -328,7 +329,7 @@ export function createLandlordPaymentVerificationEmail(
     </body>
     </html>
   `;
-  
+
   const text = `
     RentLedger - Payment Verification Request
     
@@ -377,16 +378,16 @@ export const emailService = {
     const emailParams = createLandlordPaymentVerificationEmail(params);
     return sendEmail(emailParams);
   },
-  
+
   async sendTenantInvite(tenantEmail: string, landlordName: string, propertyAddress: string, inviteUrl: string, qrCodeDataUrl: string): Promise<{ success: boolean; error?: string }> {
     const emailParams = createTenantInviteEmail(tenantEmail, landlordName, propertyAddress, inviteUrl, qrCodeDataUrl);
     return sendEmail(emailParams);
   },
-  
+
   async sendLandlordVerification(landlordEmail: string, tenantName: string, propertyAddress: string, verificationUrl: string): Promise<{ success: boolean; error?: string }> {
     const emailParams = createLandlordVerificationEmail(landlordEmail, tenantName, propertyAddress, verificationUrl);
     return sendEmail(emailParams);
   },
-  
+
   isEnabled: isEmailServiceEnabled
 };

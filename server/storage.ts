@@ -77,6 +77,12 @@ import {
   pendingLandlords,
   type PendingLandlord,
   type InsertPendingLandlord,
+  maintenanceRequests,
+  type MaintenanceRequest,
+  type InsertMaintenanceRequest,
+  auditLogs,
+  type AuditLog,
+  type InsertAuditLog,
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
@@ -89,57 +95,59 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+  getUsersWithPreferences(): Promise<User[]>;
+
   // Property operations
   createProperty(property: InsertProperty): Promise<Property>;
   getUserProperties(userId: string): Promise<Property[]>;
   updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property>;
   deleteProperty(id: number): Promise<void>;
-  
+
   // Rent payment operations
   createRentPayment(payment: InsertRentPayment): Promise<RentPayment>;
+  getManualPaymentById(id: number): Promise<ManualPayment | undefined>;
   getUserRentPayments(userId: string): Promise<RentPayment[]>;
   getPropertyRentPayments(propertyId: number): Promise<RentPayment[]>;
   updateRentPayment(id: number, payment: Partial<InsertRentPayment>): Promise<RentPayment>;
   deleteRentPayment(id: number): Promise<void>;
-  
+
   // Bank connection operations
   createBankConnection(connection: InsertBankConnection): Promise<BankConnection>;
   getUserBankConnections(userId: string): Promise<BankConnection[]>;
   updateBankConnection(id: number, connection: Partial<InsertBankConnection>): Promise<BankConnection>;
   deleteBankConnection(id: number): Promise<void>;
-  
+
   // Credit report operations
   createCreditReport(report: InsertCreditReport): Promise<CreditReport>;
   getUserCreditReports(userId: string): Promise<CreditReport[]>;
   getCreditReportByReportId(reportId: string): Promise<CreditReport | undefined>;
   updateCreditReport(id: number, report: Partial<InsertCreditReport>): Promise<CreditReport>;
-  
+
   // Report share operations
   createReportShare(share: InsertReportShare): Promise<ReportShare>;
   getReportShares(reportId: number): Promise<ReportShare[]>;
   getReportShareByUrl(url: string): Promise<ReportShare | undefined>;
   incrementShareAccess(shareId: number): Promise<void>;
-  
+
   // Landlord verification operations
   createLandlordVerification(verification: InsertLandlordVerification): Promise<LandlordVerification>;
   getLandlordVerification(token: string): Promise<LandlordVerification | undefined>;
   updateLandlordVerification(id: number, verification: Partial<InsertLandlordVerification>): Promise<LandlordVerification>;
-  
+
   // Tenant invitation operations
   createTenantInvitation(invitation: InsertTenantInvitation): Promise<TenantInvitation>;
   getTenantInvitation(token: string): Promise<TenantInvitation | undefined>;
   getLandlordInvitations(landlordId: string): Promise<TenantInvitation[]>;
   acceptTenantInvitation(id: number, tenantId: string): Promise<TenantInvitation>;
   expireInvitation(id: number): Promise<void>;
-  
+
   // Landlord operations
   getPropertyById(id: number): Promise<Property | undefined>;
   getUserById(id: string): Promise<User | undefined>;
-  getLandlordTenants(landlordId: string): Promise<Array<{tenant: User; property: Property; payments: RentPayment[]}>>;
+  getLandlordTenants(landlordId: string): Promise<Array<{ tenant: User; property: Property; payments: RentPayment[] }>>;
   getLandlordVerifications(landlordId: string): Promise<RentPayment[]>;
-  getLandlordPendingRequests(landlordId: string): Promise<Array<{type: string; id: number; tenant: User; property: Property; data: any}>>;
-  
+  getLandlordPendingRequests(landlordId: string): Promise<Array<{ type: string; id: number; tenant: User; property: Property; data: any }>>;
+
   // Dashboard statistics
   getUserStats(userId: string): Promise<DashboardStats>;
 
@@ -153,9 +161,10 @@ export interface IStorage {
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   upsertUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
 
-  // Security log operations
+  // Security & Audit
   createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog>;
-  getUserSecurityLogs(userId: string): Promise<SecurityLog[]>;
+  getSecurityLogs(filters?: { userId?: string; limit?: number }): Promise<SecurityLog[]>;
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
 
   // Admin operations
   createAdminUser(adminUser: InsertAdminUser): Promise<AdminUser>;
@@ -191,12 +200,12 @@ export interface IStorage {
     recentUsers: User[];
     recentPayments: RentPayment[];
   }>;
-  
+
   // Admin bulk operations
   getAllUsers(): Promise<User[]>;
   getAllProperties(): Promise<Property[]>;
   getAllPayments(): Promise<RentPayment[]>;
-  
+
   // Moderation operations
   getModerationItems(filters?: {
     status?: string;
@@ -204,12 +213,12 @@ export interface IStorage {
     priority?: string;
   }): Promise<ModerationItem[]>;
   updateModerationItem(id: number, updates: Partial<ModerationItem>): Promise<ModerationItem>;
-  
+
   // System settings operations
   getSystemSettings(): Promise<Record<string, any>>;
   updateSystemSettings(settings: Record<string, any>, updatedBy: string): Promise<void>;
   getSystemSetting(key: string): Promise<any>;
-  
+
   // Rent log operations
   createRentLog(log: InsertRentLog): Promise<RentLog>;
   getUserRentLogs(userId: string): Promise<RentLog[]>;
@@ -217,21 +226,21 @@ export interface IStorage {
   updateRentLog(id: number, updates: Partial<InsertRentLog>): Promise<RentLog>;
   deleteRentLog(id: number): Promise<void>;
   getUnverifiedRentLogs(landlordId?: string): Promise<RentLog[]>;
-  
+
   // Landlord-tenant link operations
   createLandlordTenantLink(link: InsertLandlordTenantLink): Promise<LandlordTenantLink>;
   getLandlordTenantLinks(landlordId: string): Promise<LandlordTenantLink[]>;
   getTenantLandlordLinks(tenantId: string): Promise<LandlordTenantLink[]>;
-  
+
   // Admin action operations
   createAdminAction(action: InsertAdminAction): Promise<AdminAction>;
   getAdminActions(adminId?: string): Promise<AdminAction[]>;
-  
+
   // Pending landlord operations
   createPendingLandlord(pending: InsertPendingLandlord): Promise<PendingLandlord>;
   getPendingLandlord(email: string): Promise<PendingLandlord | undefined>;
   updatePendingLandlordStatus(email: string, status: string): Promise<void>;
-  
+
   // Disputes operations
   getDisputes(filters?: {
     status?: string;
@@ -240,7 +249,7 @@ export interface IStorage {
   }): Promise<Dispute[]>;
   createDispute(dispute: InsertDispute): Promise<Dispute>;
   updateDispute(id: number, updates: Partial<Dispute>): Promise<Dispute>;
-  
+
   getSecurityLogs(filters: {
     startDate?: string;
     endDate?: string;
@@ -248,6 +257,27 @@ export interface IStorage {
     action?: string;
     limit?: number;
   }): Promise<SecurityLog[]>;
+
+  // Maintenance request operations
+  createMaintenanceRequest(request: InsertMaintenanceRequest): Promise<MaintenanceRequest>;
+  getMaintenanceRequests(filters?: {
+    tenantId?: string;
+    propertyId?: number;
+    status?: string;
+    landlordId?: string;
+  }): Promise<MaintenanceRequest[]>;
+  updateMaintenanceRequest(id: number, updates: Partial<MaintenanceRequest>): Promise<MaintenanceRequest>;
+
+  // Security & Audit
+  createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog>;
+  getSecurityLogs(filters?: {
+    userId?: string;
+    action?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  }): Promise<SecurityLog[]>;
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -285,9 +315,9 @@ export class DatabaseStorage implements IStorage {
   async updateUserAddress(userId: string, address: any): Promise<User> {
     const [user] = await db
       .update(users)
-      .set({ 
+      .set({
         address: address,
-        updatedAt: new Date() 
+        updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
@@ -297,9 +327,9 @@ export class DatabaseStorage implements IStorage {
   async updateUserRentInfo(userId: string, rentInfo: any): Promise<User> {
     const [user] = await db
       .update(users)
-      .set({ 
+      .set({
         rentInfo: rentInfo,
-        updatedAt: new Date() 
+        updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
@@ -518,12 +548,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async acceptTenantInvitation(id: number, tenantId: string): Promise<TenantInvitation> {
-    const [updated] = await db.update(tenantInvitations).set({status: 'accepted', tenantId, acceptedAt: sql`NOW()`, updatedAt: sql`NOW()`}).where(eq(tenantInvitations.id, id)).returning();
+    const [updated] = await db.update(tenantInvitations).set({ status: 'accepted', tenantId, acceptedAt: sql`NOW()`, updatedAt: sql`NOW()` }).where(eq(tenantInvitations.id, id)).returning();
     return updated;
   }
 
   async expireInvitation(id: number): Promise<void> {
-    await db.update(tenantInvitations).set({status: 'expired', updatedAt: sql`NOW()`}).where(eq(tenantInvitations.id, id));
+    await db.update(tenantInvitations).set({ status: 'expired', updatedAt: sql`NOW()` }).where(eq(tenantInvitations.id, id));
   }
 
   // Landlord operations
@@ -536,14 +566,14 @@ export class DatabaseStorage implements IStorage {
     return this.getUser(id);
   }
 
-  async getLandlordTenants(landlordId: string): Promise<Array<{tenant: User; property: Property; payments: RentPayment[]}>> {
+  async getLandlordTenants(landlordId: string): Promise<Array<{ tenant: User; property: Property; payments: RentPayment[] }>> {
     const landlordProperties = await db.select().from(properties).where(eq(properties.userId, landlordId));
     const results = [];
     for (const property of landlordProperties) {
       const payments = await db.select().from(rentPayments).where(eq(rentPayments.propertyId, property.id)).orderBy(desc(rentPayments.createdAt));
       if (payments.length > 0) {
         const tenant = await this.getUser(payments[0].userId);
-        if (tenant) results.push({tenant, property, payments});
+        if (tenant) results.push({ tenant, property, payments });
       }
     }
     return results;
@@ -556,13 +586,13 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(rentPayments).where(sql`${rentPayments.propertyId} = ANY(ARRAY[${sql.join(propertyIds.map(id => sql`${id}`), sql`, `)}])`).orderBy(desc(rentPayments.createdAt));
   }
 
-  async getLandlordPendingRequests(landlordId: string): Promise<Array<{type: string; id: number; tenant: User; property: Property; data: any}>> {
+  async getLandlordPendingRequests(landlordId: string): Promise<Array<{ type: string; id: number; tenant: User; property: Property; data: any }>> {
     const pendingPayments = await this.getLandlordVerifications(landlordId);
     const results = [];
     for (const payment of pendingPayments.filter(p => p.status === 'pending')) {
       const tenant = await this.getUser(payment.userId);
       const property = await this.getPropertyById(payment.propertyId);
-      if (tenant && property) results.push({type: 'payment_verification', id: payment.id, tenant, property, data: payment});
+      if (tenant && property) results.push({ type: 'payment_verification', id: payment.id, tenant, property, data: payment });
     }
     return results;
   }
@@ -576,7 +606,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(rentPayments.dueDate));
 
     const manualPaymentsData = await this.getUserManualPayments(userId);
-    
+
     // Combine manual payments with rent payments for stats calculation
     const allPayments = [
       ...payments,
@@ -756,7 +786,7 @@ export class DatabaseStorage implements IStorage {
     const [userStats] = await db
       .select({ count: sql<number>`count(*)` })
       .from(users);
-    
+
     const [activeUserStats] = await db
       .select({ count: sql<number>`count(*)` })
       .from(users)
@@ -822,7 +852,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .orderBy(desc(users.createdAt));
   }
-  
+
   // Get all properties (admin only)
   async getAllProperties(): Promise<Property[]> {
     return await db
@@ -830,7 +860,7 @@ export class DatabaseStorage implements IStorage {
       .from(properties)
       .orderBy(desc(properties.createdAt));
   }
-  
+
   // Get all payments (admin only)
   async getAllPayments(): Promise<RentPayment[]> {
     return await db
@@ -838,42 +868,108 @@ export class DatabaseStorage implements IStorage {
       .from(rentPayments)
       .orderBy(desc(rentPayments.createdAt));
   }
-  
+
   // Get security logs with filtering (admin only)
-  async getSecurityLogs(filters: {
-    startDate?: string;
-    endDate?: string;
+  async getSecurityLogs(filters?: {
     userId?: string;
     action?: string;
+    startDate?: string;
+    endDate?: string;
     limit?: number;
   }): Promise<SecurityLog[]> {
     let query = db.select().from(securityLogs);
-    
-    const conditions = [];
-    if (filters.userId) {
+    const conditions: any[] = [];
+
+    if (filters?.userId) {
       conditions.push(eq(securityLogs.userId, filters.userId));
     }
-    if (filters.action) {
+
+    if (filters?.action) {
       conditions.push(eq(securityLogs.action, filters.action));
     }
-    const timestampColumn = securityLogs.createdAt;
 
-    if (filters.startDate) {
-      conditions.push(gte(timestampColumn, new Date(filters.startDate)));
+    if (filters?.startDate) {
+      conditions.push(gte(securityLogs.createdAt, new Date(filters.startDate)));
     }
-    if (filters.endDate) {
-      conditions.push(lte(timestampColumn, new Date(filters.endDate)));
+
+    if (filters?.endDate) {
+      conditions.push(lte(securityLogs.createdAt, new Date(filters.endDate)));
     }
-    
+
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
-    
-    query = query.orderBy(desc(timestampColumn)).limit(filters.limit || 100) as any;
-    
-    return await query;
+
+    return await query
+      .orderBy(desc(securityLogs.createdAt))
+      .limit(filters?.limit || 50);
   }
-  
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [newLog] = await db.insert(auditLogs).values(log).returning();
+    return newLog;
+  }
+
+  // Maintenance request operations
+  async createMaintenanceRequest(request: InsertMaintenanceRequest): Promise<MaintenanceRequest> {
+    const [newRequest] = await db
+      .insert(maintenanceRequests)
+      .values(request)
+      .returning();
+    return newRequest;
+  }
+
+  async getMaintenanceRequests(filters?: {
+    tenantId?: string;
+    propertyId?: number;
+    status?: string;
+    landlordId?: string;
+  }): Promise<MaintenanceRequest[]> {
+    const conditions = [];
+
+    if (filters?.tenantId) conditions.push(eq(maintenanceRequests.tenantId, filters.tenantId));
+    if (filters?.propertyId) conditions.push(eq(maintenanceRequests.propertyId, filters.propertyId));
+    if (filters?.status) conditions.push(eq(maintenanceRequests.status, filters.status as any));
+
+    // If landlordId is provided, we need to find properties owned by this landlord
+    if (filters?.landlordId) {
+      const landlordProperties = await db
+        .select({ id: properties.id })
+        .from(properties)
+        .where(eq(properties.userId, filters.landlordId));
+
+      const propertyIds = landlordProperties.map(p => p.id);
+      if (propertyIds.length > 0) {
+        conditions.push(sql`${maintenanceRequests.propertyId} IN ${propertyIds}`);
+      } else {
+        return []; // Landlord has no properties, so no requests
+      }
+    }
+
+    return await db
+      .select()
+      .from(maintenanceRequests)
+      .where(and(...conditions))
+      .orderBy(desc(maintenanceRequests.createdAt));
+  }
+
+  async updateMaintenanceRequest(id: number, updates: Partial<MaintenanceRequest>): Promise<MaintenanceRequest> {
+    const [updatedRequest] = await db
+      .update(maintenanceRequests)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(maintenanceRequests.id, id))
+      .returning();
+    return updatedRequest;
+  }
+
+  async getUsersWithPreferences(): Promise<User[]> {
+    return await db.query.users.findMany({
+      with: {
+        preferences: true
+      }
+    });
+  }
+
   // Badge operations
   async createUserBadge(badge: InsertUserBadge): Promise<UserBadge> {
     const [created] = await db.insert(userBadges).values(badge).returning();
@@ -943,6 +1039,14 @@ export class DatabaseStorage implements IStorage {
     return newPayment;
   }
 
+  async getManualPaymentById(id: number): Promise<ManualPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(manualPayments)
+      .where(eq(manualPayments.id, id));
+    return payment;
+  }
+
   async getUserManualPayments(userId: string): Promise<ManualPayment[]> {
     return await db
       .select()
@@ -992,7 +1096,7 @@ export class DatabaseStorage implements IStorage {
 
   async updatePaymentStreak(userId: string, streakData: Partial<InsertPaymentStreak>): Promise<PaymentStreak> {
     const existingStreak = await this.getUserPaymentStreak(userId);
-    
+
     if (existingStreak) {
       const [updatedStreak] = await db
         .update(paymentStreaks)
@@ -1003,8 +1107,8 @@ export class DatabaseStorage implements IStorage {
     } else {
       const [newStreak] = await db
         .insert(paymentStreaks)
-        .values({ 
-          userId, 
+        .values({
+          userId,
           ...streakData,
           lastUpdateAt: new Date()
         })
@@ -1041,7 +1145,7 @@ export class DatabaseStorage implements IStorage {
   async incrementEnhancedShareAccess(shareId: number): Promise<void> {
     await db
       .update(enhancedReportShares)
-      .set({ 
+      .set({
         accessCount: sql`${enhancedReportShares.accessCount} + 1`,
         lastAccessedAt: new Date()
       })
@@ -1051,7 +1155,7 @@ export class DatabaseStorage implements IStorage {
   // Badge calculation helper method
   async calculateAndAwardBadges(userId: string): Promise<AchievementBadge[]> {
     const newBadges: AchievementBadge[] = [];
-    
+
     // Get user's payment history
     const payments = await this.getUserRentPayments(userId);
     const manualPayments = await this.getUserManualPayments(userId);
@@ -1061,7 +1165,7 @@ export class DatabaseStorage implements IStorage {
       dueDate: mp.paymentDate,
       paidDate: mp.paymentDate
     }))];
-    
+
     const paidPayments = allPayments.filter(p => p.status === 'paid');
     const existingBadges = await this.getUserAchievementBadges(userId);
     const existingBadgeTypes = existingBadges.map(b => b.badgeType);
@@ -1080,7 +1184,7 @@ export class DatabaseStorage implements IStorage {
 
     // Streak badges
     const currentStreak = await this.calculateCurrentStreak(userId);
-    
+
     const streakBadges = [
       { type: 'streak_3', months: 3, title: '3-Month Streak', description: '3 consecutive on-time payments' },
       { type: 'streak_6', months: 6, title: '6-Month Streak', description: '6 consecutive on-time payments' },
@@ -1107,7 +1211,7 @@ export class DatabaseStorage implements IStorage {
   async calculateCurrentStreak(userId: string): Promise<number> {
     const payments = await this.getUserRentPayments(userId);
     const manualPayments = await this.getUserManualPayments(userId);
-    
+
     // Combine and sort all payments by date
     const allPayments = [...payments, ...manualPayments.map(mp => ({
       ...mp,
@@ -1142,7 +1246,7 @@ export class DatabaseStorage implements IStorage {
   }): Promise<ModerationItem[]> {
     let query = db.select().from(moderationItems);
     const conditions = [];
-    
+
     if (filters?.status) {
       conditions.push(eq(moderationItems.status, filters.status as "pending" | "reviewing" | "resolved" | "dismissed"));
     }
@@ -1152,11 +1256,11 @@ export class DatabaseStorage implements IStorage {
     if (filters?.priority) {
       conditions.push(eq(moderationItems.priority, filters.priority as "low" | "medium" | "high" | "urgent"));
     }
-    
+
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
-    
+
     return await query.orderBy(desc(moderationItems.createdAt));
   }
 
@@ -1236,7 +1340,7 @@ export class DatabaseStorage implements IStorage {
   }): Promise<Dispute[]> {
     let query = db.select().from(disputes);
     const conditions = [];
-    
+
     if (filters?.status) {
       conditions.push(eq(disputes.status, filters.status as "open" | "in_progress" | "resolved" | "closed"));
     }
@@ -1246,11 +1350,11 @@ export class DatabaseStorage implements IStorage {
     if (filters?.priority) {
       conditions.push(eq(disputes.priority, filters.priority as "low" | "medium" | "high" | "urgent"));
     }
-    
+
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
-    
+
     return await query.orderBy(desc(disputes.createdAt));
   }
 

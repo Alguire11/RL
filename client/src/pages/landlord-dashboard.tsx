@@ -14,25 +14,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield, Lock, Info, Sparkles, ArrowRight } from "lucide-react";
+import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield, Lock, Info, Sparkles, ArrowRight, Wrench, Loader2 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+
+import { MaintenanceRequestsList } from "@/components/maintenance-requests-list";
 
 export default function LandlordDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [adminSession, setAdminSession] = useState<any>(null);
   const [propertyCount, setPropertyCount] = useState(0);
-  
+
   // Refs for scroll navigation
   const propertiesRef = useRef<HTMLDivElement>(null);
   const tenantsRef = useRef<HTMLDivElement>(null);
   const verificationsRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef<HTMLDivElement>(null);
-  
+
   // Invite tenant form
   const [tenantEmail, setTenantEmail] = useState('');
   const [selectedPropertyForInvite, setSelectedPropertyForInvite] = useState('');
-  
+
   // Dialog states
   const [showAddProperty, setShowAddProperty] = useState(false);
   const [showManageTenants, setShowManageTenants] = useState(false);
@@ -48,7 +50,7 @@ export default function LandlordDashboard() {
     { id: 2, name: "Property Inspection Report - 456 Oak Ave.pdf", type: "Report", uploadDate: "2024-01-10", tenant: "Michael Chen", fileData: null as Blob | null },
     { id: 3, name: "Lease Renewal - 789 Pine Rd.pdf", type: "Contract", uploadDate: "2024-01-05", tenant: "Emma Williams", fileData: null as Blob | null },
   ]);
-  
+
   // Form states
   const [propertyForm, setPropertyForm] = useState({
     address: '',
@@ -58,14 +60,14 @@ export default function LandlordDashboard() {
     rent: '',
     description: ''
   });
-  
+
   const [noticeForm, setNoticeForm] = useState({
     tenant: '',
     subject: '',
     message: '',
     urgency: 'normal'
   });
-  
+
   const [inspectionForm, setInspectionForm] = useState({
     property: '',
     date: '',
@@ -194,7 +196,7 @@ export default function LandlordDashboard() {
   const handleAddProperty = () => {
     // Check subscription limits based on active subscription plan
     const maxProperties = maxPropertiesLimit;
-    
+
     if (propertyCount >= maxProperties) {
       toast({
         title: "Property Limit Reached",
@@ -203,7 +205,7 @@ export default function LandlordDashboard() {
       });
       return;
     }
-    
+
     addPropertyMutation.mutate(propertyForm);
   };
 
@@ -292,7 +294,7 @@ export default function LandlordDashboard() {
       title: "Document Uploaded",
       description: `${selectedFile.name} uploaded successfully`,
     });
-    
+
     setSelectedFile(null);
     // Reset file input
     const fileInput = document.getElementById('document-upload') as HTMLInputElement;
@@ -302,7 +304,7 @@ export default function LandlordDashboard() {
   const handleDocumentDownload = (docId: number, docName: string) => {
     // Find the document
     const doc = documents.find(d => d.id === docId);
-    
+
     if (!doc || !doc.fileData) {
       // If no file data (mock documents), show a message
       toast({
@@ -392,22 +394,22 @@ export default function LandlordDashboard() {
 
   // API queries for tenant management
   const landlordId = adminSession?.username || 'landlord';
-  
+
   const { data: tenants = [] } = useQuery({
     queryKey: ['/api/landlord', landlordId, 'tenants'],
     enabled: !!adminSession
   });
-  
+
   const { data: verifications = [] } = useQuery({
     queryKey: ['/api/landlord', landlordId, 'verifications'],
     enabled: !!adminSession
   });
-  
+
   const { data: pendingRequests = [] } = useQuery({
     queryKey: ['/api/landlord', landlordId, 'pending-requests'],
     enabled: !!adminSession
   });
-  
+
   const inviteTenantMutation = useMutation({
     mutationFn: async (data: { landlordId: string; propertyId: number | null; tenantEmail: string; landlordName: string; propertyAddress: string }) => {
       const response = await fetch('/api/landlord/invite-tenant', {
@@ -453,7 +455,7 @@ export default function LandlordDashboard() {
 
   // Handle stats card clicks - scroll to sections
   const handleStatsCardClick = (statTitle: string) => {
-    switch(statTitle) {
+    switch (statTitle) {
       case 'Properties':
         propertiesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         break;
@@ -492,8 +494,8 @@ export default function LandlordDashboard() {
               <Badge variant="outline" className="bg-white text-blue-700 border-blue-200 font-semibold">
                 {plan?.name ?? "Free"} Plan
               </Badge>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={handleLogout}
                 className="border-red-200 text-red-600 hover:bg-red-50"
               >
@@ -564,7 +566,7 @@ export default function LandlordDashboard() {
         )}
 
         {/* Trusted Landlord Badge */}
-        <Card className="mb-6 border-2" style={{borderColor: badgeTier.tier === 'Gold' ? '#ca8a04' : badgeTier.tier === 'Silver' ? '#71717a' : '#ea580c'}}>
+        <Card className="mb-6 border-2" style={{ borderColor: badgeTier.tier === 'Gold' ? '#ca8a04' : badgeTier.tier === 'Silver' ? '#71717a' : '#ea580c' }}>
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
               <div className="flex items-center space-x-4">
@@ -636,7 +638,7 @@ export default function LandlordDashboard() {
                 </CardContent>
               </Card>
             </div>
-            
+
             {!hasFeature('advancedAnalytics') ? (
               <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
                 <Lock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
@@ -664,7 +666,7 @@ export default function LandlordDashboard() {
                           <span className="text-sm font-semibold">{12 + idx * 2} verifications</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="bg-blue-600 h-2 rounded-full" style={{width: `${60 + idx * 15}%`}}></div>
+                          <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${60 + idx * 15}%` }}></div>
                         </div>
                       </div>
                     ))}
@@ -678,7 +680,7 @@ export default function LandlordDashboard() {
         {/* Stats Grid - Clickable Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => (
-            <Card 
+            <Card
               key={stat.title}
               className="cursor-pointer hover:shadow-lg transition-all duration-300 border-0 shadow-md"
               onClick={() => handleStatsCardClick(stat.title)}
@@ -690,12 +692,11 @@ export default function LandlordDashboard() {
                     <p className="text-sm font-medium text-gray-600">{stat.title}</p>
                     <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
                   </div>
-                  <div className={`p-3 rounded-full bg-gradient-to-br ${
-                    stat.title === 'Properties' ? 'from-blue-100 to-blue-200' :
+                  <div className={`p-3 rounded-full bg-gradient-to-br ${stat.title === 'Properties' ? 'from-blue-100 to-blue-200' :
                     stat.title === 'Active Tenants' ? 'from-green-100 to-green-200' :
-                    stat.title === 'Verifications' ? 'from-purple-100 to-purple-200' :
-                    'from-orange-100 to-orange-200'
-                  } ${stat.color}`}>
+                      stat.title === 'Verifications' ? 'from-purple-100 to-purple-200' :
+                        'from-orange-100 to-orange-200'
+                    } ${stat.color}`}>
                     <stat.icon className="h-6 w-6" />
                   </div>
                 </div>
@@ -706,6 +707,22 @@ export default function LandlordDashboard() {
 
         {/* Main Content */}
         <div className="grid lg:grid-cols-2 gap-8">
+          {/* Maintenance Requests */}
+          <Card className="mb-8" ref={propertiesRef}> {/* Reusing ref for now or add new one */}
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Wrench className="h-5 w-5 mr-2" />
+                Maintenance Requests
+              </CardTitle>
+              <CardDescription>
+                Manage repair requests from your tenants
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MaintenanceRequestsList landlordId={landlordId} />
+            </CardContent>
+          </Card>
+
           {/* Verification Requests */}
           <Card>
             <CardHeader>
@@ -727,14 +744,14 @@ export default function LandlordDashboard() {
                         <p className="text-sm text-gray-600">{request.tenantEmail}</p>
                         <p className="text-sm text-gray-500 mt-1">{request.property}</p>
                       </div>
-                      <Badge 
-                        variant={request.status === 'verified' ? 'default' : 
-                                request.status === 'rejected' ? 'destructive' : 'secondary'}
+                      <Badge
+                        variant={request.status === 'verified' ? 'default' :
+                          request.status === 'rejected' ? 'destructive' : 'secondary'}
                       >
                         {request.status}
                       </Badge>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                       <div>
                         <span className="text-gray-600">Rent Amount:</span>
@@ -755,15 +772,15 @@ export default function LandlordDashboard() {
 
                     {request.status === 'pending' && (
                       <div className="flex space-x-2">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => handleVerification(request.id, 'approve')}
                         >
                           Approve
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           className="border-red-200 text-red-600 hover:bg-red-50"
                           onClick={() => handleVerification(request.id, 'reject')}
@@ -789,65 +806,86 @@ export default function LandlordDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <Dialog open={showInviteTenant} onOpenChange={setShowInviteTenant}>
                     <DialogTrigger asChild>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="h-20 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200"
                       >
                         <Link2 className="h-6 w-6 mb-2" />
                         <span className="text-sm">Invite Tenant</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[500px]">
+                    <DialogContent className="sm:max-w-[600px]">
                       <DialogHeader>
-                        <DialogTitle className="flex items-center text-xl">
-                          <Link2 className="h-5 w-5 mr-2 text-purple-600" />
-                          Invite Tenant
-                        </DialogTitle>
+                        <DialogTitle>Invite New Tenant</DialogTitle>
                         <DialogDescription>
-                          Send an invitation email with QR code to your tenant
+                          Follow the steps to onboard a new tenant.
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div>
-                          <Label htmlFor="quick-tenant-email">Tenant Email</Label>
-                          <Input
-                            id="quick-tenant-email"
-                            type="email"
-                            value={tenantEmail}
-                            onChange={(e) => setTenantEmail(e.target.value)}
-                            placeholder="tenant@example.com"
-                          />
+
+                      <div className="py-4">
+                        {/* Wizard Steps Indicator */}
+                        <div className="flex items-center justify-between mb-6 px-2">
+                          {[1, 2, 3].map((step) => (
+                            <div key={step} className="flex flex-col items-center">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${step === 1 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'
+                                }`}>
+                                {step}
+                              </div>
+                              <span className="text-xs mt-1 text-gray-500">
+                                {step === 1 ? 'Details' : step === 2 ? 'Lease' : 'Review'}
+                              </span>
+                            </div>
+                          ))}
+                          <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-100 -z-10" />
                         </div>
-                        <div>
-                          <Label htmlFor="quick-property-address">Property Address</Label>
-                          <Input
-                            id="quick-property-address"
-                            value={selectedPropertyForInvite}
-                            onChange={(e) => setSelectedPropertyForInvite(e.target.value)}
-                            placeholder="123 Main Street, London"
-                          />
+
+                        <div className="space-y-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="property">Select Property</Label>
+                            <Select value={selectedPropertyForInvite} onValueChange={setSelectedPropertyForInvite}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select property" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">123 Main Street</SelectItem>
+                                <SelectItem value="2">456 Oak Avenue</SelectItem>
+                                <SelectItem value="3">789 Pine Road</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="email">Tenant Email</Label>
+                            <Input
+                              id="email"
+                              placeholder="tenant@example.com"
+                              value={tenantEmail}
+                              onChange={(e) => setTenantEmail(e.target.value)}
+                            />
+                          </div>
+
+                          {/* Placeholder for Lease Upload (Step 2) */}
+                          <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
+                            <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                            <p className="text-sm text-gray-500">Upload Lease Agreement (Optional)</p>
+                            <Button variant="outline" size="sm" className="mt-2">Choose File</Button>
+                          </div>
                         </div>
                       </div>
+
                       <div className="flex justify-end space-x-2">
                         <Button variant="outline" onClick={() => setShowInviteTenant(false)}>Cancel</Button>
-                        <Button 
-                          onClick={() => {
-                            if (!tenantEmail || !selectedPropertyForInvite) {
-                              toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
-                              return;
-                            }
-                            inviteTenantMutation.mutate({
-                              landlordId,
-                              propertyId: null,
-                              tenantEmail,
-                              landlordName: adminSession.username,
-                              propertyAddress: selectedPropertyForInvite
-                            });
-                          }}
-                          disabled={inviteTenantMutation.isPending}
-                          className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white dark:text-white"
+                        <Button
+                          onClick={() => inviteTenantMutation.mutate({
+                            landlordId,
+                            propertyId: selectedPropertyForInvite ? parseInt(selectedPropertyForInvite) : null,
+                            tenantEmail,
+                            landlordName: adminSession.username,
+                            propertyAddress: "Selected Property Address" // Mock
+                          })}
+                          disabled={!tenantEmail || !selectedPropertyForInvite || inviteTenantMutation.isPending}
                         >
-                          {inviteTenantMutation.isPending ? "Sending..." : "Send Invitation"}
+                          {inviteTenantMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                          Send Invitation
                         </Button>
                       </div>
                     </DialogContent>
@@ -895,7 +933,7 @@ export default function LandlordDashboard() {
                           <Input
                             id="address"
                             value={propertyForm.address}
-                            onChange={(e) => setPropertyForm({...propertyForm, address: e.target.value})}
+                            onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
                             className="col-span-3"
                             placeholder="123 Main Street, London"
                           />
@@ -904,7 +942,7 @@ export default function LandlordDashboard() {
                           <Label htmlFor="type" className="text-right">
                             Type
                           </Label>
-                          <Select value={propertyForm.type} onValueChange={(value) => setPropertyForm({...propertyForm, type: value})}>
+                          <Select value={propertyForm.type} onValueChange={(value) => setPropertyForm({ ...propertyForm, type: value })}>
                             <SelectTrigger className="col-span-3">
                               <SelectValue placeholder="Select property type" />
                             </SelectTrigger>
@@ -924,7 +962,7 @@ export default function LandlordDashboard() {
                             id="bedrooms"
                             type="number"
                             value={propertyForm.bedrooms}
-                            onChange={(e) => setPropertyForm({...propertyForm, bedrooms: e.target.value})}
+                            onChange={(e) => setPropertyForm({ ...propertyForm, bedrooms: e.target.value })}
                             className="col-span-3"
                             placeholder="2"
                           />
@@ -937,7 +975,7 @@ export default function LandlordDashboard() {
                             id="rent"
                             type="number"
                             value={propertyForm.rent}
-                            onChange={(e) => setPropertyForm({...propertyForm, rent: e.target.value})}
+                            onChange={(e) => setPropertyForm({ ...propertyForm, rent: e.target.value })}
                             className="col-span-3"
                             placeholder="1200"
                           />
@@ -1009,7 +1047,7 @@ export default function LandlordDashboard() {
                           <Label htmlFor="tenant" className="text-right">
                             Tenant
                           </Label>
-                          <Select value={noticeForm.tenant} onValueChange={(value) => setNoticeForm({...noticeForm, tenant: value})}>
+                          <Select value={noticeForm.tenant} onValueChange={(value) => setNoticeForm({ ...noticeForm, tenant: value })}>
                             <SelectTrigger className="col-span-3">
                               <SelectValue placeholder="Select tenant" />
                             </SelectTrigger>
@@ -1029,7 +1067,7 @@ export default function LandlordDashboard() {
                           <Input
                             id="subject"
                             value={noticeForm.subject}
-                            onChange={(e) => setNoticeForm({...noticeForm, subject: e.target.value})}
+                            onChange={(e) => setNoticeForm({ ...noticeForm, subject: e.target.value })}
                             className="col-span-3"
                             placeholder="Rent reminder, Property inspection..."
                           />
@@ -1038,7 +1076,7 @@ export default function LandlordDashboard() {
                           <Label htmlFor="urgency" className="text-right">
                             Urgency
                           </Label>
-                          <Select value={noticeForm.urgency} onValueChange={(value) => setNoticeForm({...noticeForm, urgency: value})}>
+                          <Select value={noticeForm.urgency} onValueChange={(value) => setNoticeForm({ ...noticeForm, urgency: value })}>
                             <SelectTrigger className="col-span-3">
                               <SelectValue />
                             </SelectTrigger>
@@ -1057,7 +1095,7 @@ export default function LandlordDashboard() {
                           <Textarea
                             id="message"
                             value={noticeForm.message}
-                            onChange={(e) => setNoticeForm({...noticeForm, message: e.target.value})}
+                            onChange={(e) => setNoticeForm({ ...noticeForm, message: e.target.value })}
                             className="col-span-3"
                             placeholder="Enter your message..."
                             rows={4}
@@ -1138,8 +1176,8 @@ export default function LandlordDashboard() {
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Badge variant="secondary" className="text-xs">{doc.type}</Badge>
-                                <Button 
-                                  variant="ghost" 
+                                <Button
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => handleDocumentDownload(doc.id, doc.name)}
                                   data-testid={`button-download-doc-${doc.id}`}
@@ -1173,7 +1211,7 @@ export default function LandlordDashboard() {
                           <Label htmlFor="property" className="text-right">
                             Property
                           </Label>
-                          <Select value={inspectionForm.property} onValueChange={(value) => setInspectionForm({...inspectionForm, property: value})}>
+                          <Select value={inspectionForm.property} onValueChange={(value) => setInspectionForm({ ...inspectionForm, property: value })}>
                             <SelectTrigger className="col-span-3">
                               <SelectValue placeholder="Select property" />
                             </SelectTrigger>
@@ -1190,7 +1228,7 @@ export default function LandlordDashboard() {
                           <Label htmlFor="inspection-type" className="text-right">
                             Type
                           </Label>
-                          <Select value={inspectionForm.type} onValueChange={(value) => setInspectionForm({...inspectionForm, type: value})}>
+                          <Select value={inspectionForm.type} onValueChange={(value) => setInspectionForm({ ...inspectionForm, type: value })}>
                             <SelectTrigger className="col-span-3">
                               <SelectValue />
                             </SelectTrigger>
@@ -1210,7 +1248,7 @@ export default function LandlordDashboard() {
                             id="date"
                             type="date"
                             value={inspectionForm.date}
-                            onChange={(e) => setInspectionForm({...inspectionForm, date: e.target.value})}
+                            onChange={(e) => setInspectionForm({ ...inspectionForm, date: e.target.value })}
                             className="col-span-3"
                           />
                         </div>
@@ -1222,7 +1260,7 @@ export default function LandlordDashboard() {
                             id="time"
                             type="time"
                             value={inspectionForm.time}
-                            onChange={(e) => setInspectionForm({...inspectionForm, time: e.target.value})}
+                            onChange={(e) => setInspectionForm({ ...inspectionForm, time: e.target.value })}
                             className="col-span-3"
                           />
                         </div>
@@ -1233,7 +1271,7 @@ export default function LandlordDashboard() {
                           <Textarea
                             id="notes"
                             value={inspectionForm.notes}
-                            onChange={(e) => setInspectionForm({...inspectionForm, notes: e.target.value})}
+                            onChange={(e) => setInspectionForm({ ...inspectionForm, notes: e.target.value })}
                             className="col-span-3"
                             placeholder="Any special instructions or focus areas..."
                             rows={3}
@@ -1296,7 +1334,7 @@ export default function LandlordDashboard() {
                         </div>
                         <div className="flex justify-end space-x-2">
                           <Button variant="outline" onClick={() => setShowInviteTenant(false)}>Cancel</Button>
-                          <Button 
+                          <Button
                             onClick={() => {
                               if (!tenantEmail || !selectedPropertyForInvite) {
                                 toast({ title: "Error", description: "Please fill all fields", variant: "destructive" });
@@ -1345,8 +1383,8 @@ export default function LandlordDashboard() {
                             </div>
                             <div className="flex space-x-2">
                               <Button size="sm" variant="outline"><Mail className="h-4 w-4 mr-1" />Contact</Button>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 onClick={() => {
                                   // Download PDF ledger
@@ -1399,9 +1437,9 @@ export default function LandlordDashboard() {
                             </div>
                             {payment.status === 'pending' && (
                               <div className="space-x-2">
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   className="text-green-600 dark:text-green-400"
                                   onClick={() => verifyPaymentMutation.mutate({ paymentId: payment.id, status: 'approved' })}
                                   disabled={verifyPaymentMutation.isPending}
@@ -1409,9 +1447,9 @@ export default function LandlordDashboard() {
                                 >
                                   Approve
                                 </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
+                                <Button
+                                  size="sm"
+                                  variant="outline"
                                   className="text-red-600 dark:text-red-400"
                                   onClick={() => verifyPaymentMutation.mutate({ paymentId: payment.id, status: 'rejected' })}
                                   disabled={verifyPaymentMutation.isPending}
@@ -1460,8 +1498,8 @@ export default function LandlordDashboard() {
                               )}
                             </div>
                             <div className="space-x-2">
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white dark:text-white"
                                 onClick={() => {
                                   if (request.data?.paymentId) {
@@ -1473,9 +1511,9 @@ export default function LandlordDashboard() {
                               >
                                 Approve
                               </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
+                              <Button
+                                size="sm"
+                                variant="outline"
                                 className="text-red-600 dark:text-red-400"
                                 onClick={() => {
                                   if (request.data?.paymentId) {
@@ -1579,7 +1617,7 @@ export default function LandlordDashboard() {
                       <span className="text-sm font-semibold">12 verifications</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{width: '80%'}}></div>
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '80%' }}></div>
                     </div>
                   </div>
                   <div>
@@ -1588,7 +1626,7 @@ export default function LandlordDashboard() {
                       <span className="text-sm font-semibold">15 verifications</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{width: '100%'}}></div>
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '100%' }}></div>
                     </div>
                   </div>
                   <div>
@@ -1597,7 +1635,7 @@ export default function LandlordDashboard() {
                       <span className="text-sm font-semibold">10 verifications</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{width: '67%'}}></div>
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '67%' }}></div>
                     </div>
                   </div>
                 </div>
@@ -1652,7 +1690,7 @@ export default function LandlordDashboard() {
                       <span className="text-sm text-gray-500">Next: Platinum</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 h-3 rounded-full" style={{width: '85%'}}></div>
+                      <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 h-3 rounded-full" style={{ width: '85%' }}></div>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">15% away from Platinum tier</p>
                   </div>
@@ -1676,6 +1714,6 @@ export default function LandlordDashboard() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

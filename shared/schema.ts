@@ -224,6 +224,18 @@ export const securityLogs = pgTable("security_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Audit logs table (comprehensive system history)
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  action: varchar("action").notNull(), // create, update, delete, export, login_as
+  entityType: varchar("entity_type").notNull(), // user, property, payment, system
+  entityId: varchar("entity_id"), // Can be string or number, storing as string for flexibility
+  details: jsonb("details"), // Changed fields, snapshot, etc.
+  ipAddress: varchar("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Admin users table
 export const adminUsers = pgTable("admin_users", {
   id: serial("id").primaryKey(),
@@ -266,6 +278,7 @@ export const insertTenantInvitationSchema = createInsertSchema(tenantInvitations
 export const insertNotificationSchema = createInsertSchema(notifications);
 export const insertUserPreferencesSchema = createInsertSchema(userPreferences);
 export const insertSecurityLogSchema = createInsertSchema(securityLogs);
+export const insertAuditLogSchema = createInsertSchema(auditLogs);
 export const insertAdminUserSchema = createInsertSchema(adminUsers);
 export const insertDataExportRequestSchema = createInsertSchema(dataExportRequests);
 export const insertUserBadgeSchema = createInsertSchema(userBadges);
@@ -295,6 +308,8 @@ export type UserPreferences = typeof userPreferences.$inferSelect;
 export type InsertUserPreferences = typeof userPreferences.$inferInsert;
 export type SecurityLog = typeof securityLogs.$inferSelect;
 export type InsertSecurityLog = typeof securityLogs.$inferInsert;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = typeof adminUsers.$inferInsert;
 export type DataExportRequest = typeof dataExportRequests.$inferSelect;
@@ -492,6 +507,30 @@ export type InsertAdminAction = typeof adminActions.$inferInsert;
 export type PendingLandlord = typeof pendingLandlords.$inferSelect;
 export type InsertPendingLandlord = typeof pendingLandlords.$inferInsert;
 
+// Maintenance requests table
+export const maintenanceRequests = pgTable("maintenance_requests", {
+  id: serial("id").primaryKey(),
+  tenantId: varchar("tenant_id").references(() => users.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id).notNull(),
+  title: varchar("title").notNull(),
+  description: text("description").notNull(),
+  priority: varchar("priority", { enum: ["low", "medium", "high", "urgent"] }).default("medium"),
+  status: varchar("status", { enum: ["open", "in_progress", "resolved", "closed"] }).default("open"),
+  photos: jsonb("photos"), // Array of photo URLs
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export type MaintenanceRequest = typeof maintenanceRequests.$inferSelect;
+export type InsertMaintenanceRequest = typeof maintenanceRequests.$inferInsert;
+export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequests);
+
+export const maintenanceRequestsRelations = relations(maintenanceRequests, ({ one }) => ({
+  tenant: one(users, { fields: [maintenanceRequests.tenantId], references: [users.id] }),
+  property: one(properties, { fields: [maintenanceRequests.propertyId], references: [properties.id] }),
+}));
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   properties: many(properties),
   rentPayments: many(rentPayments),
@@ -505,6 +544,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   dataExportRequests: many(dataExportRequests),
   badges: many(userBadges),
   certificationPortfolios: many(certificationPortfolios),
+  maintenanceRequests: many(maintenanceRequests),
 }));
 
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
@@ -512,6 +552,7 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   rentPayments: many(rentPayments),
   creditReports: many(creditReports),
   landlordVerifications: many(landlordVerifications),
+  maintenanceRequests: many(maintenanceRequests),
 }));
 
 export const rentPaymentsRelations = relations(rentPayments, ({ one }) => ({
@@ -554,6 +595,10 @@ export const userPreferencesRelations = relations(userPreferences, ({ one }) => 
 
 export const securityLogsRelations = relations(securityLogs, ({ one }) => ({
   user: one(users, { fields: [securityLogs.userId], references: [users.id] }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, { fields: [auditLogs.userId], references: [users.id] }),
 }));
 
 export const adminUsersRelations = relations(adminUsers, ({ one }) => ({

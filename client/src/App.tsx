@@ -37,6 +37,7 @@ import Portfolio from "@/pages/portfolio";
 import PublicPortfolio from "@/pages/public-portfolio";
 import Subscribe from "@/pages/subscribe";
 import SupportRequest from "@/pages/support-request";
+import MaintenancePage from "@/pages/maintenance";
 
 // Lazy load admin pages
 const AdminUsers = lazy(() => import("@/pages/admin-users"));
@@ -145,6 +146,7 @@ function Router() {
       ) : (
         <Route path="/" component={Dashboard} />
       )}
+      <Route path="/maintenance" component={MaintenancePage} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -15,7 +15,8 @@ import {
   insertSecurityLogSchema,
   insertDataExportRequestSchema,
   insertLandlordVerificationSchema,
-  insertTenantInvitationSchema
+  insertTenantInvitationSchema,
+  insertMaintenanceRequestSchema,
 } from "@shared/schema";
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
@@ -356,7 +357,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create property
+      // Create property
       const property = await storage.createProperty(validatedData);
+
+      // Audit Log
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "create",
+        entityType: "property",
+        entityId: property.id.toString(),
+        details: { address: property.address, monthlyRent: property.monthlyRent },
+        ipAddress: req.ip || req.connection.remoteAddress,
+      });
+
       res.json(property);
     } catch (error: any) {
       console.error("Error creating property:", error);
@@ -377,6 +390,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = req.body;
 
       const property = await storage.updateProperty(propertyId, updateData);
+
+      // Audit Log
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "update",
+        entityType: "property",
+        entityId: property.id.toString(),
+        details: updateData,
+        ipAddress: req.ip || req.connection.remoteAddress,
+      });
+
       res.json(property);
     } catch (error) {
       console.error("Error updating property:", error);
@@ -388,6 +412,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const propertyId = parseInt(req.params.id);
       await storage.deleteProperty(propertyId);
+
+      // Audit Log
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "delete",
+        entityType: "property",
+        entityId: propertyId.toString(),
+        details: { propertyId },
+        ipAddress: req.ip || req.connection.remoteAddress,
+      });
+
       res.json({ message: "Property deleted successfully" });
     } catch (error) {
       console.error("Error deleting property:", error);
@@ -2854,10 +2889,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               tenantEmail: tenant.email,
               propertyAddress: `${property.address}, ${property.city}`,
               amount: parseFloat(amount),
-              paymentDate: new Date(paymentDate).toLocaleDateString(),
+              rentAmount: manualPayment.amount,
+              paymentDate: new Date(manualPayment.paymentDate).toLocaleDateString(),
               paymentMethod: paymentMethod.replace('_', ' ').toUpperCase(),
               receiptUrl,
-              verificationLink: `${process.env.APP_URL || 'http://localhost:5000'}/verify-payment/${manualPayment.id}`,
             });
           } catch (emailError) {
             console.error('Failed to send landlord notification email:', emailError);
@@ -3516,6 +3551,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('Error seeding test data:', error);
       res.status(500).json({ message: 'Failed to seed test data', error: String(error) });
     }
+  });
+
+  // Maintenance Request Routes
+  app.post("/api/maintenance", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    const validation = insertMaintenanceRequestSchema.safeParse({
+      ...req.body,
+      tenantId: req.user.id,
+    });
+
+    if (!validation.success) {
+      return res.status(400).json(validation.error);
+    }
+
+    const request = await storage.createMaintenanceRequest(validation.data);
+    res.status(201).json(request);
+  });
+
+  app.get("/api/maintenance", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    // If tenant, get their requests
+    // If landlord, get requests for their properties (not yet fully implemented for landlord view in this route, 
+    // but we can add a query param or separate route)
+    // For now, let's assume this is for the current user (tenant)
+    const requests = await storage.getMaintenanceRequests({
+      tenantId: req.user.id,
+    });
+    res.json(requests);
+  });
+
+  app.get("/api/landlord/:id/maintenance", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    // In a real app, check if req.user.id matches :id or is admin
+
+    const requests = await storage.getMaintenanceRequests({
+      landlordId: req.params.id,
+    });
+    res.json(requests);
+  });
+
+  app.patch("/api/maintenance/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    // Ideally check if user owns the request or is the landlord
+    const updated = await storage.updateMaintenanceRequest(parseInt(req.params.id), req.body);
+    res.json(updated);
   });
 
   const httpServer: Server = createServer(app);

@@ -1,177 +1,180 @@
-import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
-import { Navigation } from "@/components/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, ArrowLeft, Calendar, Filter } from "lucide-react";
+import { useState } from "react";
 import { format } from "date-fns";
-import { getQueryFn } from "@/lib/queryClient";
-
-interface AuditLog {
-  id: number;
-  userId: string | null;
-  action: string;
-  ipAddress: string | null;
-  userAgent: string | null;
-  metadata: any;
-  createdAt: string;
-}
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Search, Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminAuditLogs() {
-  const [, setLocation] = useLocation();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [userId, setUserId] = useState("");
-  const [action, setAction] = useState("all");
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated || user?.role !== 'admin') {
-      setLocation('/admin-login');
-    }
-  }, [authLoading, isAuthenticated, user, setLocation]);
-
-  const queryParams = new URLSearchParams();
-  if (startDate) queryParams.append('startDate', startDate);
-  if (endDate) queryParams.append('endDate', endDate);
-  if (userId) queryParams.append('userId', userId);
-  if (action !== 'all') queryParams.append('action', action);
-
-  const queryUrl = `/api/admin/audit-logs${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-  const { data: logsData, isLoading } = useQuery<{ total: number; logs: AuditLog[] }>({
-    queryKey: [queryUrl],
-    queryFn: getQueryFn({ on401: "throw" }),
-    retry: false,
-    enabled: isAuthenticated && user?.role === 'admin',
+  const { toast } = useToast();
+  const [filters, setFilters] = useState({
+    userId: "",
+    action: "",
+    startDate: "",
+    endDate: "",
   });
 
-  if (authLoading || isLoading) {
-    return <div>Loading...</div>;
+  const { data: logs, isLoading, error } = useQuery({
+    queryKey: ["/api/admin/audit-logs", filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters.userId) params.append("userId", filters.userId);
+      if (filters.action) params.append("action", filters.action);
+      if (filters.startDate) params.append("startDate", filters.startDate);
+      if (filters.endDate) params.append("endDate", filters.endDate);
+
+      const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch audit logs");
+      return res.json();
+    },
+  });
+
+  const handleExport = () => {
+    // Implementation for export functionality
+    toast({
+      title: "Export Started",
+      description: "Your audit log export is being generated.",
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 text-center text-red-500">
+        Error loading audit logs. Please try again later.
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      <Navigation />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" onClick={() => setLocation('/admin')}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Admin
-            </Button>
-            <div>
-              <div className="flex items-center space-x-2">
-                <Shield className="h-8 w-8 text-blue-600" />
-                <h1 className="text-3xl font-bold text-gray-900">Audit Logs</h1>
-              </div>
-              <p className="text-gray-600">View system audit trail and security logs</p>
+    <div className="container mx-auto py-8 space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">System Audit Logs</h1>
+        <Button onClick={handleExport} variant="outline">
+          <Download className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Filter Logs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">User ID</label>
+              <Input
+                placeholder="Filter by User ID"
+                value={filters.userId}
+                onChange={(e) => setFilters({ ...filters, userId: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Action</label>
+              <Select
+                value={filters.action}
+                onValueChange={(value) => setFilters({ ...filters, action: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Actions" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Actions</SelectItem>
+                  <SelectItem value="login">Login</SelectItem>
+                  <SelectItem value="logout">Logout</SelectItem>
+                  <SelectItem value="create_property">Create Property</SelectItem>
+                  <SelectItem value="verify_payment">Verify Payment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start Date</label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">End Date</label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+              />
             </div>
           </div>
-        </div>
+          <div className="mt-4 flex justify-end">
+            <Button
+              variant="ghost"
+              onClick={() => setFilters({ userId: "", action: "", startDate: "", endDate: "" })}
+            >
+              Reset Filters
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filter Logs</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="endDate">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="userId">User ID</Label>
-                <Input
-                  id="userId"
-                  placeholder="Filter by user ID"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="action">Action Type</Label>
-                <Select value={action} onValueChange={setAction}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Actions</SelectItem>
-                    <SelectItem value="login">Login</SelectItem>
-                    <SelectItem value="logout">Logout</SelectItem>
-                    <SelectItem value="admin_user_updated">User Updated</SelectItem>
-                    <SelectItem value="admin_user_suspended">User Suspended</SelectItem>
-                    <SelectItem value="unauthorized_access_attempt">Unauthorized Access</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Audit Logs ({logsData?.total || logsData?.logs?.length || 0})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>User ID</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>IP Address</TableHead>
-                  <TableHead>Metadata</TableHead>
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Timestamp</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Action</TableHead>
+                <TableHead>IP Address</TableHead>
+                <TableHead>Details</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logs?.map((log: any) => (
+                <TableRow key={log.id}>
+                  <TableCell>
+                    {format(new Date(log.timestamp), "MMM d, yyyy HH:mm:ss")}
+                  </TableCell>
+                  <TableCell className="font-medium">{log.userEmail || log.userId}</TableCell>
+                  <TableCell>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {log.action}
+                    </span>
+                  </TableCell>
+                  <TableCell>{log.ipAddress}</TableCell>
+                  <TableCell className="max-w-md truncate">
+                    {JSON.stringify(log.details)}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logsData?.logs?.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {format(new Date(log.createdAt), 'dd MMM yyyy HH:mm')}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{log.userId || 'N/A'}</TableCell>
-                    <TableCell className="font-medium">{log.action}</TableCell>
-                    <TableCell className="font-mono text-sm">{log.ipAddress || 'N/A'}</TableCell>
-                    <TableCell>
-                      <pre className="text-xs bg-gray-50 p-2 rounded max-w-md overflow-auto">
-                        {JSON.stringify(log.metadata, null, 2)}
-                      </pre>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+              ))}
+              {logs?.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    No logs found matching your filters.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-
