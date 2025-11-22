@@ -29,8 +29,12 @@ import LandlordVerification from "@/pages/landlord-verification";
 import LandlordVerify from "@/pages/landlord-verify";
 import OnboardingPage from "@/pages/onboarding";
 import RentTracker from "@/pages/rent-tracker";
+import CreditBuilder from "@/pages/credit-builder";
+import ManualVerify from "@/pages/manual-verify";
+import Trust from "@/pages/trust";
 import ReportGenerator from "@/pages/report-generator";
 import Portfolio from "@/pages/portfolio";
+import PublicPortfolio from "@/pages/public-portfolio";
 import Subscribe from "@/pages/subscribe";
 import SupportRequest from "@/pages/support-request";
 
@@ -61,9 +65,12 @@ function Router() {
 
   return (
     <Switch>
+      {/* Public portfolio view route */}
+      <Route path="/portfolio/:shareToken" component={PublicPortfolio} />
+
       {/* Public landlord verification route */}
       <Route path="/landlord/verify/:token" component={LandlordVerify} />
-      
+
       {/* Public routes - available when not authenticated */}
       <Route path="/auth" component={AuthPage} />
       <Route path="/admin-login" component={AdminLogin} />
@@ -73,12 +80,12 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/support" component={Support} />
-      <Route path="/contact" component={Contact} />  
+      <Route path="/contact" component={Contact} />
       <Route path="/help" component={Help} />
       <Route path="/status" component={Status} />
       <Route path="/product" component={Product} />
       <Route path="/landlord-verification" component={LandlordVerification} />
-      
+
       {/* Admin and special routes */}
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/users" component={() => (
@@ -119,16 +126,19 @@ function Router() {
       <Route path="/landlord-dashboard" component={LandlordDashboard} />
       <Route path="/subscribe" component={Subscribe} />
       <Route path="/support-request" component={SupportRequest} />
-      
+
       {/* Authenticated routes - always available, auth check happens inside components */}
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/reports" component={Reports} />
       <Route path="/settings" component={Settings} />
       <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/rent-tracker" component={RentTracker} />
+      <Route path="/credit-builder" component={CreditBuilder} />
+      <Route path="/manual-verify" component={ManualVerify} />
+      <Route path="/trust" component={Trust} />
       <Route path="/report-generator" component={ReportGenerator} />
       <Route path="/portfolio" component={Portfolio} />
-      
+
       {/* Root route - conditional based on auth */}
       {!isAuthenticated ? (
         <Route path="/" component={Landing} />

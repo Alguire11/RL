@@ -76,6 +76,16 @@ export default function Settings() {
     }
   }, [user]);
 
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/logout", {});
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout failed", error);
+      window.location.href = "/";
+    }
+  };
+
   const { data: bankConnections = [] } = useQuery<BankConnection[]>({
     queryKey: ["/api/bank-connections"],
     retry: false,
@@ -244,8 +254,8 @@ export default function Settings() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="flex items-center mb-4">
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               onClick={() => setLocation('/dashboard')}
               className="mr-4 bg-gray-600 hover:bg-gray-700 text-white"
             >
@@ -305,7 +315,7 @@ export default function Settings() {
                 </div>
               </div>
               <div className="mt-6">
-                <Button 
+                <Button
                   onClick={handleSaveProfile}
                   disabled={updateProfileMutation.isPending}
                   className="gradient-primary text-white"
@@ -426,7 +436,7 @@ export default function Settings() {
                   </div>
                   <Switch
                     checked={notifications.paymentReminders}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setNotifications({ ...notifications, paymentReminders: checked })
                     }
                   />
@@ -438,7 +448,7 @@ export default function Settings() {
                   </div>
                   <Switch
                     checked={notifications.creditReports}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       setNotifications({ ...notifications, creditReports: checked })
                     }
                   />
@@ -457,9 +467,9 @@ export default function Settings() {
                 <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   Export Data
                 </Button>
-                <Button 
+                <Button
                   className="w-full bg-gray-600 hover:bg-gray-700 text-white"
-                  onClick={() => window.location.href = "/api/logout"}
+                  onClick={handleLogout}
                 >
                   Sign Out
                 </Button>

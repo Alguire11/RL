@@ -31,9 +31,21 @@ type LoginData = z.infer<typeof loginSchema>;
 type RegisterData = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+
+  // Determine initial tab from hash or default to login
+  const [activeTab, setActiveTab] = useState(() => {
+    if (window.location.hash === "#register") return "register";
+    return "login";
+  });
+
+  // Update URL hash when tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    window.location.hash = value;
+  };
 
   const loginForm = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
@@ -80,8 +92,11 @@ export default function AuthPage() {
       const response = await apiRequest("POST", "/api/register", data);
       return await response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    onSuccess: async () => {
+      // Invalidate and wait for user query to refetch to ensure session is established
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // Small delay to ensure session cookie is set
+      await new Promise(resolve => setTimeout(resolve, 100));
       toast({
         title: "Account created!",
         description: "Welcome to RentLedger. Let's get you started.",
@@ -106,32 +121,34 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-blue-500 via-blue-600 to-purple-700 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         {/* Back Button */}
         <Button
           variant="ghost"
           onClick={() => navigate("/")}
-          className="mb-6 hover:bg-white/50"
+          className="mb-6 hover:bg-white/20 text-white"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Home
         </Button>
-        
+
         <div className="text-center">
-          <Logo className="mx-auto h-12 w-12 mb-4" />
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900">
+          <div className="mb-4 flex justify-center">
+            <Logo className="text-white" />
+          </div>
+          <h2 className="text-3xl font-bold tracking-tight text-white">
             Welcome to RentLedger
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-white/90">
             Build your credit history through rent payments
           </p>
-          <div className="mt-3 px-4 py-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+          <div className="mt-3 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg text-xs text-white">
             👤 Tenant sign up/login - Create your free account
           </div>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Sign In</TabsTrigger>
             <TabsTrigger value="register">Sign Up</TabsTrigger>
@@ -204,7 +221,7 @@ export default function AuthPage() {
                     {loginMutation.isPending ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
-                
+
                 <div className="mt-4 text-center">
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
@@ -214,7 +231,7 @@ export default function AuthPage() {
                       <span className="bg-white px-2 text-gray-500">Landlord or Admin?</span>
                     </div>
                   </div>
-                  
+
                   <Button
                     type="button"
                     variant="outline"
@@ -360,13 +377,13 @@ export default function AuthPage() {
         </Card>
 
         <div className="text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-white/80">
             By signing up, you agree to our{" "}
-            <a href="/terms" className="text-blue-600 hover:underline">
+            <a href="/terms" className="text-white hover:underline">
               Terms of Service
             </a>{" "}
             and{" "}
-            <a href="/privacy" className="text-blue-600 hover:underline">
+            <a href="/privacy" className="text-white hover:underline">
               Privacy Policy
             </a>
           </p>

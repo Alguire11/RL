@@ -85,7 +85,7 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
   const manualPaymentMutation = useMutation({
     mutationFn: async (data: ManualPaymentFormData) => {
       let receiptUrl = data.receiptUrl;
-      
+
       // Upload file if exists
       if (uploadedFile) {
         setIsUploading(true);
@@ -113,7 +113,7 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/achievements"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/stats"] });
-      
+
       toast({
         title: "Payment Logged Successfully!",
         description: `Payment of £${form.getValues("amount")} has been recorded.`,
@@ -216,22 +216,29 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
             <FormField
               control={form.control}
               name="paymentDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Date</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      type="date"
-                      max={new Date().toISOString().split('T')[0]}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    When was this payment made?
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const threeMonthsAgo = new Date();
+                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                const minDate = threeMonthsAgo.toISOString().split('T')[0];
+
+                return (
+                  <FormItem>
+                    <FormLabel>Payment Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="date"
+                        max={new Date().toISOString().split('T')[0]}
+                        min={minDate}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      When was this payment made? (Max 3 months back)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <FormField
@@ -334,14 +341,38 @@ export function ManualPaymentForm({ onSuccess }: ManualPaymentFormProps) {
 }
 
 export function ManualPaymentList() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: manualPayments = [], isLoading } = useQuery<ManualPaymentRecord[]>({
     queryKey: ["/api/manual-payments"],
     retry: false,
   });
 
+  const verifyMutation = useMutation({
+    mutationFn: async (paymentId: number) => {
+      const response = await apiRequest("POST", `/api/payments/${paymentId}/request-verification`);
+      if (!response.ok) throw new Error("Failed to send verification request");
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Verification Requested",
+        description: "An email has been sent to your landlord for verification.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/manual-payments"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to send verification request. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoading) {
     return (
-      <Card>
+      <Card className="h-full border-none shadow-sm bg-white/50 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Manual Payments</CardTitle>
           <CardDescription>Loading your manual payment history...</CardDescription>
@@ -350,67 +381,83 @@ export function ManualPaymentList() {
     );
   }
 
-  if (manualPayments.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Manual Payments</CardTitle>
-          <CardDescription>No manual payments recorded yet</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            Log payments made outside of bank linking to build your credit history.
-          </p>
-          <ManualPaymentForm />
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Manual Payments</CardTitle>
-          <CardDescription>
-            {manualPayments.length} manual payment{manualPayments.length !== 1 ? 's' : ''} recorded
-          </CardDescription>
-        </div>
-        <ManualPaymentForm />
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {manualPayments.map((payment) => (
-            <div
-              key={payment.id}
-              className="flex items-center justify-between p-3 border rounded-lg"
-            >
-                <div className="flex items-center space-x-3">
-                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">£{Number(payment.amount).toFixed(2)}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(payment.paymentDate).toLocaleDateString()}
-                  </p>
-                  {payment.description && (
-                    <p className="text-xs text-muted-foreground">{payment.description}</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {payment.needsVerification ? (
-                  <Badge variant="secondary">Pending Verification</Badge>
-                ) : (
-                  <Badge variant="default">Verified</Badge>
-                )}
-                {payment.receiptUrl && (
-                  <Upload className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Manual Payments</h2>
+        <p className="text-muted-foreground">
+          {manualPayments.length} manual payment{manualPayments.length !== 1 ? 's' : ''} recorded
+        </p>
+      </div>
+
+      {manualPayments.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="bg-blue-50 p-4 rounded-full mb-4">
+              <CalendarDays className="h-8 w-8 text-blue-500" />
             </div>
+            <h3 className="text-lg font-semibold mb-2">No manual payments yet</h3>
+            <p className="text-sm text-muted-foreground max-w-sm mb-6">
+              Log payments made outside of bank linking (like cash or bank transfers) to build your credit history.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 max-h-[500px] overflow-y-auto pr-2">
+          {manualPayments.map((payment) => (
+            <Card key={payment.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-0">
+                <div className="flex items-center p-6">
+                  <div className="flex-shrink-0 mr-4">
+                    <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
+                      <CalendarDays className="h-6 w-6 text-blue-600" />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-lg font-semibold text-gray-900">
+                        £{Number(payment.amount).toFixed(2)}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {payment.needsVerification ? (
+                          <>
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+                              Pending Verification
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-xs"
+                              onClick={() => verifyMutation.mutate(payment.id)}
+                              disabled={verifyMutation.isPending}
+                            >
+                              {verifyMutation.isPending ? "Sending..." : "Verify"}
+                            </Button>
+                          </>
+                        ) : (
+                          <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+                            Verified
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <p>{new Date(payment.paymentDate).toLocaleDateString(undefined, {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}</p>
+                      <p className="italic">{payment.description || "Rent payment"}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      <ManualPaymentForm />
+    </div>
   );
 }

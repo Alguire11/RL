@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle } from "lucide-react";
+import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle, TrendingUp, Upload } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -31,8 +31,13 @@ export function Navigation() {
 
   const isAdmin = user?.role === "admin" && !!adminUser;
 
+  // Don't show Dashboard when already on dashboard
+  const isOnDashboard = location === "/" || location === "/dashboard";
+  
   const navItems = [
-    { path: "/", label: "Dashboard", icon: BarChart3 },
+    ...(isOnDashboard ? [] : [{ path: "/", label: "Dashboard", icon: BarChart3 }]),
+    { path: "/credit-builder", label: "Credit Builder", icon: TrendingUp },
+    { path: "/manual-verify", label: "Manual Verification", icon: Upload },
     { path: "/settings", label: "Settings", icon: Settings },
     ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: Shield }] : []),
   ];
@@ -71,16 +76,16 @@ export function Navigation() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6 ml-8">
             {navItems.map((item) => {
               const Icon = item.icon;
               return (
                 <Link key={item.path} href={item.path}>
                   <span
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
                       isActive(item.path)
-                        ? "text-primary bg-primary/10"
-                        : "text-gray-600 hover:text-primary hover:bg-primary/5"
+                        ? "text-blue-600 bg-blue-50"
+                        : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -95,10 +100,10 @@ export function Navigation() {
               <DropdownMenuTrigger asChild>
                 <Button 
                   variant="ghost" 
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     location === '/report-generator' || location === '/reports'
-                      ? "text-primary bg-primary/10"
-                      : "text-gray-600 hover:text-primary hover:bg-primary/5"
+                      ? "text-blue-600 bg-blue-50"
+                      : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                   }`}
                 >
                   <FileText className="w-4 h-4" />
@@ -124,14 +129,14 @@ export function Navigation() {
           </div>
 
           {/* User Menu */}
-          <div className="hidden md:flex items-center space-x-3">
+          <div className="hidden md:flex items-center space-x-4 ml-4">
             <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
+                <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-blue-50 transition-colors">
+                  <Avatar className="h-9 w-9 border-2 border-transparent hover:border-blue-200 transition-colors">
                     <AvatarImage src={user?.profileImageUrl} alt={user?.email || "User"} />
-                    <AvatarFallback className="text-sm">
+                    <AvatarFallback className="text-sm bg-blue-100 text-blue-700">
                       {getUserInitials(user)}
                     </AvatarFallback>
                   </Avatar>
@@ -153,6 +158,12 @@ export function Navigation() {
                   <Link href="/settings">
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/reports">
+                    <FileText className="mr-2 h-4 w-4" />
+                    <span>Reports</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
@@ -210,10 +221,10 @@ export function Navigation() {
                     return (
                       <Link key={item.path} href={item.path}>
                         <a
-                          className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                          className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
                             isActive(item.path)
-                              ? "text-primary bg-primary/10"
-                              : "text-gray-600 hover:text-primary hover:bg-primary/5"
+                              ? "text-blue-600 bg-blue-50"
+                              : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                           }`}
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
@@ -228,7 +239,7 @@ export function Navigation() {
                   <div className="space-y-1">
                     <Link href="/report-generator">
                       <a
-                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary hover:bg-primary/5"
+                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
                         <PlusCircle className="w-5 h-5" />
@@ -237,7 +248,7 @@ export function Navigation() {
                     </Link>
                     <Link href="/reports">
                       <a
-                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-primary hover:bg-primary/5"
+                        className="flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200"
                         onClick={() => setIsMobileMenuOpen(false)}
                       >
                         <History className="w-5 h-5" />

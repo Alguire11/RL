@@ -54,9 +54,9 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
   const calculateNextPaymentDate = (amount: number, dayOfMonth: number, frequency: string, firstPaymentDate: string) => {
     const baseDate = new Date(firstPaymentDate);
     const today = new Date();
-    
+
     let nextDate: Date;
-    
+
     switch (frequency) {
       case "weekly":
         nextDate = new Date(baseDate);
@@ -78,14 +78,14 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
         }
         break;
     }
-    
+
     return format(nextDate, "PPP");
   };
 
   const updateRentMutation = useMutation({
     mutationFn: async (data: RentDateData) => {
       const nextPayment = calculateNextPaymentDate(data.amount, data.dayOfMonth, data.frequency, data.firstPaymentDate);
-      
+
       const rentData = {
         ...data,
         nextPaymentDate: nextPayment,
@@ -96,12 +96,12 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
           rentInfo: rentData,
           monthlyRent: data.amount
         });
-        
+
         if (!response.ok) {
           const error = await response.json();
           throw error;
         }
-        
+
         return response.json();
       } else {
         return apiRequest("PUT", "/api/user/rent-info", rentData);
@@ -109,10 +109,10 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
     },
     onSuccess: (data) => {
       const remainingUpdates = data?._meta?.remainingRentUpdates;
-      
+
       toast({
         title: "Rent details updated",
-        description: remainingUpdates !== undefined 
+        description: remainingUpdates !== undefined
           ? `Your rent payment details have been updated. You have ${remainingUpdates} rent update${remainingUpdates !== 1 ? 's' : ''} remaining this month.`
           : "Your rent payment details have been successfully updated.",
       });
@@ -122,16 +122,20 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       setIsOpen(false);
       if (onRentUpdate) {
-        onRentUpdate(form.getValues());
+        // Pass the updated data back to the parent immediately
+        onRentUpdate({
+          ...form.getValues(),
+          // Ensure we pass the transformed values if needed, but form.getValues() returns the form state
+        });
       }
     },
     onError: (error: any) => {
       const errorMessage = error.message || "Failed to update rent details. Please try again.";
       const isLimitReached = error.remainingUpdates === 0;
-      
+
       toast({
         title: isLimitReached ? "Rent Update Limit Reached" : "Error updating rent details",
-        description: isLimitReached 
+        description: isLimitReached
           ? `${errorMessage} The limit will reset next month.`
           : errorMessage,
         variant: "destructive",
@@ -158,6 +162,18 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
     }
   }, [watchedValues]);
 
+  // Update form values when currentRentInfo changes
+  React.useEffect(() => {
+    if (currentRentInfo) {
+      form.reset({
+        amount: currentRentInfo.amount || 0,
+        dayOfMonth: currentRentInfo.dayOfMonth || 1,
+        frequency: (currentRentInfo.frequency as any) || "monthly",
+        firstPaymentDate: currentRentInfo.firstPaymentDate || format(new Date(), "yyyy-MM-dd"),
+      });
+    }
+  }, [currentRentInfo, form]);
+
   const displayRentInfo =
     currentRentInfo?.amount != null && currentRentInfo?.dayOfMonth != null
       ? `£${currentRentInfo.amount}/month - Due ${currentRentInfo.dayOfMonth}${getOrdinalSuffix(currentRentInfo.dayOfMonth)}`
@@ -174,17 +190,21 @@ export function RentDateEditor({ currentRentInfo, onRentUpdate, propertyId }: Re
           <CardContent>
             <div className="flex items-center space-x-2">
               <Calendar className="h-4 w-4 text-gray-500" />
-              <p className="text-sm text-gray-600">{displayRentInfo}</p>
+              <p className="text-sm text-gray-600">
+                {currentRentInfo?.amount != null
+                  ? `£${currentRentInfo.amount}/month - Due ${currentRentInfo.dayOfMonth || 1}${getOrdinalSuffix(Number(currentRentInfo.dayOfMonth || 1))}`
+                  : "No rent details set"}
+              </p>
             </div>
           </CardContent>
         </Card>
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Rent Details</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="amount">Monthly Rent Amount (£)</Label>

@@ -69,6 +69,7 @@ export const properties = pgTable("properties", {
   isActive: boolean("is_active").default(true),
   rentUpdateCount: integer("rent_update_count").default(0),
   lastRentUpdateMonth: varchar("last_rent_update_month"), // Format: YYYY-MM
+  rentInfo: jsonb("rent_info"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -247,89 +248,15 @@ export const dataExportRequests = pgTable("data_export_requests", {
 });
 
 // Relations
-export const usersRelations = relations(users, ({ one, many }) => ({
-  properties: many(properties),
-  rentPayments: many(rentPayments),
-  bankConnections: many(bankConnections),
-  creditReports: many(creditReports),
-  landlordVerifications: many(landlordVerifications),
-  notifications: many(notifications),
-  preferences: one(userPreferences),
-  securityLogs: many(securityLogs),
-  adminUser: one(adminUsers),
-  dataExportRequests: many(dataExportRequests),
-  badges: many(userBadges),
-  certificationPortfolios: many(certificationPortfolios),
-}));
-
-export const propertiesRelations = relations(properties, ({ one, many }) => ({
-  user: one(users, { fields: [properties.userId], references: [users.id] }),
-  rentPayments: many(rentPayments),
-  creditReports: many(creditReports),
-  landlordVerifications: many(landlordVerifications),
-}));
-
-export const rentPaymentsRelations = relations(rentPayments, ({ one }) => ({
-  user: one(users, { fields: [rentPayments.userId], references: [users.id] }),
-  property: one(properties, { fields: [rentPayments.propertyId], references: [properties.id] }),
-}));
-
-export const bankConnectionsRelations = relations(bankConnections, ({ one }) => ({
-  user: one(users, { fields: [bankConnections.userId], references: [users.id] }),
-}));
-
-export const creditReportsRelations = relations(creditReports, ({ one, many }) => ({
-  user: one(users, { fields: [creditReports.userId], references: [users.id] }),
-  property: one(properties, { fields: [creditReports.propertyId], references: [properties.id] }),
-  shares: many(reportShares),
-}));
-
-export const reportSharesRelations = relations(reportShares, ({ one }) => ({
-  report: one(creditReports, { fields: [reportShares.reportId], references: [creditReports.id] }),
-}));
-
-export const landlordVerificationsRelations = relations(landlordVerifications, ({ one }) => ({
-  user: one(users, { fields: [landlordVerifications.userId], references: [users.id] }),
-  property: one(properties, { fields: [landlordVerifications.propertyId], references: [properties.id] }),
-}));
-
-export const tenantInvitationsRelations = relations(tenantInvitations, ({ one }) => ({
-  landlord: one(users, { fields: [tenantInvitations.landlordId], references: [users.id] }),
-  property: one(properties, { fields: [tenantInvitations.propertyId], references: [properties.id] }),
-  tenant: one(users, { fields: [tenantInvitations.tenantId], references: [users.id] }),
-}));
-
-export const notificationsRelations = relations(notifications, ({ one }) => ({
-  user: one(users, { fields: [notifications.userId], references: [users.id] }),
-}));
-
-export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
-  user: one(users, { fields: [userPreferences.userId], references: [users.id] }),
-}));
-
-export const securityLogsRelations = relations(securityLogs, ({ one }) => ({
-  user: one(users, { fields: [securityLogs.userId], references: [users.id] }),
-}));
-
-export const adminUsersRelations = relations(adminUsers, ({ one }) => ({
-  user: one(users, { fields: [adminUsers.userId], references: [users.id] }),
-}));
-
-export const dataExportRequestsRelations = relations(dataExportRequests, ({ one }) => ({
-  user: one(users, { fields: [dataExportRequests.userId], references: [users.id] }),
-}));
-
-export const userBadgesRelations = relations(userBadges, ({ one }) => ({
-  user: one(users, { fields: [userBadges.userId], references: [users.id] }),
-}));
-
-export const certificationPortfoliosRelations = relations(certificationPortfolios, ({ one }) => ({
-  user: one(users, { fields: [certificationPortfolios.userId], references: [users.id] }),
-}));
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users);
-export const insertPropertySchema = createInsertSchema(properties);
+export const insertPropertySchema = createInsertSchema(properties).extend({
+  contractDuration: z.union([z.number().int().positive(), z.string().transform((val) => {
+    const num = parseInt(val, 10);
+    return isNaN(num) || num <= 0 ? undefined : num;
+  }).optional(), z.undefined()]).optional(),
+});
 export const insertRentPaymentSchema = createInsertSchema(rentPayments);
 export const insertBankConnectionSchema = createInsertSchema(bankConnections);
 export const insertCreditReportSchema = createInsertSchema(creditReports);
@@ -377,8 +304,8 @@ export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;
 export const achievementBadges = pgTable("achievement_badges", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  badgeType: varchar("badge_type", { 
-    enum: ["first_payment", "streak_3", "streak_6", "streak_12", "perfect_year", "early_bird", "consistent_payer"] 
+  badgeType: varchar("badge_type", {
+    enum: ["first_payment", "streak_3", "streak_6", "streak_12", "perfect_year", "early_bird", "consistent_payer"]
   }).notNull(),
   earnedAt: timestamp("earned_at").defaultNow(),
   title: varchar("title").notNull(),
@@ -396,6 +323,8 @@ export const manualPayments = pgTable("manual_payments", {
   paymentMethod: varchar("payment_method"), // bank_transfer, cash, cheque, etc.
   description: varchar("description"),
   receiptUrl: varchar("receipt_url"), // For uploaded receipt images
+  landlordEmail: varchar("landlord_email"), // Landlord email for verification
+  landlordPhone: varchar("landlord_phone"), // Landlord phone for verification
   needsVerification: boolean("needs_verification").default(true),
   verifiedAt: timestamp("verified_at"),
   verifiedBy: varchar("verified_by"), // landlord email or admin
@@ -494,3 +423,171 @@ export type SystemSetting = typeof systemSettings.$inferSelect;
 export type InsertSystemSetting = typeof systemSettings.$inferInsert;
 export type Dispute = typeof disputes.$inferSelect;
 export type InsertDispute = typeof disputes.$inferInsert;
+
+// Rent logs table for tracking verified rent payments
+export const rentLogs = pgTable("rent_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  month: varchar("month", { length: 7 }).notNull(), // Format: YYYY-MM
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  verified: boolean("verified").default(false),
+  verifiedBy: varchar("verified_by").references(() => users.id), // landlord or admin user id
+  proofURL: varchar("proof_url"), // URL to uploaded receipt/proof
+  landlordId: varchar("landlord_id").references(() => users.id), // Linked landlord if applicable
+  landlordEmail: varchar("landlord_email"), // Stored email if landlord not registered yet
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Landlord-tenant links for multi-unit support
+export const landlordTenantLinks = pgTable("landlord_tenant_links", {
+  id: serial("id").primaryKey(),
+  landlordId: varchar("landlord_id").references(() => users.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => users.id).notNull(),
+  propertyId: integer("property_id").references(() => properties.id),
+  status: varchar("status", { enum: ["pending", "active", "inactive", "terminated"] }).default("pending"),
+  linkedAt: timestamp("linked_at").defaultNow(),
+  terminatedAt: timestamp("terminated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Admin actions log for tracking verifications, rejections, deletions
+export const adminActions = pgTable("admin_actions", {
+  id: serial("id").primaryKey(),
+  adminId: varchar("admin_id").references(() => users.id).notNull(),
+  actionType: varchar("action_type", {
+    enum: ["verify_rent", "reject_rent", "delete_rent", "verify_landlord", "reject_landlord", "delete_user", "other"]
+  }).notNull(),
+  targetType: varchar("target_type", { enum: ["rent_log", "user", "landlord", "property", "other"] }).notNull(),
+  targetId: varchar("target_id").notNull(), // ID of the target (rent_log id, user id, etc.)
+  details: jsonb("details"), // Additional action details
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Pending landlord registrations - store email/info before they register
+export const pendingLandlords = pgTable("pending_landlords", {
+  id: serial("id").primaryKey(),
+  email: varchar("email").notNull(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  phone: varchar("phone"),
+  businessName: varchar("business_name"),
+  invitedBy: varchar("invited_by").references(() => users.id), // Tenant who invited them
+  invitationToken: varchar("invitation_token").unique(),
+  status: varchar("status", { enum: ["pending", "registered", "expired"] }).default("pending"),
+  metadata: jsonb("metadata"), // Additional info
+  createdAt: timestamp("created_at").defaultNow(),
+  registeredAt: timestamp("registered_at"),
+});
+
+export type RentLog = typeof rentLogs.$inferSelect;
+export type InsertRentLog = typeof rentLogs.$inferInsert;
+export type LandlordTenantLink = typeof landlordTenantLinks.$inferSelect;
+export type InsertLandlordTenantLink = typeof landlordTenantLinks.$inferInsert;
+export type AdminAction = typeof adminActions.$inferSelect;
+export type InsertAdminAction = typeof adminActions.$inferInsert;
+export type PendingLandlord = typeof pendingLandlords.$inferSelect;
+export type InsertPendingLandlord = typeof pendingLandlords.$inferInsert;
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  properties: many(properties),
+  rentPayments: many(rentPayments),
+  bankConnections: many(bankConnections),
+  creditReports: many(creditReports),
+  landlordVerifications: many(landlordVerifications),
+  notifications: many(notifications),
+  preferences: one(userPreferences),
+  securityLogs: many(securityLogs),
+  adminUser: one(adminUsers),
+  dataExportRequests: many(dataExportRequests),
+  badges: many(userBadges),
+  certificationPortfolios: many(certificationPortfolios),
+}));
+
+export const propertiesRelations = relations(properties, ({ one, many }) => ({
+  user: one(users, { fields: [properties.userId], references: [users.id] }),
+  rentPayments: many(rentPayments),
+  creditReports: many(creditReports),
+  landlordVerifications: many(landlordVerifications),
+}));
+
+export const rentPaymentsRelations = relations(rentPayments, ({ one }) => ({
+  user: one(users, { fields: [rentPayments.userId], references: [users.id] }),
+  property: one(properties, { fields: [rentPayments.propertyId], references: [properties.id] }),
+}));
+
+export const bankConnectionsRelations = relations(bankConnections, ({ one }) => ({
+  user: one(users, { fields: [bankConnections.userId], references: [users.id] }),
+}));
+
+export const creditReportsRelations = relations(creditReports, ({ one, many }) => ({
+  user: one(users, { fields: [creditReports.userId], references: [users.id] }),
+  property: one(properties, { fields: [creditReports.propertyId], references: [properties.id] }),
+  shares: many(reportShares),
+}));
+
+export const reportSharesRelations = relations(reportShares, ({ one }) => ({
+  report: one(creditReports, { fields: [reportShares.reportId], references: [creditReports.id] }),
+}));
+
+export const landlordVerificationsRelations = relations(landlordVerifications, ({ one }) => ({
+  user: one(users, { fields: [landlordVerifications.userId], references: [users.id] }),
+  property: one(properties, { fields: [landlordVerifications.propertyId], references: [properties.id] }),
+}));
+
+export const tenantInvitationsRelations = relations(tenantInvitations, ({ one }) => ({
+  landlord: one(users, { fields: [tenantInvitations.landlordId], references: [users.id] }),
+  property: one(properties, { fields: [tenantInvitations.propertyId], references: [properties.id] }),
+  tenant: one(users, { fields: [tenantInvitations.tenantId], references: [users.id] }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
+  user: one(users, { fields: [userPreferences.userId], references: [users.id] }),
+}));
+
+export const securityLogsRelations = relations(securityLogs, ({ one }) => ({
+  user: one(users, { fields: [securityLogs.userId], references: [users.id] }),
+}));
+
+export const adminUsersRelations = relations(adminUsers, ({ one }) => ({
+  user: one(users, { fields: [adminUsers.userId], references: [users.id] }),
+}));
+
+export const dataExportRequestsRelations = relations(dataExportRequests, ({ one }) => ({
+  user: one(users, { fields: [dataExportRequests.userId], references: [users.id] }),
+}));
+
+export const userBadgesRelations = relations(userBadges, ({ one }) => ({
+  user: one(users, { fields: [userBadges.userId], references: [users.id] }),
+}));
+
+export const certificationPortfoliosRelations = relations(certificationPortfolios, ({ one }) => ({
+  user: one(users, { fields: [certificationPortfolios.userId], references: [users.id] }),
+}));
+
+export const rentLogsRelations = relations(rentLogs, ({ one }) => ({
+  user: one(users, { fields: [rentLogs.userId], references: [users.id] }),
+  landlord: one(users, { fields: [rentLogs.landlordId], references: [users.id] }),
+  verifier: one(users, { fields: [rentLogs.verifiedBy], references: [users.id] }),
+}));
+
+export const landlordTenantLinksRelations = relations(landlordTenantLinks, ({ one }) => ({
+  landlord: one(users, { fields: [landlordTenantLinks.landlordId], references: [users.id] }),
+  tenant: one(users, { fields: [landlordTenantLinks.tenantId], references: [users.id] }),
+  property: one(properties, { fields: [landlordTenantLinks.propertyId], references: [properties.id] }),
+}));
+
+export const adminActionsRelations = relations(adminActions, ({ one }) => ({
+  admin: one(users, { fields: [adminActions.adminId], references: [users.id] }),
+}));
+
+export const pendingLandlordsRelations = relations(pendingLandlords, ({ one }) => ({
+  inviter: one(users, { fields: [pendingLandlords.invitedBy], references: [users.id] }),
+}));

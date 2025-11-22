@@ -86,6 +86,19 @@ const TOUR_STEPS: TourStep[] = [
     position: 'right'
   },
   {
+    id: 'rent-tracking',
+    title: 'Track Your Rent Payments',
+    description: 'Build credit through rent',
+    content: 'Log your rent payments to build your credit history. You can upload receipts manually or connect your bank for automatic tracking. Each verified payment strengthens your financial profile.',
+    target: '.payment-history',
+    icon: CreditCard,
+    position: 'top',
+    action: {
+      label: 'Log My Rent',
+      onClick: () => window.location.href = '/credit-builder'
+    }
+  },
+  {
     id: 'notifications',
     title: 'Smart Notifications',
     description: 'Never miss a payment again',
