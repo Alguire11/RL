@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -18,17 +18,17 @@ import { ManualPaymentList } from "@/components/manual-payment-form";
 import { PaymentStreakCard } from "@/components/payment-streak-card";
 import { AchievementBadgesEarned } from "@/components/achievement-badges-earned";
 import { UpcomingBadges } from "@/components/upcoming-badges";
-import { EnhancedDataExport } from "@/components/enhanced-data-export";
 import { DashboardTour, useDashboardTour } from "@/components/dashboard-tour";
 import { format } from "date-fns";
 import { AddressEditor } from "@/components/address-editor";
 import { RentDateEditor } from "@/components/rent-date-editor";
 import { PropertyForm } from "@/components/property-form";
 import { Footer } from "@/components/footer";
-import { SubscriptionGuard } from "@/components/subscription-guard";
 import type { DashboardStats } from "@shared/dashboard";
 import type { ApiProperty, RentPayment } from "@/types/api";
 import { getQueryFn } from "@/lib/queryClient";
+
+import { PaymentHistoryDialog } from "@/components/payment-history-dialog";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { showTour, startTour, closeTour, completeTour, shouldShowTour } = useDashboardTour();
   const { plan, isLoading: subLoading, subscription } = useSubscription();
+  const [isPaymentHistoryOpen, setIsPaymentHistoryOpen] = useState(false);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -127,12 +128,32 @@ export default function Dashboard() {
   };
 
   // Calculate payment status
-  const calculatePaymentStatus = (payment: RentPayment) => {
+  // Merge regular and manual payments for the dashboard list
+  const { data: manualPayments = [] } = useQuery<any[]>({
+    queryKey: ["/api/manual-payments"],
+    retry: false,
+  });
+
+  const allPayments = useMemo(() => {
+    const combined = [...payments, ...manualPayments.map(p => ({
+      ...p,
+      id: `manual-${p.id}`,
+      dueDate: p.paymentDate,
+      paidDate: p.paymentDate,
+      status: p.needsVerification ? 'pending' : 'paid',
+      isVerified: !p.needsVerification,
+      isManual: true
+    }))];
+    return combined.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  }, [payments, manualPayments]);
+
+  const calculatePaymentStatus = (payment: RentPayment & { isManual?: boolean }) => {
     const today = new Date();
     const dueDate = new Date(payment.dueDate);
     const paidDate = payment.paidDate ? new Date(payment.paidDate) : null;
-    
-    if (payment.verified) return 'verified';
+
+    if (payment.verified || payment.isVerified) return 'verified';
+    if (payment.isManual && !payment.isVerified) return 'awaiting-verification';
     if (paidDate) return 'awaiting-verification';
     if (today > dueDate) return 'overdue';
     if (today.toDateString() === dueDate.toDateString()) return 'due-today';
@@ -142,17 +163,17 @@ export default function Dashboard() {
   // Calculate payment streak
   const calculatePaymentStreak = (payments: RentPayment[]) => {
     // Sort by due date descending (most recent first)
-    const sorted = [...payments].sort((a, b) => 
+    const sorted = [...payments].sort((a, b) =>
       new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
     );
     let streak = 0;
-    
+
     for (const payment of sorted) {
       if (!payment.paidDate) break;
       const paidDate = new Date(payment.paidDate);
       const dueDate = new Date(payment.dueDate);
       const diffDays = Math.ceil((paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       // On-time if paid within 5 days of due date
       if (diffDays <= 5) {
         streak++;
@@ -221,7 +242,7 @@ export default function Dashboard() {
 
   // Handle action item clicks
   const handleActionClick = (actionId: string) => {
-    switch(actionId) {
+    switch (actionId) {
       case 'add-property':
         // Scroll to PropertyForm
         const propertyForm = document.querySelector('.property-form');
@@ -230,7 +251,7 @@ export default function Dashboard() {
         }
         break;
       case 'verify-payments':
-        setLocation('/rent-tracker');
+        setLocation('/credit-builder');
         break;
       case 'connect-bank':
         setLocation('/bank-connections');
@@ -446,7 +467,7 @@ export default function Dashboard() {
 
         {/* Quick Actions */}
         <div className="bank-connections grid md:grid-cols-3 gap-6 mb-8">
-          <AddressEditor 
+          <AddressEditor
             currentAddress={properties[0] ? {
               street: properties[0].address,
               city: properties[0].city,
@@ -455,12 +476,13 @@ export default function Dashboard() {
             } : undefined}
             propertyId={properties[0]?.id}
           />
-          <RentDateEditor 
+          <RentDateEditor
+            key={properties[0]?.rentInfo?.dayOfMonth || 'default'}
             currentRentInfo={properties[0] ? {
-              amount: parseFloat(String(properties[0].monthlyRent)),
-              dayOfMonth: 1, // Default, can be enhanced later
-              frequency: 'monthly',
-              firstPaymentDate: properties[0].tenancyStartDate || undefined
+              amount: properties[0].rentInfo?.amount || parseFloat(String(properties[0].monthlyRent)),
+              dayOfMonth: properties[0].rentInfo?.dayOfMonth || 1,
+              frequency: properties[0].rentInfo?.frequency || 'monthly',
+              firstPaymentDate: properties[0].rentInfo?.firstPaymentDate || properties[0].tenancyStartDate || undefined
             } : undefined}
             propertyId={properties[0]?.id}
           />
@@ -473,7 +495,7 @@ export default function Dashboard() {
           <Card className="payment-history">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-xl font-semibold">Recent Payments</CardTitle>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setLocation('/rent-tracker')}>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setIsPaymentHistoryOpen(true)}>
                 View All
               </Button>
             </CardHeader>
@@ -498,75 +520,75 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {payments.slice(0, 3).map((payment) => {
+                  {allPayments.slice(0, 3).map((payment) => {
                     const paymentStatus = calculatePaymentStatus(payment);
                     const statusColor = getStatusColor(paymentStatus);
                     const isVerified = Boolean(payment.verified ?? payment.isVerified);
-                    
+
                     return (
                       <div
                         key={payment.id}
                         className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-l-4 transition-colors"
                         style={{ borderLeftColor: statusColor }}
                       >
-                      <div className="flex items-center space-x-3">
-                        <div 
-                          className="w-10 h-10 rounded-full flex items-center justify-center"
-                          style={{ backgroundColor: `${statusColor}20` }}
-                        >
-                          {paymentStatus === 'verified' || paymentStatus === 'awaiting-verification' ? (
-                            <CheckCircle className="w-5 h-5" style={{ color: statusColor }} />
-                          ) : paymentStatus === 'overdue' ? (
-                            <Calendar className="w-5 h-5" style={{ color: statusColor }} />
-                          ) : (
-                            <Calendar className="w-5 h-5 text-gray-600" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <p className="font-medium">{formatDate(payment.dueDate)}</p>
-                            {paymentStatus === 'verified' && (
-                              <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
-                                <Shield className="w-3 h-3 mr-1" />
-                                Verified
-                              </Badge>
-                            )}
-                            {paymentStatus === 'awaiting-verification' && (
-                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
-                                Awaiting Verification
-                              </Badge>
-                            )}
-                            {paymentStatus === 'overdue' && (
-                              <Badge variant="destructive" className="bg-red-100 text-red-800 text-xs">
-                                Overdue
-                              </Badge>
-                            )}
-                            {paymentStatus === 'due-today' && (
-                              <Badge className="bg-orange-100 text-orange-800 text-xs">
-                                Due Today
-                              </Badge>
-                            )}
-                            {paymentStatus === 'upcoming' && (
-                              <Badge variant="secondary" className="text-xs">
-                                Upcoming
-                              </Badge>
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: `${statusColor}20` }}
+                          >
+                            {paymentStatus === 'verified' || paymentStatus === 'awaiting-verification' ? (
+                              <CheckCircle className="w-5 h-5" style={{ color: statusColor }} />
+                            ) : paymentStatus === 'overdue' ? (
+                              <Calendar className="w-5 h-5" style={{ color: statusColor }} />
+                            ) : (
+                              <Calendar className="w-5 h-5 text-gray-600" />
                             )}
                           </div>
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <p className="font-medium">{formatDate(payment.dueDate)}</p>
+                              {paymentStatus === 'verified' && (
+                                <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              )}
+                              {paymentStatus === 'awaiting-verification' && (
+                                <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
+                                  Awaiting Verification
+                                </Badge>
+                              )}
+                              {paymentStatus === 'overdue' && (
+                                <Badge variant="destructive" className="bg-red-100 text-red-800 text-xs">
+                                  Overdue
+                                </Badge>
+                              )}
+                              {paymentStatus === 'due-today' && (
+                                <Badge className="bg-orange-100 text-orange-800 text-xs">
+                                  Due Today
+                                </Badge>
+                              )}
+                              {paymentStatus === 'upcoming' && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Upcoming
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              {paymentStatus === 'verified' ? 'Verified payment' :
+                                paymentStatus === 'awaiting-verification' ? 'Waiting for landlord confirmation' :
+                                  paymentStatus === 'overdue' ? 'Payment overdue' :
+                                    paymentStatus === 'due-today' ? 'Payment due today' :
+                                      'Upcoming payment'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{formatCurrency(Number(payment.amount))}</p>
                           <p className="text-sm text-gray-600">
-                            {paymentStatus === 'verified' ? 'Verified payment' : 
-                             paymentStatus === 'awaiting-verification' ? 'Waiting for landlord confirmation' :
-                             paymentStatus === 'overdue' ? 'Payment overdue' :
-                             paymentStatus === 'due-today' ? 'Payment due today' :
-                             'Upcoming payment'}
+                            {payment.paidDate ? formatDate(payment.paidDate) : 'Due ' + formatDate(payment.dueDate)}
                           </p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(Number(payment.amount))}</p>
-                        <p className="text-sm text-gray-600">
-                          {payment.paidDate ? formatDate(payment.paidDate) : 'Due ' + formatDate(payment.dueDate)}
-                        </p>
-                      </div>
                       </div>
                     );
                   })}
@@ -591,7 +613,7 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <GradientButton
                   className="w-full h-12 justify-center"
-                  onClick={() => handleInternalNavigation('/rent-tracker')}
+                  onClick={() => handleInternalNavigation('/credit-builder')}
                 >
                   <Plus className="w-5 h-5 mr-3" />
                   Add Payment Record
@@ -671,40 +693,36 @@ export default function Dashboard() {
         )}
 
         {/* Additional Features Section - Reorganized per image layout */}
-        <div className="grid lg:grid-cols-3 gap-8 mt-8">
-          {/* Left Column: Manual Payment Logging */}
-          <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+          {/* Left Column: Manual Payment Logging - Takes 2 columns for better visibility */}
+          <div className="lg:col-span-2">
             <ManualPaymentList />
           </div>
-          
-          {/* Middle Column: Payment Streak, Achievement Badges, Upcoming Badges, Enhanced Data Export */}
+
+          {/* Right Column: Payment Streak, Achievement Badges, Upcoming Badges */}
           <div className="lg:col-span-1 space-y-6">
             {/* Payment Streak Progress */}
             <PaymentStreakCard />
-            
+
             {/* Achievement Badges (Earned) */}
             <AchievementBadgesEarned />
-            
+
             {/* Upcoming Badges */}
             <UpcomingBadges />
-            
-            {/* Enhanced Data Export - Premium Feature */}
-            <SubscriptionGuard feature="enhancedExports" requiredPlan="premium">
-              <EnhancedDataExport />
-            </SubscriptionGuard>
-          </div>
-          
-          {/* Right Column: Empty or can add other content */}
-          <div className="lg:col-span-1">
-            {/* Reserved for future content */}
           </div>
         </div>
 
         {/* Tour Component */}
-        <DashboardTour 
-          isOpen={showTour} 
-          onClose={closeTour} 
-          onComplete={completeTour} 
+        <DashboardTour
+          isOpen={showTour}
+          onClose={closeTour}
+          onComplete={completeTour}
+        />
+
+        <PaymentHistoryDialog
+          isOpen={isPaymentHistoryOpen}
+          onClose={() => setIsPaymentHistoryOpen(false)}
+          payments={allPayments}
         />
       </div>
       <Footer />

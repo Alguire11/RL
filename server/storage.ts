@@ -65,6 +65,18 @@ import {
   disputes,
   type Dispute,
   type InsertDispute,
+  rentLogs,
+  type RentLog,
+  type InsertRentLog,
+  landlordTenantLinks,
+  type LandlordTenantLink,
+  type InsertLandlordTenantLink,
+  adminActions,
+  type AdminAction,
+  type InsertAdminAction,
+  pendingLandlords,
+  type PendingLandlord,
+  type InsertPendingLandlord,
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
@@ -197,6 +209,28 @@ export interface IStorage {
   getSystemSettings(): Promise<Record<string, any>>;
   updateSystemSettings(settings: Record<string, any>, updatedBy: string): Promise<void>;
   getSystemSetting(key: string): Promise<any>;
+  
+  // Rent log operations
+  createRentLog(log: InsertRentLog): Promise<RentLog>;
+  getUserRentLogs(userId: string): Promise<RentLog[]>;
+  getRentLog(id: number): Promise<RentLog | undefined>;
+  updateRentLog(id: number, updates: Partial<InsertRentLog>): Promise<RentLog>;
+  deleteRentLog(id: number): Promise<void>;
+  getUnverifiedRentLogs(landlordId?: string): Promise<RentLog[]>;
+  
+  // Landlord-tenant link operations
+  createLandlordTenantLink(link: InsertLandlordTenantLink): Promise<LandlordTenantLink>;
+  getLandlordTenantLinks(landlordId: string): Promise<LandlordTenantLink[]>;
+  getTenantLandlordLinks(tenantId: string): Promise<LandlordTenantLink[]>;
+  
+  // Admin action operations
+  createAdminAction(action: InsertAdminAction): Promise<AdminAction>;
+  getAdminActions(adminId?: string): Promise<AdminAction[]>;
+  
+  // Pending landlord operations
+  createPendingLandlord(pending: InsertPendingLandlord): Promise<PendingLandlord>;
+  getPendingLandlord(email: string): Promise<PendingLandlord | undefined>;
+  updatePendingLandlordStatus(email: string, status: string): Promise<void>;
   
   // Disputes operations
   getDisputes(filters?: {
@@ -1246,6 +1280,94 @@ export class DatabaseStorage implements IStorage {
       .where(eq(disputes.id, id))
       .returning();
     return updated;
+  }
+
+  // Rent log operations
+  async createRentLog(log: InsertRentLog): Promise<RentLog> {
+    const [created] = await db.insert(rentLogs).values(log).returning();
+    return created;
+  }
+
+  async getUserRentLogs(userId: string): Promise<RentLog[]> {
+    return await db.select().from(rentLogs).where(eq(rentLogs.userId, userId)).orderBy(desc(rentLogs.submittedAt));
+  }
+
+  async getRentLog(id: number): Promise<RentLog | undefined> {
+    const [log] = await db.select().from(rentLogs).where(eq(rentLogs.id, id));
+    return log;
+  }
+
+  async updateRentLog(id: number, updates: Partial<InsertRentLog>): Promise<RentLog> {
+    const [updated] = await db.update(rentLogs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(rentLogs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRentLog(id: number): Promise<void> {
+    await db.delete(rentLogs).where(eq(rentLogs.id, id));
+  }
+
+  async getUnverifiedRentLogs(landlordId?: string): Promise<RentLog[]> {
+    if (landlordId) {
+      return await db.select().from(rentLogs)
+        .where(and(eq(rentLogs.verified, false), eq(rentLogs.landlordId, landlordId)))
+        .orderBy(desc(rentLogs.submittedAt));
+    }
+    return await db.select().from(rentLogs)
+      .where(eq(rentLogs.verified, false))
+      .orderBy(desc(rentLogs.submittedAt));
+  }
+
+  // Landlord-tenant link operations
+  async createLandlordTenantLink(link: InsertLandlordTenantLink): Promise<LandlordTenantLink> {
+    const [created] = await db.insert(landlordTenantLinks).values(link).returning();
+    return created;
+  }
+
+  async getLandlordTenantLinks(landlordId: string): Promise<LandlordTenantLink[]> {
+    return await db.select().from(landlordTenantLinks)
+      .where(eq(landlordTenantLinks.landlordId, landlordId))
+      .orderBy(desc(landlordTenantLinks.linkedAt));
+  }
+
+  async getTenantLandlordLinks(tenantId: string): Promise<LandlordTenantLink[]> {
+    return await db.select().from(landlordTenantLinks)
+      .where(eq(landlordTenantLinks.tenantId, tenantId))
+      .orderBy(desc(landlordTenantLinks.linkedAt));
+  }
+
+  // Admin action operations
+  async createAdminAction(action: InsertAdminAction): Promise<AdminAction> {
+    const [created] = await db.insert(adminActions).values(action).returning();
+    return created;
+  }
+
+  async getAdminActions(adminId?: string): Promise<AdminAction[]> {
+    if (adminId) {
+      return await db.select().from(adminActions)
+        .where(eq(adminActions.adminId, adminId))
+        .orderBy(desc(adminActions.createdAt));
+    }
+    return await db.select().from(adminActions).orderBy(desc(adminActions.createdAt));
+  }
+
+  // Pending landlord operations
+  async createPendingLandlord(pending: InsertPendingLandlord): Promise<PendingLandlord> {
+    const [created] = await db.insert(pendingLandlords).values(pending).returning();
+    return created;
+  }
+
+  async getPendingLandlord(email: string): Promise<PendingLandlord | undefined> {
+    const [pending] = await db.select().from(pendingLandlords).where(eq(pendingLandlords.email, email));
+    return pending;
+  }
+
+  async updatePendingLandlordStatus(email: string, status: string): Promise<void> {
+    await db.update(pendingLandlords)
+      .set({ status: status as any, registeredAt: status === 'registered' ? new Date() : undefined })
+      .where(eq(pendingLandlords.email, email));
   }
 }
 

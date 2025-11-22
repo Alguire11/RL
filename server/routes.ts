@@ -6,9 +6,9 @@ import passport from "passport";
 import { sendEmail, createLandlordVerificationEmail, createTenantInviteEmail, emailService } from "./emailService";
 import QRCode from "qrcode";
 import { z } from "zod";
-import { 
-  insertPropertySchema, 
-  insertRentPaymentSchema, 
+import {
+  insertPropertySchema,
+  insertRentPaymentSchema,
   insertBankConnectionSchema,
   insertNotificationSchema,
   insertUserPreferencesSchema,
@@ -26,17 +26,17 @@ async function generateRLID(role: string): Promise<string> {
   const prefix = role === 'landlord' ? 'LRLID-' : 'TRLID-';
   let rlid: string;
   let exists = true;
-  
+
   // Keep generating until we find a unique ID
   while (exists) {
     const randomNum = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
     rlid = `${prefix}${randomNum}`;
-    
+
     // Check if this RLID already exists
     const allUsers = await storage.getAllUsers();
     exists = allUsers.some(user => user.rlid === rlid);
   }
-  
+
   return rlid!;
 }
 
@@ -148,13 +148,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const updateData = req.body;
-      
+
       const user = await storage.upsertUser({
         id: userId,
         ...updateData,
         updatedAt: new Date(),
       });
-      
+
       res.json(user);
     } catch (error) {
       console.error("Error updating user profile:", error);
@@ -167,14 +167,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { street, city, postcode, country } = req.body;
-      
+
       const user = await storage.updateUserAddress(userId, {
         street, city, postcode, country
       });
-      
-      res.json({ 
+
+      res.json({
         message: 'Address updated successfully',
-        address: user.address 
+        address: user.address
       });
     } catch (error) {
       console.error("Error updating user address:", error);
@@ -187,21 +187,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { amount, dayOfMonth, frequency, firstPaymentDate, nextPaymentDate, landlordName, landlordEmail, landlordPhone } = req.body;
-      
+
       const user = await storage.updateUserRentInfo(userId, {
-        amount, 
-        dayOfMonth, 
-        frequency, 
-        firstPaymentDate, 
+        amount,
+        dayOfMonth,
+        frequency,
+        firstPaymentDate,
         nextPaymentDate,
         landlordName,
         landlordEmail,
         landlordPhone
       });
-      
-      res.json({ 
+
+      res.json({
         message: 'Rent information updated successfully',
-        rentInfo: user.rentInfo 
+        rentInfo: user.rentInfo
       });
     } catch (error) {
       console.error("Error updating rent information:", error);
@@ -224,13 +224,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/properties', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const propertyData = insertPropertySchema.parse({ ...req.body, userId });
-      
-      const property = await storage.createProperty(propertyData);
+
+      // Validate required fields first
+      if (!req.body.address || !req.body.city || !req.body.postcode || !req.body.monthlyRent) {
+        return res.status(400).json({
+          message: "Missing required fields: address, city, postcode, and monthlyRent are required",
+          received: {
+            address: !!req.body.address,
+            city: !!req.body.city,
+            postcode: !!req.body.postcode,
+            monthlyRent: !!req.body.monthlyRent
+          }
+        });
+      }
+
+      // Validate monthlyRent is a valid number
+      const monthlyRentNum = parseFloat(req.body.monthlyRent);
+      if (isNaN(monthlyRentNum) || monthlyRentNum <= 0) {
+        return res.status(400).json({
+          message: "Invalid monthly rent: must be a positive number",
+          received: req.body.monthlyRent
+        });
+      }
+
+      // Prepare property data with proper formatting - only include fields we explicitly want
+      // Start with a clean object and only add what we need
+      const propertyData: any = {
+        userId,
+        address: String(req.body.address).trim(),
+        city: String(req.body.city).trim(),
+        postcode: String(req.body.postcode).trim(),
+        monthlyRent: monthlyRentNum.toFixed(2),
+      };
+
+      // Log the incoming request body to debug
+      console.log("Incoming request body:", JSON.stringify(req.body, null, 2));
+
+      // Add optional string fields only if they exist and are not empty
+      if (req.body.landlordName && String(req.body.landlordName).trim()) {
+        propertyData.landlordName = String(req.body.landlordName).trim();
+      }
+      if (req.body.landlordEmail && String(req.body.landlordEmail).trim()) {
+        propertyData.landlordEmail = String(req.body.landlordEmail).trim();
+      }
+      if (req.body.landlordPhone && String(req.body.landlordPhone).trim()) {
+        propertyData.landlordPhone = String(req.body.landlordPhone).trim();
+      }
+      if (req.body.tenancyStartDate && String(req.body.tenancyStartDate).trim()) {
+        propertyData.tenancyStartDate = req.body.tenancyStartDate;
+      } else if (req.body.firstPaymentDate && String(req.body.firstPaymentDate).trim()) {
+        propertyData.tenancyStartDate = req.body.firstPaymentDate;
+      }
+      if (req.body.tenancyEndDate && String(req.body.tenancyEndDate).trim()) {
+        propertyData.tenancyEndDate = req.body.tenancyEndDate;
+      }
+      if (req.body.leaseType && String(req.body.leaseType).trim()) {
+        propertyData.leaseType = req.body.leaseType;
+      }
+
+      // DO NOT include contractDuration unless explicitly provided and valid
+      // The schema expects it to be a number or undefined, never a string
+      // Only add it if we have a valid positive number
+      if (req.body.contractDuration !== undefined && req.body.contractDuration !== null) {
+        const contractDurationValue = req.body.contractDuration;
+        // If it's already a number and valid, use it
+        if (typeof contractDurationValue === 'number' && !isNaN(contractDurationValue) && contractDurationValue > 0) {
+          propertyData.contractDuration = contractDurationValue;
+        }
+        // If it's a string, try to parse it
+        else if (typeof contractDurationValue === 'string') {
+          const trimmed = contractDurationValue.trim();
+          if (trimmed && trimmed !== '0' && trimmed !== '') {
+            const parsed = parseInt(trimmed, 10);
+            if (!isNaN(parsed) && parsed > 0) {
+              propertyData.contractDuration = parsed;
+            }
+          }
+        }
+        // Otherwise, don't include it at all
+      }
+
+      // Explicitly exclude any other fields that might cause issues
+      // Don't include rentUpdateCount, lastRentUpdateMonth, etc. - they have defaults
+
+      // Final cleanup: remove any undefined, null, empty string values, and ensure types are correct
+      const cleanedPropertyData: any = {};
+      for (const [key, value] of Object.entries(propertyData)) {
+        // Skip undefined, null, and empty strings
+        if (value === undefined || value === null || value === '') {
+          continue;
+        }
+
+        // Special handling for contractDuration - must be a number, never a string
+        if (key === 'contractDuration') {
+          // Only include if it's actually a number type
+          if (typeof value === 'number' && !isNaN(value) && value > 0) {
+            cleanedPropertyData[key] = value;
+          }
+          // Explicitly skip if it's a string or any other invalid type
+          continue;
+        }
+
+        // Include all other valid values
+        cleanedPropertyData[key] = value;
+      }
+
+      // Double-check: explicitly remove contractDuration if it's not a number
+      if (cleanedPropertyData.contractDuration !== undefined) {
+        if (typeof cleanedPropertyData.contractDuration !== 'number') {
+          delete cleanedPropertyData.contractDuration;
+        }
+      }
+
+      console.log("Creating property with cleaned data:", JSON.stringify(cleanedPropertyData, null, 2));
+
+      // Validate with schema
+      let validatedData;
+      try {
+        validatedData = insertPropertySchema.parse(cleanedPropertyData);
+        console.log("Validation passed, validated data:", JSON.stringify(validatedData, null, 2));
+      } catch (validationError: any) {
+        console.error("Schema validation error:", validationError);
+        console.error("Validation error issues:", JSON.stringify(validationError?.issues || [], null, 2));
+        console.error("Data that failed validation:", JSON.stringify(cleanedPropertyData, null, 2));
+        return res.status(400).json({
+          message: "Validation failed",
+          error: validationError?.issues?.[0]?.message || validationError?.message,
+          path: validationError?.issues?.[0]?.path || [],
+          issues: validationError?.issues || []
+        });
+      }
+
+      // Create property
+      const property = await storage.createProperty(validatedData);
       res.json(property);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating property:", error);
-      res.status(500).json({ message: "Failed to create property" });
+      console.error("Error stack:", error?.stack);
+      // Return more detailed error message
+      const errorMessage = error?.issues?.[0]?.message || error?.message || "Failed to create property";
+      res.status(500).json({
+        message: errorMessage,
+        details: error?.issues || error?.code || error,
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      });
     }
   });
 
@@ -238,7 +375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const propertyId = parseInt(req.params.id);
       const updateData = req.body;
-      
+
       const property = await storage.updateProperty(propertyId, updateData);
       res.json(property);
     } catch (error) {
@@ -264,7 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const payments = await storage.getUserRentPayments(userId);
       const manualPayments = await storage.getUserManualPayments(userId);
-      
+
       // Combine manual payments with rent payments
       const allPayments = [
         ...payments,
@@ -286,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receiptUrl: mp.receiptUrl,
         }))
       ].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-      
+
       res.json(allPayments);
     } catch (error) {
       console.error("Error fetching rent payments:", error);
@@ -298,14 +435,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const paymentData = insertRentPaymentSchema.parse({ ...req.body, userId });
-      
+
       const payment = await storage.createRentPayment(paymentData);
-      
+
       // Get property and user details for email and notification
       if (payment.propertyId) {
         const property = await storage.getPropertyById(payment.propertyId);
         const user = await storage.getUserById(userId);
-        
+
         // Send confirmation email to landlord
         if (property?.landlordEmail && user) {
           await sendEmail({
@@ -327,7 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `
           });
         }
-        
+
         // Create "due soon" notification if payment is within 5 days
         const dueDate = new Date(payment.dueDate);
         const today = new Date();
@@ -343,7 +480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-      
+
       res.json(payment);
     } catch (error) {
       console.error("Error creating rent payment:", error);
@@ -355,7 +492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const paymentId = parseInt(req.params.id);
       const updateData = req.body;
-      
+
       const payment = await storage.updateRentPayment(paymentId, updateData);
       res.json(payment);
     } catch (error) {
@@ -486,7 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const connectionData = insertBankConnectionSchema.parse({ ...req.body, userId });
-      
+
       const connection = await storage.createBankConnection(connectionData);
       res.json(connection);
     } catch (error) {
@@ -522,26 +659,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { propertyId, reportType = 'credit' } = req.body;
-      
+
       // Get user data
       const user = await storage.getUser(userId);
       const properties = await storage.getUserProperties(userId);
       const property = properties.find(p => p.id === propertyId);
       const payments = await storage.getPropertyRentPayments(propertyId);
       const allPayments = await storage.getUserRentPayments(userId);
-      
+
       if (!user || !property) {
         return res.status(404).json({ message: "User or property not found" });
       }
-      
+
       // Get user badges (achievements)
       const badges = await storage.getUserBadges(userId);
-      
+
       // Calculate payment stats
       const verifiedPayments = allPayments.filter(p => p.isVerified);
       const totalPayments = allPayments.length;
       const verificationRate = totalPayments > 0 ? (verifiedPayments.length / totalPayments) * 100 : 0;
-      
+
       // Calculate on-time rate
       const onTimePayments = allPayments.filter(p => {
         if (!p.paidDate) return false;
@@ -551,9 +688,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return diffDays <= 5; // Within 5 days grace period
       });
       const onTimeRate = totalPayments > 0 ? (onTimePayments.length / totalPayments) * 100 : 0;
-      
+
       // Calculate payment streak
-      const sortedPayments = [...allPayments].sort((a, b) => 
+      const sortedPayments = [...allPayments].sort((a, b) =>
         new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
       );
       let paymentStreak = 0;
@@ -568,7 +705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           break;
         }
       }
-      
+
       // Calculate Rent Score (0-1000)
       // Payment History Score (60%): Based on on-time rate
       const paymentHistoryScore = (onTimeRate / 100) * 600;
@@ -577,10 +714,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Streak Score (20%): Based on payment streak (capped at 12 months = max 200)
       const streakScore = Math.min((paymentStreak / 12) * 200, 200);
       const rentScore = Math.round(paymentHistoryScore + verificationScore + streakScore);
-      
+
       // Total paid
       const totalPaid = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-      
+
       // Common data for all report types
       const userInfo = {
         name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
@@ -588,21 +725,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: user.email || 'N/A',
         phone: user.phone || 'N/A',
       };
-      
+
       const currentAddress = {
         fullAddress: property.address || 'N/A',
         city: property.city || 'N/A',
         postcode: property.postcode || 'N/A',
         moveInDate: property.tenancyStartDate || undefined,
       };
-      
+
       const landlordInfo = {
         name: property.landlordName || 'N/A',
         email: property.landlordEmail || 'N/A',
         phone: property.landlordPhone || 'N/A',
         verificationStatus: verifiedPayments.length > 0 ? 'verified' : 'unverified' as const,
       };
-      
+
       const paymentHistory = payments.slice(0, 12).map(p => ({
         date: p.dueDate,
         amount: parseFloat(p.amount),
@@ -610,7 +747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dueDate: p.dueDate,
         paidDate: p.paidDate || undefined,
       }));
-      
+
       const earnedBadges = badges.map(b => ({
         type: b.badgeType,
         level: b.level || 1,
@@ -618,10 +755,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         earnedAt: b.earnedAt?.toISOString() || new Date().toISOString(),
         description: JSON.stringify(b.metadata) !== '{}' ? JSON.stringify(b.metadata) : undefined,
       }));
-      
+
       // Generate report based on type
       let reportData: any;
-      
+
       if (reportType === 'credit') {
         reportData = {
           reportType: 'credit',
@@ -703,7 +840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paymentStreak,
         };
       }
-      
+
       const report = await storage.createCreditReport({
         userId,
         propertyId,
@@ -711,7 +848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verificationId: reportData.reportId,
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
-      
+
       res.json(report);
     } catch (error) {
       console.error("Error generating credit report:", error);
@@ -723,9 +860,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const reportId = parseInt(req.params.id);
       const { recipientEmail, recipientType } = req.body;
-      
+
       const shareUrl = `https://${req.hostname}/shared-report/${Date.now()}-${reportId}`;
-      
+
       const share = await storage.createReportShare({
         reportId,
         recipientEmail,
@@ -733,7 +870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         shareUrl,
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       });
-      
+
       res.json(share);
     } catch (error) {
       console.error("Error sharing report:", error);
@@ -746,25 +883,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const shareUrl = `https://${req.hostname}/shared-report/${req.params.url}`;
       const share = await storage.getReportShareByUrl(shareUrl);
-      
+
       if (!share || !share.isActive) {
         return res.status(404).json({ message: "Report not found or expired" });
       }
-      
+
       if (share.expiresAt && new Date() > share.expiresAt) {
         return res.status(410).json({ message: "Report has expired" });
       }
-      
+
       // Increment access count
       await storage.incrementShareAccess(share.id);
-      
+
       // Get the actual report
       const report = await storage.getCreditReportByReportId(share.reportId.toString());
-      
+
       if (!report) {
         return res.status(404).json({ message: "Report not found" });
       }
-      
+
       res.json({ report: report.reportData, share });
     } catch (error) {
       console.error("Error accessing shared report:", error);
@@ -800,11 +937,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const preferences = await storage.getUserPreferences(userId);
-      res.json(preferences || { 
+      res.json(preferences || {
         paymentReminders: true,
         emailNotifications: true,
         smsNotifications: false,
-        reminderDays: 3 
+        reminderDays: 3
       });
     } catch (error) {
       console.error('Error fetching user preferences:', error);
@@ -830,19 +967,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { propertyId, landlordEmail } = req.body;
-      
+
       const verificationToken = nanoid(32);
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-      
+
       // Get user and property info for email
       const user = await storage.getUser(userId);
       const properties = await storage.getUserProperties(userId);
       const property = properties.find(p => p.id === propertyId);
-      
+
       if (!user || !property) {
         return res.status(404).json({ message: 'User or property not found' });
       }
-      
+
       const verification = await storage.createLandlordVerification({
         userId,
         propertyId,
@@ -850,19 +987,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         landlordEmail,
         expiresAt,
       });
-      
+
       // Send live email to landlord
       const verificationUrl = `${req.protocol}://${req.hostname}/landlord/verify/${verificationToken}`;
       const tenantName = `${user.firstName} ${user.lastName}`;
       const propertyAddress = `${property.address}, ${property.city} ${property.postcode}`;
-      
+
       const emailData = createLandlordVerificationEmail(
         landlordEmail,
         tenantName,
         propertyAddress,
         verificationUrl
       );
-      
+
       const emailResult = await sendEmail(emailData);
 
       if (!emailResult.success) {
@@ -907,28 +1044,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const token = req.params.token;
       const verification = await storage.getLandlordVerification(token);
-      
+
       if (!verification) {
         return res.status(404).json({ message: 'Verification not found' });
       }
-      
+
       if (verification.expiresAt && new Date() > verification.expiresAt) {
         return res.status(410).json({ message: 'Verification link has expired' });
       }
-      
+
       if (verification.isVerified) {
         return res.status(400).json({ message: 'Already verified' });
       }
-      
+
       // Get user and property info for display
       const user = await storage.getUser(verification.userId);
       const properties = await storage.getUserProperties(verification.userId);
       const property = properties.find(p => p.id === verification.propertyId);
-      
+
       if (!user || !property) {
         return res.status(404).json({ message: 'User or property not found' });
       }
-      
+
       res.json({
         user: {
           name: `${user.firstName} ${user.lastName}`,
@@ -955,25 +1092,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const token = req.params.token;
       const verification = await storage.getLandlordVerification(token);
-      
+
       if (!verification) {
         return res.status(404).json({ message: 'Verification not found' });
       }
-      
+
       if (verification.expiresAt && new Date() > verification.expiresAt) {
         return res.status(410).json({ message: 'Verification link has expired' });
       }
-      
+
       if (verification.isVerified) {
         return res.status(400).json({ message: 'Already verified' });
       }
-      
+
       // Mark as verified
       await storage.updateLandlordVerification(verification.id, {
         isVerified: true,
         verifiedAt: new Date(),
       });
-      
+
       // Create notification for user
       await storage.createNotification({
         userId: verification.userId,
@@ -981,7 +1118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         title: 'Landlord Verification Confirmed',
         message: 'Your landlord has confirmed your rent payment history',
       });
-      
+
       res.json({ message: 'Verification confirmed successfully' });
     } catch (error) {
       console.error('Error confirming verification:', error);
@@ -1005,19 +1142,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { dataType = 'all' } = req.body;
-      
+
       const exportRequest = await storage.createDataExportRequest({
         userId,
         dataType,
         status: 'pending',
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       });
-      
-      await logSecurityEvent(req, 'data_export_requested', { 
+
+      await logSecurityEvent(req, 'data_export_requested', {
         dataType,
-        requestId: exportRequest.id 
+        requestId: exportRequest.id
       });
-      
+
       // TODO: Implement actual data export processing
       // For now, mark as completed immediately
       setTimeout(async () => {
@@ -1027,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             completedAt: new Date(),
             downloadUrl: `${req.protocol}://${req.hostname}/api/user/export-data/${exportRequest.id}/download`,
           });
-          
+
           await storage.createNotification({
             userId,
             type: 'system',
@@ -1038,8 +1175,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Error completing data export:', error);
         }
       }, 2000);
-      
-      res.json({ 
+
+      res.json({
         message: 'Data export request submitted successfully',
         requestId: exportRequest.id
       });
@@ -1053,29 +1190,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const requestId = parseInt(req.params.id);
-      
+
       const requests = await storage.getUserDataExportRequests(userId);
       const exportRequest = requests.find(r => r.id === requestId);
-      
+
       if (!exportRequest) {
         return res.status(404).json({ message: 'Export request not found' });
       }
-      
+
       if (exportRequest.status !== 'completed') {
         return res.status(400).json({ message: 'Export not ready' });
       }
-      
+
       if (exportRequest.expiresAt && new Date() > exportRequest.expiresAt) {
         return res.status(410).json({ message: 'Export has expired' });
       }
-      
+
       // Get user data
       const user = await storage.getUser(userId);
       const properties = await storage.getUserProperties(userId);
       const payments = await storage.getUserRentPayments(userId);
       const reports = await storage.getUserCreditReports(userId);
       const bankConnections = await storage.getUserBankConnections(userId);
-      
+
       const exportData = {
         user: { ...user, password: undefined },
         properties,
@@ -1087,12 +1224,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })),
         exportedAt: new Date().toISOString(),
       };
-      
-      await logSecurityEvent(req, 'data_export_downloaded', { 
+
+      await logSecurityEvent(req, 'data_export_downloaded', {
         requestId: exportRequest.id,
         dataType: exportRequest.dataType
       });
-      
+
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="enoikio-data-${userId}-${Date.now()}.json"`);
       res.json(exportData);
@@ -1135,20 +1272,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-    app.get('/api/admin/system-health', requireAdmin, async (req: any, res) => {
-      try {
-        type HealthStatus = 'healthy' | 'degraded' | 'down';
-        const health: {
-          database: HealthStatus;
-          emailService: HealthStatus;
-          paymentProcessor: HealthStatus;
-          lastChecked: string;
-        } = {
-          database: 'healthy',
-          emailService: 'healthy',
-          paymentProcessor: 'healthy',
-          lastChecked: new Date().toISOString(),
-        };
+  app.get('/api/admin/system-health', requireAdmin, async (req: any, res) => {
+    try {
+      type HealthStatus = 'healthy' | 'degraded' | 'down';
+      const health: {
+        database: HealthStatus;
+        emailService: HealthStatus;
+        paymentProcessor: HealthStatus;
+        lastChecked: string;
+      } = {
+        database: 'healthy',
+        emailService: 'healthy',
+        paymentProcessor: 'healthy',
+        lastChecked: new Date().toISOString(),
+      };
 
       // Perform actual health checks
       try {
@@ -1169,12 +1306,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-    app.post('/api/admin/system-check', requireAdmin, async (req: any, res) => {
-      try {
-        const adminUser = (req as any).adminUser;
-        await logSecurityEvent(req, 'admin_system_check', { adminId: adminUser.id });
-      
-        const checks = {
+  app.post('/api/admin/system-check', requireAdmin, async (req: any, res) => {
+    try {
+      const adminUser = (req as any).adminUser;
+      await logSecurityEvent(req, 'admin_system_check', { adminId: adminUser.id });
+
+      const checks = {
         database: true,
         emailService: !!process.env.SENDGRID_API_KEY,
         storage: true,
@@ -1182,8 +1319,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const allHealthy = Object.values(checks).every(check => check);
-      
-      res.json({ 
+
+      res.json({
         status: allHealthy ? 'healthy' : 'issues_detected',
         checks,
         timestamp: new Date().toISOString()
@@ -1304,21 +1441,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (format === 'csv') {
         // Convert to CSV format (simplified - in production, use a proper CSV library)
         const csvRows: string[] = [];
-        
+
         // Users CSV
         csvRows.push('=== USERS ===');
         csvRows.push('ID,Email,Username,Role,Plan,Status,Created');
         users.forEach(u => {
           csvRows.push(`${u.id},${u.email || ''},${u.username || ''},${u.role || ''},${u.subscriptionPlan || ''},${u.isActive ? 'active' : 'inactive'},${u.createdAt || ''}`);
         });
-        
+
         // Properties CSV
         csvRows.push('\n=== PROPERTIES ===');
         csvRows.push('ID,User ID,Address,City,Monthly Rent,Status');
         properties.forEach(p => {
           csvRows.push(`${p.id},${p.userId},${p.address || ''},${p.city || ''},${p.monthlyRent || ''},${p.isActive ? 'active' : 'inactive'}`);
         });
-        
+
         // Payments CSV
         csvRows.push('\n=== PAYMENTS ===');
         csvRows.push('ID,User ID,Property ID,Amount,Due Date,Paid Date,Status');
@@ -1344,37 +1481,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/send-announcement', requireAdmin, async (req: any, res) => {
     try {
       const { message } = req.body;
-      
+
       if (!message || message.trim().length === 0) {
         return res.status(400).json({ message: 'Announcement message is required' });
       }
 
-        const adminUser = (req as any).adminUser;
-        await logSecurityEvent(req, 'admin_announcement', {
-          adminId: adminUser.id,
-          messageLength: message.length
-        });
+      const adminUser = (req as any).adminUser;
+      await logSecurityEvent(req, 'admin_announcement', {
+        adminId: adminUser.id,
+        messageLength: message.length
+      });
 
       // Get all active users
       const users = await storage.getAllUsers();
       const activeUsers = users.filter((user: any) => user.isOnboarded);
 
       // Create notifications for all active users
-        const notifications = activeUsers.map((user: any) =>
-          storage.createNotification({
-            userId: user.id,
-            type: 'system',
-            title: 'System Announcement',
-            message: message.trim(),
-            scheduledFor: new Date(),
-          })
-        );
+      const notifications = activeUsers.map((user: any) =>
+        storage.createNotification({
+          userId: user.id,
+          type: 'system',
+          title: 'System Announcement',
+          message: message.trim(),
+          scheduledFor: new Date(),
+        })
+      );
 
       await Promise.all(notifications);
 
-      res.json({ 
+      res.json({
         message: 'Announcement sent successfully',
-        recipientCount: activeUsers.length 
+        recipientCount: activeUsers.length
       });
     } catch (error) {
       console.error('Error sending announcement:', error);
@@ -1387,23 +1524,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // This would typically be called by a cron job or scheduled task
       const { authToken } = req.body;
-      
+
       // Simple auth check for system endpoints
       if (authToken !== process.env.SYSTEM_TOKEN) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
-      
+
       // Get all users with payment reminders enabled
       const stats = await storage.getSystemStats();
       const users = stats.recentUsers; // This would be all users in a real implementation
-      
+
       let remindersSent = 0;
-      
+
       for (const user of users) {
         try {
           const preferences = await storage.getUserPreferences(user.id);
           if (!preferences?.paymentReminders) continue;
-          
+
           const payments = await storage.getUserRentPayments(user.id);
           const upcomingPayments = payments.filter(p => {
             if (p.status !== 'pending') return false;
@@ -1412,7 +1549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
             return daysUntilDue === (preferences.reminderDays || 3);
           });
-          
+
           for (const payment of upcomingPayments) {
             await storage.createNotification({
               userId: user.id,
@@ -1427,10 +1564,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error(`Error sending reminder for user ${user.id}:`, error);
         }
       }
-      
-      res.json({ 
+
+      res.json({
         message: `Sent ${remindersSent} payment reminders`,
-        remindersSent 
+        remindersSent
       });
     } catch (error) {
       console.error('Error sending payment reminders:', error);
@@ -1479,13 +1616,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { type } = req.body;
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      
-        if (type === 'email' && user?.email) {
-          await sendEmail({
-            to: user.email,
-            from: 'noreply@enoikio.com',
-            subject: 'Enoíkio - Test Notification',
-            html: `
+
+      if (type === 'email' && user?.email) {
+        await sendEmail({
+          to: user.email,
+          from: 'noreply@enoikio.com',
+          subject: 'Enoíkio - Test Notification',
+          html: `
             <h2>Test Notification from Enoíkio</h2>
             <p>This is a test email notification to confirm your settings are working correctly.</p>
             <p>You'll receive payment reminders and updates at this email address.</p>
@@ -1494,7 +1631,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `,
         });
       }
-      
+
       res.json({ success: true, message: `Test ${type} notification sent` });
     } catch (error) {
       console.error("Error sending test notification:", error);
@@ -1522,7 +1659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { reportId } = req.params;
       const report = await storage.getCreditReportByReportId(reportId);
-      
+
       if (!report) {
         return res.status(404).json({ message: "Report not found" });
       }
@@ -1530,7 +1667,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(report.userId);
       const payments = await storage.getUserRentPayments(report.userId);
       const properties = await storage.getUserProperties(report.userId);
-      
+
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1538,17 +1675,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const primaryProperty = properties[0];
       const propertyForReport = primaryProperty
         ? {
-            address: primaryProperty.address,
-            city: primaryProperty.city ?? 'N/A',
-            postcode: primaryProperty.postcode ?? 'N/A',
-            monthlyRent: Number(primaryProperty.monthlyRent) || 0,
-          }
+          address: primaryProperty.address,
+          city: primaryProperty.city ?? 'N/A',
+          postcode: primaryProperty.postcode ?? 'N/A',
+          monthlyRent: Number(primaryProperty.monthlyRent) || 0,
+        }
         : {
-            address: 'N/A',
-            city: 'N/A',
-            postcode: 'N/A',
-            monthlyRent: 0,
-          };
+          address: 'N/A',
+          city: 'N/A',
+          postcode: 'N/A',
+          monthlyRent: 0,
+        };
 
       const reportData = {
         user: {
@@ -1578,7 +1715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { generateCreditReportPDF } = await import('./pdfGenerator');
       const pdfBuffer = await generateCreditReportPDF(reportData);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="rent-credit-report-${reportId}.pdf"`);
       res.send(pdfBuffer);
@@ -1592,10 +1729,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/support/contact', async (req, res) => {
     try {
       const { name, email, subject, category, message, priority } = req.body;
-      
+
       const supportEmail = 'support@enoikio.com';
       const userEmail = email;
-      
+
       // Send email to support team
       const supportEmailSuccess = await sendEmail({
         to: supportEmail,
@@ -1662,21 +1799,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (supportEmailSuccess && userEmailSuccess) {
-        res.json({ 
-          success: true, 
-          message: 'Support request submitted successfully. You will receive a confirmation email shortly.' 
+        res.json({
+          success: true,
+          message: 'Support request submitted successfully. You will receive a confirmation email shortly.'
         });
       } else {
-        res.status(500).json({ 
-          success: false, 
-          message: 'Failed to send support request. Please try again or contact us directly.' 
+        res.status(500).json({
+          success: false,
+          message: 'Failed to send support request. Please try again or contact us directly.'
         });
       }
     } catch (error) {
       console.error('Support contact error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Support system error. Please try again later.' 
+      res.status(500).json({
+        success: false,
+        message: 'Support system error. Please try again later.'
       });
     }
   });
@@ -1686,7 +1823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { message, sessionId } = req.body;
       const userId = req.isAuthenticated ? req.isAuthenticated() ? (req as any).user?.id : 'anonymous' : 'anonymous';
-      
+
       // In a real implementation, this would connect to a chat service
       // For now, we'll simulate a response
       const responses = [
@@ -1696,9 +1833,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "I'm here to help. Can you provide a bit more detail about the issue?",
         "Let me check our knowledge base for the best solution to your problem."
       ];
-      
+
       const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      
+
       // Simulate processing time
       setTimeout(() => {
         res.json({
@@ -1708,12 +1845,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           agent: 'Support Agent'
         });
       }, 1000 + Math.random() * 2000);
-      
+
     } catch (error) {
       console.error('Chat error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Chat service temporarily unavailable' 
+      res.status(500).json({
+        success: false,
+        message: 'Chat service temporarily unavailable'
       });
     }
   });
@@ -1780,7 +1917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingUser) {
         return res.status(404).json({ message: 'User not found' });
       }
-      
+
       await storage.upsertUser({
         ...existingUser,
         password: hashedPassword,
@@ -1792,7 +1929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adminId: (req as any).adminUser.id,
       });
 
-      res.json({ 
+      res.json({
         message: 'Password reset successfully',
         note: 'New password has been set. Share securely with user.'
       });
@@ -1808,7 +1945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const updates = req.body;
-      
+
       // Validate updates
       const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'role', 'subscriptionPlan', 'subscriptionStatus', 'isActive', 'isOnboarded', 'emailVerified'];
       const filteredUpdates = Object.keys(updates)
@@ -1817,18 +1954,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           obj[key] = updates[key];
           return obj;
         }, {} as any);
-      
+
       const user = await storage.upsertUser({
         id: userId,
         ...filteredUpdates,
         updatedAt: new Date(),
       });
-      
+
       await logSecurityEvent(req, 'admin_user_updated', {
         targetUserId: userId,
         updates: filteredUpdates,
       });
-      
+
       res.json(user);
     } catch (error) {
       console.error('Error updating user:', error);
@@ -1844,17 +1981,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingUser) {
         return res.status(404).json({ message: 'User not found' });
       }
-      
+
       await storage.upsertUser({
         ...existingUser,
         isActive: false,
         updatedAt: new Date(),
       });
-      
+
       await logSecurityEvent(req, 'admin_user_suspended', {
         targetUserId: userId,
       });
-      
+
       res.json({ message: 'User suspended successfully' });
     } catch (error) {
       console.error('Error suspending user:', error);
@@ -1870,17 +2007,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existingUser) {
         return res.status(404).json({ message: 'User not found' });
       }
-      
+
       await storage.upsertUser({
         ...existingUser,
         isActive: true,
         updatedAt: new Date(),
       });
-      
+
       await logSecurityEvent(req, 'admin_user_reactivated', {
         targetUserId: userId,
       });
-      
+
       res.json({ message: 'User reactivated successfully' });
     } catch (error) {
       console.error('Error reactivating user:', error);
@@ -1892,7 +2029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Retrieve settings from database, with defaults if not set
       const dbSettings = await storage.getSystemSettings();
-      
+
       // Default settings (used if not in database)
       const defaultSettings = {
         maintenanceMode: false,
@@ -1909,10 +2046,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dataRetentionDays: 365,
         sessionTimeoutMinutes: 60,
       };
-      
+
       // Merge database settings with defaults (database takes precedence)
       const settings = { ...defaultSettings, ...dbSettings };
-      
+
       res.json(settings);
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -1925,24 +2062,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const settings = req.body;
       const adminUser = (req as any).adminUser;
-      
+
       // Validate settings object
       if (!settings || typeof settings !== 'object') {
         return res.status(400).json({ message: 'Invalid settings format' });
       }
-      
+
       // Persist settings to database
       await storage.updateSystemSettings(settings, adminUser.id || adminUser.userId);
-      
+
       // Log the security event
       await logSecurityEvent(req, 'admin_settings_updated', {
         settings: Object.keys(settings),
         adminId: adminUser.id,
       });
-      
-      res.json({ 
+
+      res.json({
         message: 'Settings updated successfully',
-        settings 
+        settings
       });
     } catch (error) {
       console.error('Error updating settings:', error);
@@ -1954,11 +2091,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/test-email', requireAdmin, async (req: any, res) => {
     try {
       const { email } = req.body;
-      
+
       if (!email) {
         return res.status(400).json({ message: 'Email address is required' });
       }
-      
+
       const emailResult = await sendEmail({
         to: email,
         from: 'noreply@enoikio.co.uk',
@@ -1970,18 +2107,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           <p>Sent at: ${new Date().toISOString()}</p>
         `,
       });
-      
+
       await logSecurityEvent(req, 'admin_test_email_sent', {
         recipientEmail: email,
         success: emailResult.success,
       });
-      
+
       if (emailResult.success) {
         res.json({ message: 'Test email sent successfully' });
       } else {
-        res.status(500).json({ 
+        res.status(500).json({
           message: 'Failed to send test email',
-          error: emailResult.error 
+          error: emailResult.error
         });
       }
     } catch (error) {
@@ -2043,10 +2180,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { subscriptionId } = req.params;
       const updates = req.body;
-      
+
       // Extract userId from subscriptionId (format: sub_userId)
       const userId = subscriptionId.replace('sub_', '');
-      
+
       const allowedFields = ['subscriptionPlan', 'subscriptionStatus', 'subscriptionEndDate'];
       const filteredUpdates = Object.keys(updates)
         .filter(key => allowedFields.includes(key))
@@ -2054,7 +2191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           obj[key] = updates[key];
           return obj;
         }, {} as any);
-      
+
       const currentUser = await storage.getUser(userId);
       if (!currentUser) {
         return res.status(404).json({ message: 'User not found' });
@@ -2065,12 +2202,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subscriptionStatus: filteredUpdates.subscriptionStatus || currentUser.subscriptionStatus || 'active',
         subscriptionEndDate: filteredUpdates.subscriptionEndDate ? new Date(filteredUpdates.subscriptionEndDate) : currentUser.subscriptionEndDate || undefined,
       });
-      
+
       await logSecurityEvent(req, 'admin_subscription_updated', {
         userId,
         updates: filteredUpdates,
       });
-      
+
       res.json({ message: 'Subscription updated successfully' });
     } catch (error) {
       console.error('Error updating subscription:', error);
@@ -2102,7 +2239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { range = '30' } = req.query;
       const days = parseInt(range as string);
-      
+
       // Generate mock chart data
       const chartData = [];
       for (let i = days; i >= 0; i--) {
@@ -2170,14 +2307,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignedTo: adminUser.userId || adminUser.id,
         updatedAt: new Date(),
       });
-      
+
       await logSecurityEvent(req, 'admin_moderation_resolved', {
         itemId,
         action,
         adminId: adminUser.id,
       });
-      
-      res.json({ 
+
+      res.json({
         message: `Moderation item ${action}d successfully`,
         itemId,
         action,
@@ -2198,7 +2335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const adminUser = (req as any).adminUser;
       const { itemId } = req.body;
-      
+
       if (!itemId) {
         return res.status(400).json({ message: 'Item ID is required' });
       }
@@ -2217,8 +2354,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adminId: adminUser.id,
         priority: 'urgent',
       });
-      
-      res.json({ 
+
+      res.json({
         message: 'Moderation item escalated successfully',
         itemId,
         escalatedAt: new Date().toISOString(),
@@ -2240,14 +2377,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/disputes', requireAdmin, async (req: any, res) => {
     try {
       const { status, type, priority } = req.query;
-      
+
       // Fetch disputes with filters
       const disputesList = await storage.getDisputes({
         status: status as string,
         type: type as string,
         priority: priority as string,
       });
-      
+
       res.json(disputesList);
     } catch (error) {
       console.error('Error fetching disputes:', error);
@@ -2262,11 +2399,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/disputes', requireAdmin, async (req: any, res) => {
     try {
       const { userId, propertyId, paymentId, type, subject, description, priority } = req.body;
-      
+
       // Validate required fields
       if (!userId || !type || !subject || !description) {
-        return res.status(400).json({ 
-          message: 'Missing required fields: userId, type, subject, description' 
+        return res.status(400).json({
+          message: 'Missing required fields: userId, type, subject, description'
         });
       }
 
@@ -2342,23 +2479,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/regional-activity', requireAdmin, async (req: any, res) => {
     try {
       const properties = await storage.getAllProperties();
-      
+
       // Group by city and calculate activity
       const regionalMap = new Map<string, { users: number; activity: number }>();
-      
+
       for (const property of properties) {
         const city = property.city || 'Unknown';
         const existing = regionalMap.get(city) || { users: 0, activity: 0 };
         existing.users += 1;
         regionalMap.set(city, existing);
       }
-      
+
       const regionalData = Array.from(regionalMap.entries()).map(([region, data]) => ({
         region,
         users: data.users,
         activity: properties.length > 0 ? Math.min((data.users / properties.length) * 100, 100) : 0,
       })).sort((a, b) => b.users - a.users).slice(0, 5);
-      
+
       res.json(regionalData);
     } catch (error) {
       console.error('Error fetching regional activity:', error);
@@ -2397,7 +2534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user's payment history to calculate badges
       const payments = await storage.getUserPayments(userId);
       const badges = await calculateUserBadges(userId, payments);
-      
+
       res.json(badges);
     } catch (error) {
       console.error('Error fetching user badges:', error);
@@ -2491,9 +2628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Portfolio not found' });
       }
 
-        if (portfolio.expiresAt && new Date() > new Date(portfolio.expiresAt)) {
-          return res.status(410).json({ message: 'Portfolio has expired' });
-        }
+      if (portfolio.expiresAt && new Date() > new Date(portfolio.expiresAt)) {
+        return res.status(410).json({ message: 'Portfolio has expired' });
+      }
 
       res.json(portfolio);
     } catch (error) {
@@ -2505,51 +2642,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Report generation endpoint
   app.post('/api/generate-report', requireAuth, async (req, res) => {
     try {
-        // Defensive check protects the report pipeline when sessions expire mid-request
-        const sessionUser = req.user as { id?: string } | undefined;
-        if (!sessionUser?.id) {
-          return res.status(401).json({ message: 'Unauthorized' });
-        }
+      // Defensive check protects the report pipeline when sessions expire mid-request
+      const sessionUser = req.user as { id?: string } | undefined;
+      if (!sessionUser?.id) {
+        return res.status(401).json({ message: 'Unauthorized' });
+      }
 
-        const userId = sessionUser.id;
-        const { reportType = 'credit', includePortfolio = false } = req.body;
+      const userId = sessionUser.id;
+      const { reportType = 'credit', includePortfolio = false } = req.body;
 
-        const user = await storage.getUser(userId);
-        if (!user) {
-          return res.status(404).json({ message: 'User not found' });
-        }
-        const payments = await storage.getUserPayments(userId);
-        const properties = await storage.getUserProperties(userId);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+      const payments = await storage.getUserPayments(userId);
+      const properties = await storage.getUserProperties(userId);
 
-        const report: {
-          id: string;
-          userId: string;
-          type: string;
-          generatedAt: string;
-          user: { name: string; email: string };
-          paymentSummary: {
-            totalPayments: number;
-            onTimePayments: number;
-            totalAmount: number;
-            averageMonthlyRent: number;
-          };
-          properties: Array<{
-            address: string;
-            monthlyRent: string;
-            tenancyStart: Date | string | null;
-            tenancyEnd: Date | string | null;
-          }>;
-          paymentHistory: Array<{
-            amount: string;
-            dueDate: string;
-            paidDate: string | null;
-            status: string;
-          }>;
-          badges?: Array<{ id: string; badgeType: string; level: number; earnedAt: string; isActive: boolean; metadata: any }>;
-        } = {
-          id: Date.now().toString(),
-          userId,
-          type: reportType,
+      const report: {
+        id: string;
+        userId: string;
+        type: string;
+        generatedAt: string;
+        user: { name: string; email: string };
+        paymentSummary: {
+          totalPayments: number;
+          onTimePayments: number;
+          totalAmount: number;
+          averageMonthlyRent: number;
+        };
+        properties: Array<{
+          address: string;
+          monthlyRent: string;
+          tenancyStart: Date | string | null;
+          tenancyEnd: Date | string | null;
+        }>;
+        paymentHistory: Array<{
+          amount: string;
+          dueDate: string;
+          paidDate: string | null;
+          status: string;
+        }>;
+        badges?: Array<{ id: string; badgeType: string; level: number; earnedAt: string; isActive: boolean; metadata: any }>;
+      } = {
+        id: Date.now().toString(),
+        userId,
+        type: reportType,
         generatedAt: new Date().toISOString(),
         user: {
           name: `${user.firstName} ${user.lastName}`.trim() || 'User',
@@ -2576,8 +2713,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       if (includePortfolio) {
-          const badges = await calculateUserBadges(userId, payments);
-          report.badges = badges;
+        const badges = await calculateUserBadges(userId, payments);
+        report.badges = badges;
       }
 
       // In a real app, you'd generate a PDF and store it
@@ -2595,205 +2732,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Helper functions
   async function calculateUserBadges(userId: string, payments: any[]) {
-  const badges = [];
+    const badges = [];
 
-  // Payment streak badge
-  const currentStreak = calculatePaymentStreak(payments);
-  if (currentStreak >= 3) {
-    let level = 1;
-    if (currentStreak >= 6) level = 2;
-    if (currentStreak >= 12) level = 3;
-    if (currentStreak >= 24) level = 4;
-    if (currentStreak >= 36) level = 5;
+    // Payment streak badge
+    const currentStreak = calculatePaymentStreak(payments);
+    if (currentStreak >= 3) {
+      let level = 1;
+      if (currentStreak >= 6) level = 2;
+      if (currentStreak >= 12) level = 3;
+      if (currentStreak >= 24) level = 4;
+      if (currentStreak >= 36) level = 5;
 
-    badges.push({
-      id: `payment_streak_${userId}`,
-      badgeType: 'payment_streak',
-      level,
-      earnedAt: new Date().toISOString(),
-      isActive: true,
-      metadata: { streakMonths: currentStreak }
-    });
-  }
-
-  // Reliable tenant badge
-  const onTimePayments = payments.filter(p => p.status === 'paid').length;
-  if (onTimePayments >= 12) {
-    let level = 1;
-    if (onTimePayments >= 24) level = 2;
-    if (onTimePayments >= 48) level = 3;
-    if (onTimePayments >= 72) level = 4;
-    if (onTimePayments >= 120) level = 5;
-
-    badges.push({
-      id: `reliable_tenant_${userId}`,
-      badgeType: 'reliable_tenant',
-      level,
-      earnedAt: new Date().toISOString(),
-      isActive: true,
-      metadata: { totalPayments: onTimePayments }
-    });
-  }
-
-  // Early payer badge
-  const earlyPayments = payments.filter(p => 
-    p.status === 'paid' && p.paidDate && new Date(p.paidDate) < new Date(p.dueDate)
-  ).length;
-  if (earlyPayments >= 6) {
-    let level = 1;
-    if (earlyPayments >= 12) level = 2;
-    if (earlyPayments >= 24) level = 3;
-    if (earlyPayments >= 48) level = 4;
-    if (earlyPayments >= 72) level = 5;
-
-    badges.push({
-      id: `early_payer_${userId}`,
-      badgeType: 'early_payer',
-      level,
-      earnedAt: new Date().toISOString(),
-      isActive: true,
-      metadata: { earlyPaymentCount: earlyPayments }
-    });
-  }
-
-  return badges;
-}
-
-function calculatePaymentStreak(payments: any[]): number {
-  if (payments.length === 0) return 0;
-  
-  // Sort payments by due date (newest first)
-  const sortedPayments = payments
-    .filter(p => p.status === 'paid')
-    .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-
-  let streak = 0;
-  for (const payment of sortedPayments) {
-    if (payment.status === 'paid') {
-      streak++;
-    } else {
-      break;
+      badges.push({
+        id: `payment_streak_${userId}`,
+        badgeType: 'payment_streak',
+        level,
+        earnedAt: new Date().toISOString(),
+        isActive: true,
+        metadata: { streakMonths: currentStreak }
+      });
     }
-  }
-  
-  return streak;
-}
 
-// Manual payment routes
-function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
-  app.post('/api/manual-payments', requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { propertyId, amount, paymentDate, paymentMethod, description, receiptUrl } = req.body;
-      
-      // Get property and landlord info for notifications
-      const property = await storage.getPropertyById(parseInt(propertyId));
-      const tenant = await storage.getUser(userId);
-      
-      const manualPayment = await storage.createManualPayment({
-        userId,
-        propertyId: parseInt(propertyId),
-        amount: parseFloat(amount).toFixed(2),
-        paymentDate: new Date(paymentDate),
-        paymentMethod,
-        description,
-        receiptUrl,
-        needsVerification: true,
+    // Reliable tenant badge
+    const onTimePayments = payments.filter(p => p.status === 'paid').length;
+    if (onTimePayments >= 12) {
+      let level = 1;
+      if (onTimePayments >= 24) level = 2;
+      if (onTimePayments >= 48) level = 3;
+      if (onTimePayments >= 72) level = 4;
+      if (onTimePayments >= 120) level = 5;
+
+      badges.push({
+        id: `reliable_tenant_${userId}`,
+        badgeType: 'reliable_tenant',
+        level,
+        earnedAt: new Date().toISOString(),
+        isActive: true,
+        metadata: { totalPayments: onTimePayments }
       });
-      
-      // Send notification to landlord if landlord email exists
-      if (property.landlordEmail) {
-        try {
-          await emailService.sendLandlordVerificationRequest({
-            landlordEmail: property.landlordEmail,
-            landlordName: property.landlordName || 'Landlord',
-            tenantName: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.email,
-            tenantEmail: tenant.email,
-            propertyAddress: `${property.address}, ${property.city}`,
-            amount: parseFloat(amount),
-            paymentDate: new Date(paymentDate).toLocaleDateString(),
-            paymentMethod: paymentMethod.replace('_', ' ').toUpperCase(),
-            receiptUrl,
-          });
-        } catch (emailError) {
-          console.error('Failed to send landlord notification email:', emailError);
-          // Don't fail the whole request if email fails
-        }
+    }
+
+    // Early payer badge
+    const earlyPayments = payments.filter(p =>
+      p.status === 'paid' && p.paidDate && new Date(p.paidDate) < new Date(p.dueDate)
+    ).length;
+    if (earlyPayments >= 6) {
+      let level = 1;
+      if (earlyPayments >= 12) level = 2;
+      if (earlyPayments >= 24) level = 3;
+      if (earlyPayments >= 48) level = 4;
+      if (earlyPayments >= 72) level = 5;
+
+      badges.push({
+        id: `early_payer_${userId}`,
+        badgeType: 'early_payer',
+        level,
+        earnedAt: new Date().toISOString(),
+        isActive: true,
+        metadata: { earlyPaymentCount: earlyPayments }
+      });
+    }
+
+    return badges;
+  }
+
+  function calculatePaymentStreak(payments: any[]): number {
+    if (payments.length === 0) return 0;
+
+    // Sort payments by due date (newest first)
+    const sortedPayments = payments
+      .filter(p => p.status === 'paid')
+      .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+
+    let streak = 0;
+    for (const payment of sortedPayments) {
+      if (payment.status === 'paid') {
+        streak++;
+      } else {
+        break;
       }
-      
-      // Create in-app notification for tenant
-      await storage.createNotification({
-        userId,
-        type: 'system',
-        title: 'Payment Logged Successfully',
-        message: `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} is awaiting landlord verification.`,
-      });
-      
-      // Update payment streak and check for badges
-      const currentStreak = await storage.calculateCurrentStreak(userId);
-      await storage.updatePaymentStreak(userId, {
-        currentStreak,
-        lastPaymentDate: new Date(paymentDate),
-      });
-      
-      // Check for new achievement badges
-      const newBadges = await storage.calculateAndAwardBadges(userId);
-      if (newBadges.length > 0) {
+    }
+
+    return streak;
+  }
+
+  // Manual payment routes
+  function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
+    app.post('/api/manual-payments', requireAuth, async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { propertyId, amount, paymentDate, paymentMethod, description, receiptUrl, landlordEmail, landlordPhone } = req.body;
+
+        // Get property and tenant info
+        const property = await storage.getPropertyById(parseInt(propertyId));
+        const tenant = await storage.getUserById(userId);
+
+        // Use provided landlord email or fall back to property landlord email
+        const verificationEmail = landlordEmail || property.landlordEmail;
+        const verificationPhone = landlordPhone || property.landlordPhone;
+
+        const manualPayment = await storage.createManualPayment({
+          userId,
+          propertyId: parseInt(propertyId),
+          amount: parseFloat(amount).toFixed(2),
+          paymentDate: new Date(paymentDate),
+          paymentMethod,
+          description,
+          receiptUrl,
+          landlordEmail: verificationEmail,
+          landlordPhone: verificationPhone,
+          needsVerification: true,
+        });
+
+        // Send notification to landlord if email exists
+        if (verificationEmail) {
+          try {
+            await emailService.sendLandlordVerificationRequest({
+              landlordEmail: verificationEmail,
+              landlordName: property.landlordName || 'Landlord',
+              tenantName: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.email,
+              tenantEmail: tenant.email,
+              propertyAddress: `${property.address}, ${property.city}`,
+              amount: parseFloat(amount),
+              paymentDate: new Date(paymentDate).toLocaleDateString(),
+              paymentMethod: paymentMethod.replace('_', ' ').toUpperCase(),
+              receiptUrl,
+              verificationLink: `${process.env.APP_URL || 'http://localhost:5000'}/verify-payment/${manualPayment.id}`,
+            });
+          } catch (emailError) {
+            console.error('Failed to send landlord notification email:', emailError);
+            // Don't fail the whole request if email fails
+          }
+        }
+
+        // Create in-app notification for tenant
         await storage.createNotification({
           userId,
           type: 'system',
-          title: `New Badge${newBadges.length > 1 ? 's' : ''} Earned!`,
-          message: `Congratulations! You've earned: ${newBadges.map((badge: any) => badge.title).join(', ')}`,
+          title: 'Payment Logged Successfully',
+          message: verificationEmail
+            ? `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} is awaiting landlord verification. We've sent a verification request to ${verificationEmail}.`
+            : `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} has been logged. Add landlord contact info to request verification.`,
         });
+
+        // Update payment streak and check for badges
+        const currentStreak = await storage.calculateCurrentStreak(userId);
+        await storage.updatePaymentStreak(userId, {
+          currentStreak,
+          lastPaymentDate: new Date(paymentDate),
+        });
+
+        // Check for new achievement badges
+        const newBadges = await storage.calculateAndAwardBadges(userId);
+        if (newBadges.length > 0) {
+          await storage.createNotification({
+            userId,
+            type: 'system',
+            title: `New Badge${newBadges.length > 1 ? 's' : ''} Earned!`,
+            message: `Congratulations! You've earned: ${newBadges.map((badge: any) => badge.title).join(', ')}`,
+          });
+        }
+
+        res.json({
+          manualPayment,
+          newBadges,
+          currentStreak,
+          message: verificationEmail
+            ? 'Manual payment logged successfully and landlord has been notified for verification'
+            : 'Manual payment logged successfully'
+        });
+      } catch (error) {
+        console.error('Error creating manual payment:', error);
+        res.status(500).json({ message: 'Failed to log manual payment' });
       }
-      
-      res.json({ 
-        manualPayment,
-        newBadges,
-        currentStreak,
-        message: 'Manual payment logged successfully and landlord has been notified for verification' 
-      });
-    } catch (error) {
-      console.error('Error creating manual payment:', error);
-      res.status(500).json({ message: 'Failed to log manual payment' });
-    }
-  });
+    });
 
-  app.get('/api/manual-payments', requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const manualPayments = await storage.getUserManualPayments(userId);
-      res.json(manualPayments);
-    } catch (error) {
-      console.error('Error fetching manual payments:', error);
-      res.status(500).json({ message: 'Failed to fetch manual payments' });
-    }
-  });
+    app.get('/api/manual-payments', requireAuth, async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const manualPayments = await storage.getUserManualPayments(userId);
+        res.json(manualPayments);
+      } catch (error) {
+        console.error('Error fetching manual payments:', error);
+        res.status(500).json({ message: 'Failed to fetch manual payments' });
+      }
+    });
 
-  // Achievement badge routes
-  app.get('/api/achievements', requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const badges = await storage.getUserAchievementBadges(userId);
-      const streak = await storage.getUserPaymentStreak(userId);
-      res.json({ badges, streak });
-    } catch (error) {
-      console.error('Error fetching achievements:', error);
-      res.status(500).json({ message: 'Failed to fetch achievements' });
-    }
-  });
-}
+    // Achievement badge routes
+    app.get('/api/achievements', requireAuth, async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const badges = await storage.getUserAchievementBadges(userId);
+        const streak = await storage.getUserPaymentStreak(userId);
+        res.json({ badges, streak });
+      } catch (error) {
+        console.error('Error fetching achievements:', error);
+        res.status(500).json({ message: 'Failed to fetch achievements' });
+      }
+    });
+  }
 
-// Add manual payment routes
-addManualPaymentRoutes(app, requireAuth, storage);
+  // Add manual payment routes
+  addManualPaymentRoutes(app, requireAuth, storage);
 
   // Stripe payment intent endpoint
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
       // Check if Stripe is configured
       if (!process.env.STRIPE_SECRET_KEY) {
-        return res.status(503).json({ 
-          message: "Payment system not configured. Please contact support." 
+        return res.status(503).json({
+          message: "Payment system not configured. Please contact support."
         });
       }
 
@@ -2819,8 +2967,8 @@ addManualPaymentRoutes(app, requireAuth, storage);
       res.json({ clientSecret: paymentIntent.client_secret });
     } catch (error: any) {
       console.error("Stripe payment error:", error);
-      res.status(500).json({ 
-        message: "Error creating payment intent: " + error.message 
+      res.status(500).json({
+        message: "Error creating payment intent: " + error.message
       });
     }
   });
@@ -2829,13 +2977,13 @@ addManualPaymentRoutes(app, requireAuth, storage);
   app.post('/api/landlord/signup', async (req, res) => {
     try {
       const { email, password, firstName, lastName, phone, businessName } = req.body;
-      
+
       // Check if landlord already exists
       const existing = await storage.getUserByEmail(email);
       if (existing) {
         return res.status(400).json({ message: 'Email already registered' });
       }
-      
+
       // Create landlord user with secure password hashing
       // Use email as username for login compatibility
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -2855,7 +3003,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
         emailVerified: false,
         isActive: true
       });
-      
+
       res.json({ success: true, landlord: { id: landlord.id, email: landlord.email } });
     } catch (error) {
       console.error("Error creating landlord account:", error);
@@ -2889,10 +3037,10 @@ addManualPaymentRoutes(app, requireAuth, storage);
         if (loginErr) {
           return next(loginErr);
         }
-        return res.json({ 
-          success: true, 
-          ...user, 
-          password: undefined 
+        return res.json({
+          success: true,
+          ...user,
+          password: undefined
         });
       });
     })(req, res, next);
@@ -2904,33 +3052,33 @@ addManualPaymentRoutes(app, requireAuth, storage);
       const propertyId = parseInt(req.params.id);
       const updateData = req.body;
       const userId = req.user.id;
-      
+
       // Get existing property to check if rent is being updated
       const existingProperties = await storage.getUserProperties(userId);
       const existingProperty = existingProperties.find(p => p.id === propertyId);
-      
+
       if (!existingProperty) {
         return res.status(404).json({ message: "Property not found" });
       }
-      
+
       // Check if rent amount is being updated
       const isRentUpdate = updateData.rentInfo?.amount || updateData.monthlyRent;
       const newRentAmount = updateData.rentInfo?.amount || updateData.monthlyRent;
-      
+
       if (isRentUpdate && newRentAmount !== undefined) {
         const currentRent = parseFloat(String(existingProperty.monthlyRent));
         const newRent = parseFloat(String(newRentAmount));
-        
+
         // Only enforce limit if rent is actually changing
         if (currentRent !== newRent) {
           const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
           const lastUpdateMonth = existingProperty.lastRentUpdateMonth;
           const updateCount = existingProperty.rentUpdateCount || 0;
-          
+
           // Check if we're in the same month as the last update
           if (lastUpdateMonth === currentMonth) {
             if (updateCount >= 3) {
-              return res.status(429).json({ 
+              return res.status(429).json({
                 message: 'Rent price update limit reached. You can only update rent prices 3 times per month.',
                 remainingUpdates: 0,
                 resetDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString()
@@ -2946,14 +3094,15 @@ addManualPaymentRoutes(app, requireAuth, storage);
           }
         }
       }
-      
+
       const property = await storage.updateProperty(propertyId, updateData);
-      
+
       // Calculate remaining updates for this month
       const remainingUpdates = 3 - (property.rentUpdateCount || 0);
-      
-      res.json({ 
+
+      res.json({
         ...property,
+        rentInfo: property.rentInfo, // Explicitly include rentInfo
         _meta: {
           remainingRentUpdates: Math.max(0, remainingUpdates),
           rentUpdateCount: property.rentUpdateCount || 0
@@ -2977,33 +3126,104 @@ addManualPaymentRoutes(app, requireAuth, storage);
   });
 
   // Payment verification routes (UAT-08, 09)
+  app.post('/api/payments/:id/request-verification', requireAuth, async (req: any, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const userId = req.user.id;
+
+      // In a real app, we would fetch the payment and check ownership
+      // const payment = await storage.getPayment(paymentId);
+      // if (payment.userId !== userId) return res.status(403).send("Unauthorized");
+
+      // Mock sending email
+      console.log(`Sending verification email for payment ${paymentId} to landlord...`);
+
+      // Here you would use SendGrid or similar
+      // await sendEmail({ to: landlordEmail, subject: "Verify Payment", ... });
+
+      res.json({ success: true, message: "Verification request sent" });
+    } catch (error) {
+      console.error("Error requesting verification:", error);
+      res.status(500).json({ message: "Failed to request verification" });
+    }
+  });
+
   app.post('/api/payments/:id/verify', async (req, res) => {
     try {
       const paymentId = parseInt(req.params.id);
       const { status, notes } = req.body;
-      
+
       const payment = await storage.updateRentPayment(paymentId, {
         status: status === 'approved' ? 'paid' : status === 'rejected' ? 'missed' : 'pending',
         isVerified: status === 'approved',
         updatedAt: new Date()
       });
-      
+
       // Create notification for tenant
       if (payment.userId) {
         await storage.createNotification({
           userId: payment.userId,
           type: 'system',
           title: status === 'approved' ? 'Payment Verified' : 'Payment Status Updated',
-          message: status === 'approved' 
+          message: status === 'approved'
             ? `Your rent payment of £${payment.amount} has been verified by your landlord.`
             : `Your rent payment status has been updated to: ${status}`,
           isRead: false
         });
       }
-      
+
       res.json({ success: true, payment });
     } catch (error) {
       console.error("Error verifying payment:", error);
+      res.status(500).json({ message: "Failed to verify payment" });
+    }
+  });
+
+  // Admin verification for manual payments
+  app.post('/api/manual-payments/:id/admin-verify', requireAuth, async (req: any, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const userId = req.user.id;
+      const { status, notes } = req.body; // status: 'approved' or 'rejected'
+
+      // Check if user is admin (you should implement proper admin check)
+      const user = await storage.getUserById(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      // Get the manual payment
+      const manualPayment = await storage.getManualPaymentById(paymentId);
+      if (!manualPayment) {
+        return res.status(404).json({ message: 'Payment not found' });
+      }
+
+      // Update manual payment verification status
+      const updatedPayment = await storage.updateManualPayment(paymentId, {
+        needsVerification: status !== 'approved',
+        verifiedAt: status === 'approved' ? new Date() : null,
+        verifiedBy: status === 'approved' ? `admin:${user.email}` : null,
+        updatedAt: new Date()
+      });
+
+      // Create notification for tenant
+      await storage.createNotification({
+        userId: manualPayment.userId,
+        type: 'system',
+        title: status === 'approved' ? 'Payment Verified by Admin' : 'Payment Verification Update',
+        message: status === 'approved'
+          ? `Your manual payment of £${manualPayment.amount} has been verified by an administrator.`
+          : `Your manual payment verification status has been updated. ${notes || ''}`,
+        isRead: false
+      });
+
+      res.json({
+        success: true,
+        payment: updatedPayment,
+        message: status === 'approved' ? 'Payment verified successfully' : 'Payment status updated'
+      });
+    } catch (error) {
+      console.error("Error admin verifying payment:", error);
       res.status(500).json({ message: "Failed to verify payment" });
     }
   });
@@ -3012,17 +3232,17 @@ addManualPaymentRoutes(app, requireAuth, storage);
   app.get('/api/landlord/:landlordId/tenant/:tenantId/ledger-pdf', async (req, res) => {
     try {
       const { landlordId, tenantId } = req.params;
-      
+
       // Get tenant data
       const tenant = await storage.getUserById(tenantId);
       if (!tenant) {
         return res.status(404).json({ message: 'Tenant not found' });
       }
-      
+
       // Get tenant's payments
       const payments = await storage.getUserPayments(tenantId);
       const verifiedPayments = payments.filter((p) => p.isVerified);
-      
+
       // Simple HTML-based PDF content
       const verificationId = nanoid(16);
       const html = `
@@ -3073,7 +3293,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
         </body>
         </html>
       `;
-      
+
       res.setHeader('Content-Type', 'text/html');
       res.setHeader('Content-Disposition', `attachment; filename="rent-ledger-${tenant.firstName}-${tenant.lastName}.html"`);
       res.send(html);
@@ -3087,7 +3307,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
   app.post('/api/support/request', async (req, res) => {
     try {
       const { name, email, subject, message, priority } = req.body;
-      
+
       // Send email to support
       await sendEmail({
         from: 'noreply@rentledger.co.uk',
@@ -3103,7 +3323,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
           <p>${message}</p>
         `
       });
-      
+
       res.json({ success: true, message: 'Support request submitted successfully' });
     } catch (error) {
       console.error("Error submitting support request:", error);
@@ -3115,22 +3335,22 @@ addManualPaymentRoutes(app, requireAuth, storage);
   app.get('/api/landlord/:landlordId/analytics', async (req, res) => {
     try {
       const { landlordId } = req.params;
-      
+
       // Get landlord's properties
       const properties = await storage.getUserProperties(landlordId);
-      
+
       // Get all payments for landlord's properties
       let allPayments: any[] = [];
       for (const property of properties) {
         const payments = await storage.getPropertyRentPayments(property.id);
         allPayments = allPayments.concat(payments);
       }
-      
+
       // Calculate analytics
       const verifiedPayments = allPayments.filter((p: any) => p.isVerified);
       const pendingPayments = allPayments.filter((p: any) => p.status === 'pending');
       const totalRevenue = verifiedPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount.toString()), 0);
-      
+
       // Monthly breakdown
       const monthlyData = allPayments.reduce((acc: any, payment: any) => {
         const month = payment.paidDate ? new Date(payment.paidDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : 'Pending';
@@ -3144,7 +3364,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
         }
         return acc;
       }, {});
-      
+
       res.json({
         totalRevenue,
         verifiedCount: verifiedPayments.length,
@@ -3162,7 +3382,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
   app.get('/api/admin/audit-logs', requireAdmin, async (req, res) => {
     try {
       const { startDate, endDate, userId, action, limit = 100 } = req.query;
-      
+
       // Get security logs from database
       const logs = await storage.getSecurityLogs({
         startDate: startDate as string,
@@ -3171,7 +3391,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
         action: action as string,
         limit: parseInt(limit as string)
       });
-      
+
       // Format for admin reporting
       const formattedLogs = logs.map((log: any) => ({
         id: log.id,
@@ -3182,7 +3402,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
         metadata: log.metadata,
         createdAt: log.timestamp || log.createdAt || new Date().toISOString(),
       }));
-      
+
       res.json({
         total: formattedLogs.length,
         logs: formattedLogs,
@@ -3199,16 +3419,16 @@ addManualPaymentRoutes(app, requireAuth, storage);
     try {
       // Get system performance metrics
       const startTime = Date.now();
-      
+
       // Query database for counts
       const [users, properties, payments] = await Promise.all([
         storage.getAllUsers(),
         storage.getAllProperties(),
         storage.getAllPayments()
       ]);
-      
+
       const queryTime = Date.now() - startTime;
-      
+
       res.json({
         performanceMetrics: {
           databaseQueryTime: `${queryTime}ms`,
@@ -3245,7 +3465,7 @@ addManualPaymentRoutes(app, requireAuth, storage);
 
       // Import the createAdminAccount function
       const { createAdminAccount } = await import('./create-admin');
-      
+
       const user = await createAdminAccount(
         username,
         password,
@@ -3270,9 +3490,9 @@ addManualPaymentRoutes(app, requireAuth, storage);
       });
     } catch (error: any) {
       console.error('Error creating admin account:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to create admin account',
-        error: error.message 
+        error: error.message
       });
     }
   });
@@ -3284,10 +3504,10 @@ addManualPaymentRoutes(app, requireAuth, storage);
       if (process.env.NODE_ENV === 'production') {
         return res.status(403).json({ message: 'Test data seeding not allowed in production' });
       }
-      
+
       const { seedTestData } = await import('./seed-test-data');
       const result = await seedTestData();
-      
+
       res.json({
         message: 'Test data seeding completed successfully',
         ...result,

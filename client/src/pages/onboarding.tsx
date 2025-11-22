@@ -32,6 +32,9 @@ import { SubscriptionGuard } from "@/components/subscription-guard";
 const rentDetailsSchema = z.object({
   monthlyRent: z.string().min(1, "Monthly rent is required"),
   paymentDay: z.string().min(1, "Payment day is required"),
+  address: z.string().min(1, "Property address is required"),
+  city: z.string().min(1, "City is required"),
+  postcode: z.string().min(1, "Postcode is required"),
   landlordName: z.string().min(1, "Landlord/Agent name is required"),
   landlordEmail: z.string().email("Valid landlord/agent email is required"),
   landlordPhone: z.string().min(10, "Landlord/Agent phone number is required"),
@@ -66,6 +69,9 @@ export default function OnboardingPage() {
     defaultValues: {
       monthlyRent: "",
       paymentDay: "1",
+      address: "",
+      city: "",
+      postcode: "",
       landlordName: "",
       landlordEmail: "",
       landlordPhone: "",
@@ -125,7 +131,38 @@ export default function OnboardingPage() {
 
   const updateRentInfoMutation = useMutation({
     mutationFn: async (data: RentDetailsData) => {
-      // First, save rent info
+      // First, create or update property with address
+      const propertyData = {
+        address: data.address.trim(),
+        city: data.city.trim(),
+        postcode: data.postcode.trim(),
+        monthlyRent: parseFloat(data.monthlyRent),
+        landlordName: data.landlordName.trim(),
+        landlordEmail: data.landlordEmail.trim(),
+        landlordPhone: data.landlordPhone.trim(),
+        tenancyStartDate: data.firstPaymentDate, // Use first payment date as tenancy start
+      };
+      
+      // Create property
+      let property;
+      try {
+        console.log("Sending property data:", propertyData);
+        const propertyResponse = await apiRequest("POST", "/api/properties", propertyData);
+        if (!propertyResponse.ok) {
+          const error = await propertyResponse.json();
+          console.error("Property creation error response:", error);
+          const errorMsg = error.message || error.error || error.details || "Failed to create property";
+          throw new Error(errorMsg);
+        }
+        property = await propertyResponse.json();
+        console.log("Property created successfully:", property);
+      } catch (error: any) {
+        console.error("Property creation failed:", error);
+        const errorMsg = error.message || "Failed to create property. Please check all required fields are filled.";
+        throw new Error(errorMsg);
+      }
+      
+      // Save rent info to user profile
       const rentData = {
         amount: parseFloat(data.monthlyRent),
         dayOfMonth: parseInt(data.paymentDay),
@@ -142,17 +179,34 @@ export default function OnboardingPage() {
         const error = await response.json();
         throw new Error(error.message || "Failed to save rent details");
       }
+      const rentInfoResult = await response.json();
       
-      // Get user properties to send verification email
-      const propertiesResponse = await apiRequest("GET", "/api/properties");
-      const properties = await propertiesResponse.json();
-      const userProperty = properties[0]; // Get first property if available
+      // Update user address
+      try {
+        const addressData = {
+          address: {
+            street: data.address.trim(),
+            city: data.city.trim(),
+            postcode: data.postcode.trim(),
+          }
+        };
+        await apiRequest("PATCH", "/api/user/profile", addressData);
+        // Invalidate user query to refresh address
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      } catch (error) {
+        console.error("Failed to update user address:", error);
+        // Don't fail onboarding if address update fails
+      }
       
-      // Send landlord verification email if we have property
-      if (userProperty && data.landlordEmail) {
+      // Invalidate properties query to ensure it's refreshed
+      queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      
+      // Send landlord verification email
+      if (property && data.landlordEmail) {
         try {
           await apiRequest("POST", "/api/landlord/verify-request", {
-            propertyId: userProperty.id,
+            propertyId: property.id,
             landlordEmail: data.landlordEmail,
           });
         } catch (error) {
@@ -161,7 +215,7 @@ export default function OnboardingPage() {
         }
       }
       
-      return response.json();
+      return { property, rentInfo: rentInfoResult };
     },
     onSuccess: () => {
       updateProfileMutation.mutate({ isOnboarded: true });
@@ -347,40 +401,86 @@ export default function OnboardingPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={rentForm.handleSubmit(onRentDetails)} className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Property Address</h3>
                   <div className="space-y-2">
-                    <Label htmlFor="monthlyRent">Monthly Rent Amount (£)</Label>
+                    <Label htmlFor="address">Street Address <span className="text-red-500">*</span></Label>
                     <Input
-                      id="monthlyRent"
-                      type="number"
-                      placeholder="1200"
-                      step="0.01"
-                      {...rentForm.register("monthlyRent")}
+                      id="address"
+                      placeholder="123 Main Street"
+                      {...rentForm.register("address")}
+                      className="border-2"
                     />
+                    {rentForm.formState.errors.address && (
+                      <p className="text-sm text-red-600">{rentForm.formState.errors.address.message}</p>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentDay">Payment Day of Month</Label>
-                    <Select onValueChange={(value) => rentForm.setValue("paymentDay", value)} defaultValue="1">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 31 }, (_, i) => (
-                          <SelectItem key={i + 1} value={(i + 1).toString()}>
-                            {i + 1}{i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="city"
+                        placeholder="London"
+                        {...rentForm.register("city")}
+                        className="border-2"
+                      />
+                      {rentForm.formState.errors.city && (
+                        <p className="text-sm text-red-600">{rentForm.formState.errors.city.message}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postcode">Postcode <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="postcode"
+                        placeholder="SW1A 1AA"
+                        {...rentForm.register("postcode")}
+                        className="border-2"
+                      />
+                      {rentForm.formState.errors.postcode && (
+                        <p className="text-sm text-red-600">{rentForm.formState.errors.postcode.message}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="firstPaymentDate">First Payment Date</Label>
-                  <Input
-                    id="firstPaymentDate"
-                    type="date"
-                    {...rentForm.register("firstPaymentDate")}
-                  />
+                
+                <div className="border-t pt-4 space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Rent Details</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="monthlyRent">Monthly Rent Amount (£)</Label>
+                      <Input
+                        id="monthlyRent"
+                        type="number"
+                        placeholder="1200"
+                        step="0.01"
+                        {...rentForm.register("monthlyRent")}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="paymentDay">Payment Day of Month</Label>
+                      <Select onValueChange={(value) => rentForm.setValue("paymentDay", value)} defaultValue="1">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 31 }, (_, i) => (
+                            <SelectItem key={i + 1} value={(i + 1).toString()}>
+                              {i + 1}{i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="firstPaymentDate">First Payment Date</Label>
+                    <Input
+                      id="firstPaymentDate"
+                      type="date"
+                      className="h-12 text-base"
+                      {...rentForm.register("firstPaymentDate")}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-2">

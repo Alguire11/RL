@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Trophy } from "lucide-react";
 import type { TenantAchievementsResponse, TenantAchievementBadge } from "@/types/api";
 
@@ -19,7 +20,7 @@ export function AchievementBadgesEarned() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="border-none shadow-sm bg-white/50 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>Achievement Badges</CardTitle>
           <CardDescription>Loading...</CardDescription>
@@ -31,48 +32,59 @@ export function AchievementBadgesEarned() {
   const badges = achievements?.badges ?? [];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Trophy className="h-5 w-5 text-yellow-600" />
-          <span>Achievement Badges</span>
-        </CardTitle>
-        <CardDescription>
-          {badges.length > 0 
-            ? `You've earned ${badges.length} badge${badges.length !== 1 ? 's' : ''}!`
+    <Card className="border-none shadow-md bg-gradient-to-br from-white to-amber-50/30 overflow-hidden">
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <Trophy className="h-5 w-5 text-amber-600" />
+            </div>
+            <CardTitle className="text-xl">Achievement Badges</CardTitle>
+          </div>
+          <Badge variant="secondary" className="bg-amber-100 text-amber-800 hover:bg-amber-200">
+            {badges.length} Earned
+          </Badge>
+        </div>
+        <CardDescription className="mt-2">
+          {badges.length > 0
+            ? "Keep up the great work! You're building a strong rental history."
             : "Start making payments to earn your first badge"
           }
         </CardDescription>
       </CardHeader>
       <CardContent>
         {badges.length === 0 ? (
-          <div className="text-center py-8">
-            <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No badges earned yet</p>
+          <div className="text-center py-8 bg-white/50 rounded-xl border border-dashed border-amber-200">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center">
+              <Trophy className="h-8 w-8 text-amber-300" />
+            </div>
+            <p className="font-medium text-gray-900">No badges yet</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Make your first payment to earn the "First Payment" badge!
+              Make your first payment to unlock badges!
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             {badges.map((badge: TenantAchievementBadge) => {
               const IconComponent = badgeIcons[badge.iconName as keyof typeof badgeIcons] || Trophy;
               return (
                 <div
                   key={badge.id}
-                  className="flex items-center space-x-3 p-4 border rounded-lg bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20"
+                  className="group relative overflow-hidden rounded-xl border border-amber-100 bg-gradient-to-r from-amber-50 to-white p-4 transition-all hover:shadow-md hover:border-amber-200"
                 >
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                      <IconComponent className="h-6 w-6 text-yellow-600" />
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300">
+                        <IconComponent className="h-6 w-6 text-amber-700" />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-yellow-900 dark:text-yellow-100">{badge.title}</h4>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">{badge.description}</p>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                      Earned {new Date(badge.earnedAt).toLocaleDateString()}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-gray-900 mb-1">{badge.title}</h4>
+                      <p className="text-sm text-gray-600 leading-relaxed">{badge.description}</p>
+                      <div className="mt-3 flex items-center text-xs font-medium text-amber-600 bg-amber-50 w-fit px-2 py-1 rounded-full">
+                        Earned {new Date(badge.earnedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

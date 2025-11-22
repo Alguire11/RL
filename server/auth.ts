@@ -139,6 +139,7 @@ export function setupAuth(app: Express) {
         password: hashedPassword,
         firstName,
         lastName,
+        role: 'tenant', // Explicitly set role to tenant
         isOnboarded: false,
         emailVerified: false,
       });
