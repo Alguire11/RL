@@ -79,10 +79,10 @@ export function computeDashboardStats(
   const verificationStatus: VerificationStatus = !paidPayments.length
     ? "unverified"
     : verifiedPayments.length === paidPayments.length
-    ? "verified"
-    : verifiedPayments.length > 0
-    ? "partially_verified"
-    : "unverified";
+      ? "verified"
+      : verifiedPayments.length > 0
+        ? "partially_verified"
+        : "unverified";
 
   const pendingVerificationCount = sorted.filter(
     (p) => p.status === "pending" && !p.isVerified,

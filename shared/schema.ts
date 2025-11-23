@@ -47,6 +47,8 @@ export const users = pgTable("users", {
   subscriptionStatus: varchar("subscription_status").default("active"),
   subscriptionEndDate: timestamp("subscription_end_date"),
   isActive: boolean("is_active").default(true),
+  googleCalendarRefreshToken: text("google_calendar_refresh_token"),
+  googleCalendarEnabled: boolean("google_calendar_enabled").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -259,6 +261,17 @@ export const dataExportRequests = pgTable("data_export_requests", {
   completedAt: timestamp("completed_at"),
 });
 
+// Password reset tokens table
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  token: varchar("token", { length: 255 }).unique().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+
 // Relations
 
 // Insert schemas
@@ -283,6 +296,7 @@ export const insertAdminUserSchema = createInsertSchema(adminUsers);
 export const insertDataExportRequestSchema = createInsertSchema(dataExportRequests);
 export const insertUserBadgeSchema = createInsertSchema(userBadges);
 export const insertCertificationPortfolioSchema = createInsertSchema(certificationPortfolios);
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens);
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
@@ -525,6 +539,64 @@ export const maintenanceRequests = pgTable("maintenance_requests", {
 export type MaintenanceRequest = typeof maintenanceRequests.$inferSelect;
 export type InsertMaintenanceRequest = typeof maintenanceRequests.$inferInsert;
 export const insertMaintenanceRequestSchema = createInsertSchema(maintenanceRequests);
+
+// Landlord reviews table
+export const landlordReviews = pgTable("landlord_reviews", {
+  id: serial("id").primaryKey(),
+  reviewerId: varchar("reviewer_id").references(() => users.id).notNull(), // Tenant who wrote review
+  landlordId: varchar("landlord_id").references(() => users.id).notNull(), // Landlord being reviewed
+  propertyId: integer("property_id").references(() => properties.id),
+  rating: integer("rating").notNull(), // 1-5 stars
+  comment: text("comment"),
+  isVerified: boolean("is_verified").default(false), // Only verified tenants can leave reviews
+  isVisible: boolean("is_visible").default(true), // Admins can hide inappropriate reviews
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type LandlordReview = typeof landlordReviews.$inferSelect;
+export type InsertLandlordReview = typeof landlordReviews.$inferInsert;
+export const insertLandlordReviewSchema = createInsertSchema(landlordReviews);
+
+// Support tickets table
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  name: varchar("name").notNull(),
+  email: varchar("email").notNull(),
+  subject: varchar("subject").notNull(),
+  message: text("message").notNull(),
+  priority: varchar("priority", { enum: ["normal", "high", "urgent"] }).default("normal"),
+  status: varchar("status", { enum: ["open", "in_progress", "resolved", "closed"] }).default("open"),
+  assignedTo: varchar("assigned_to").references(() => users.id), // Admin assigned to ticket
+  replies: jsonb("replies"), // Array of reply objects
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicket = typeof supportTickets.$inferInsert;
+export const insertSupportTicketSchema = createInsertSchema(supportTickets);
+
+// API keys table
+export const apiKeys = pgTable("api_keys", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(), // Friendly name for the key
+  key: varchar("key").notNull().unique(), // The actual API key
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  permissions: jsonb("permissions"), // Array of allowed endpoints/actions
+  isActive: boolean("is_active").default(true),
+  lastUsedAt: timestamp("last_used_at"),
+  usageCount: integer("usage_count").default(0),
+  rateLimit: integer("rate_limit").default(1000), // Requests per hour
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type InsertApiKey = typeof apiKeys.$inferInsert;
+export const insertApiKeySchema = createInsertSchema(apiKeys);
 
 export const maintenanceRequestsRelations = relations(maintenanceRequests, ({ one }) => ({
   tenant: one(users, { fields: [maintenanceRequests.tenantId], references: [users.id] }),

@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { storage } from '../storage';
-import { sendEmail } from '../emailService';
+import { emailService } from '../emailService';
 
 // Run every day at 9:00 AM
 export function startScheduler() {
@@ -40,18 +40,12 @@ export function startScheduler() {
 
                     // Send email if enabled
                     if (userWithPrefs.preferences.emailNotifications) {
-                        await sendEmail({
-                            to: user.email,
-                            from: 'noreply@rentledger.co.uk',
-                            subject: 'Rent Payment Reminder',
-                            html: `
-                <h2>Rent Payment Reminder</h2>
-                <p>Hi ${user.firstName},</p>
-                <p>This is a friendly reminder that your rent payment of <strong>£${rentInfo.amount}</strong> is due on <strong>${nextPaymentDate.toLocaleDateString()}</strong>.</p>
-                <p>Log in to RentLedger to record your payment and keep your streak alive!</p>
-                <a href="https://rentledger.co.uk/dashboard">Go to Dashboard</a>
-              `,
-                        });
+                        await emailService.sendRentReminder(
+                            user.email,
+                            user.firstName || 'Tenant',
+                            parseFloat(rentInfo.amount),
+                            nextPaymentDate.toLocaleDateString()
+                        );
                     }
                 }
             }
@@ -59,6 +53,7 @@ export function startScheduler() {
             console.error('Error in rent reminder job:', error);
         }
     });
+
 
     // Check for overdue payments (5 days past due)
     cron.schedule('0 10 * * *', async () => {

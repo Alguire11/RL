@@ -42,6 +42,7 @@ export default function AdminModeration() {
   const [selectedItem, setSelectedItem] = useState<ModerationItem | null>(null);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [resolution, setResolution] = useState("");
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function AdminModeration() {
   });
 
   const resolveModerationMutation = useMutation({
-    mutationFn: (data: { itemId: string; resolution: string; action: 'resolve' | 'dismiss' }) => 
+    mutationFn: (data: { itemId: string; resolution: string; action: 'resolve' | 'dismiss' }) =>
       fetch('/api/admin/resolve-moderation', {
         method: 'POST',
         credentials: 'include',
@@ -91,7 +92,7 @@ export default function AdminModeration() {
   });
 
   const escalateModerationMutation = useMutation({
-    mutationFn: (itemId: string) => 
+    mutationFn: (itemId: string) =>
       fetch('/api/admin/escalate-moderation', {
         method: 'POST',
         credentials: 'include',
@@ -114,6 +115,36 @@ export default function AdminModeration() {
       toast({
         title: "Escalation Failed",
         description: "Failed to escalate moderation item",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const bulkActionMutation = useMutation({
+    mutationFn: (data: { itemIds: string[]; action: 'resolve' | 'dismiss' }) =>
+      fetch('/api/admin/moderation/bulk-action', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }).then(res => {
+        if (!res.ok) throw new Error('Failed to perform bulk action');
+        return res.json();
+      }),
+    onSuccess: () => {
+      toast({
+        title: "Bulk Action Completed",
+        description: "Selected items have been processed successfully",
+      });
+      setSelectedItems(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/moderation"] });
+    },
+    onError: () => {
+      toast({
+        title: "Bulk Action Failed",
+        description: "Failed to process selected items",
         variant: "destructive",
       });
     }
@@ -181,7 +212,7 @@ export default function AdminModeration() {
 
   const handleResolve = (action: 'resolve' | 'dismiss') => {
     if (!selectedItem) return;
-    
+
     resolveModerationMutation.mutate({
       itemId: selectedItem.id,
       resolution: resolution,
@@ -228,7 +259,7 @@ export default function AdminModeration() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -242,7 +273,7 @@ export default function AdminModeration() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -250,8 +281,8 @@ export default function AdminModeration() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Resolved Today</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {moderationItems.filter(item => 
-                      item.status === 'resolved' && 
+                    {moderationItems.filter(item =>
+                      item.status === 'resolved' &&
                       new Date(item.updatedAt).toDateString() === new Date().toDateString()
                     ).length}
                   </p>
@@ -259,7 +290,7 @@ export default function AdminModeration() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -332,7 +363,41 @@ export default function AdminModeration() {
         {/* Moderation Items Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Moderation Queue ({filteredItems.length})</CardTitle>
+            <div className="flex justify-between items-center">
+              <CardTitle>Moderation Queue ({filteredItems.length})</CardTitle>
+              {selectedItems.size > 0 && (
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      bulkActionMutation.mutate({
+                        itemIds: Array.from(selectedItems),
+                        action: 'resolve'
+                      });
+                    }}
+                    disabled={bulkActionMutation.isPending}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Approve Selected ({selectedItems.size})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      bulkActionMutation.mutate({
+                        itemIds: Array.from(selectedItems),
+                        action: 'dismiss'
+                      });
+                    }}
+                    disabled={bulkActionMutation.isPending}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Dismiss Selected ({selectedItems.size})
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -347,6 +412,20 @@ export default function AdminModeration() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.size === filteredItems.length && filteredItems.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedItems(new Set(filteredItems.map(item => item.id)));
+                          } else {
+                            setSelectedItems(new Set());
+                          }
+                        }}
+                        className="rounded border-gray-300"
+                      />
+                    </TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead>Status</TableHead>
@@ -359,6 +438,22 @@ export default function AdminModeration() {
                 <TableBody>
                   {filteredItems.map((item) => (
                     <TableRow key={item.id}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(item.id)}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedItems);
+                            if (e.target.checked) {
+                              newSelected.add(item.id);
+                            } else {
+                              newSelected.delete(item.id);
+                            }
+                            setSelectedItems(newSelected);
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           {getTypeIcon(item.type)}
@@ -438,17 +533,17 @@ export default function AdminModeration() {
                     <div className="mt-1">{getPriorityBadge(selectedItem.priority)}</div>
                   </div>
                 </div>
-                
+
                 <div>
                   <Label>Subject</Label>
                   <div className="mt-1 font-medium">{selectedItem.subject}</div>
                 </div>
-                
+
                 <div>
                   <Label>Description</Label>
                   <div className="mt-1 text-sm text-gray-600">{selectedItem.description}</div>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="resolution">Resolution Notes</Label>
                   <Textarea
@@ -459,10 +554,10 @@ export default function AdminModeration() {
                     rows={4}
                   />
                 </div>
-                
+
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setShowResolveDialog(false)}
                   >
                     Cancel

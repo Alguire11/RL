@@ -22,6 +22,9 @@ import {
   type UpsertUser,
   type Property,
   type InsertProperty,
+  passwordResetTokens,
+  type PasswordResetToken,
+  type InsertPasswordResetToken,
   type RentPayment,
   type InsertRentPayment,
   type BankConnection,
@@ -80,6 +83,15 @@ import {
   maintenanceRequests,
   type MaintenanceRequest,
   type InsertMaintenanceRequest,
+  landlordReviews,
+  type LandlordReview,
+  type InsertLandlordReview,
+  supportTickets,
+  type SupportTicket,
+  type InsertSupportTicket,
+  apiKeys,
+  type ApiKey,
+  type InsertApiKey,
   auditLogs,
   type AuditLog,
   type InsertAuditLog,
@@ -247,6 +259,7 @@ export interface IStorage {
     type?: string;
     priority?: string;
   }): Promise<Dispute[]>;
+  getUserDisputes(userId: string): Promise<Dispute[]>;
   createDispute(dispute: InsertDispute): Promise<Dispute>;
   updateDispute(id: number, updates: Partial<Dispute>): Promise<Dispute>;
 
@@ -267,6 +280,25 @@ export interface IStorage {
     landlordId?: string;
   }): Promise<MaintenanceRequest[]>;
   updateMaintenanceRequest(id: number, updates: Partial<MaintenanceRequest>): Promise<MaintenanceRequest>;
+
+  // Landlord review operations
+  createLandlordReview(review: InsertLandlordReview): Promise<LandlordReview>;
+  getLandlordReviews(landlordId: string): Promise<LandlordReview[]>;
+  updateLandlordReview(id: number, updates: Partial<LandlordReview>): Promise<LandlordReview>;
+
+  // Support ticket operations
+  createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  getSupportTickets(filters?: { status?: string; assignedTo?: string }): Promise<SupportTicket[]>;
+  getSupportTicket(id: number): Promise<SupportTicket | undefined>;
+  updateSupportTicket(id: number, updates: Partial<SupportTicket>): Promise<SupportTicket>;
+
+  // API key operations
+  createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
+  getApiKeys(): Promise<ApiKey[]>;
+  getApiKey(key: string): Promise<ApiKey | undefined>;
+  updateApiKey(id: number, updates: Partial<ApiKey>): Promise<ApiKey>;
+  deleteApiKey(id: number): Promise<void>;
+  incrementApiKeyUsage(key: string): Promise<void>;
 
   // Security & Audit
   createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog>;
@@ -954,12 +986,130 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateMaintenanceRequest(id: number, updates: Partial<MaintenanceRequest>): Promise<MaintenanceRequest> {
-    const [updatedRequest] = await db
+    const [updated] = await db
       .update(maintenanceRequests)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(maintenanceRequests.id, id))
       .returning();
-    return updatedRequest;
+    return updated;
+  }
+
+  // Landlord review operations
+  async createLandlordReview(review: InsertLandlordReview): Promise<LandlordReview> {
+    const [created] = await db
+      .insert(landlordReviews)
+      .values(review)
+      .returning();
+    return created;
+  }
+
+  async getLandlordReviews(landlordId: string): Promise<LandlordReview[]> {
+    return await db
+      .select()
+      .from(landlordReviews)
+      .where(and(
+        eq(landlordReviews.landlordId, landlordId),
+        eq(landlordReviews.isVisible, true)
+      ))
+      .orderBy(desc(landlordReviews.createdAt));
+  }
+
+  async updateLandlordReview(id: number, updates: Partial<LandlordReview>): Promise<LandlordReview> {
+    const [updated] = await db
+      .update(landlordReviews)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(landlordReviews.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Support ticket operations
+  async createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket> {
+    const [created] = await db
+      .insert(supportTickets)
+      .values(ticket)
+      .returning();
+    return created;
+  }
+
+  async getSupportTickets(filters?: { status?: string; assignedTo?: string }): Promise<SupportTicket[]> {
+    const conditions = [];
+    if (filters?.status) {
+      conditions.push(eq(supportTickets.status, filters.status as any));
+    }
+    if (filters?.assignedTo) {
+      conditions.push(eq(supportTickets.assignedTo, filters.assignedTo));
+    }
+
+    return await db
+      .select()
+      .from(supportTickets)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getSupportTicket(id: number): Promise<SupportTicket | undefined> {
+    const [ticket] = await db
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.id, id));
+    return ticket;
+  }
+
+  async updateSupportTicket(id: number, updates: Partial<SupportTicket>): Promise<SupportTicket> {
+    const [updated] = await db
+      .update(supportTickets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return updated;
+  }
+
+  // API key operations
+  async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {
+    const [created] = await db
+      .insert(apiKeys)
+      .values(apiKey)
+      .returning();
+    return created;
+  }
+
+  async getApiKeys(): Promise<ApiKey[]> {
+    return await db
+      .select()
+      .from(apiKeys)
+      .orderBy(desc(apiKeys.createdAt));
+  }
+
+  async getApiKey(key: string): Promise<ApiKey | undefined> {
+    const [apiKey] = await db
+      .select()
+      .from(apiKeys)
+      .where(eq(apiKeys.key, key));
+    return apiKey;
+  }
+
+  async updateApiKey(id: number, updates: Partial<ApiKey>): Promise<ApiKey> {
+    const [updated] = await db
+      .update(apiKeys)
+      .set(updates)
+      .where(eq(apiKeys.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteApiKey(id: number): Promise<void> {
+    await db.delete(apiKeys).where(eq(apiKeys.id, id));
+  }
+
+  async incrementApiKeyUsage(key: string): Promise<void> {
+    await db
+      .update(apiKeys)
+      .set({
+        usageCount: sql`${apiKeys.usageCount} + 1`,
+        lastUsedAt: new Date(),
+      })
+      .where(eq(apiKeys.key, key));
   }
 
   async getUsersWithPreferences(): Promise<User[]> {
@@ -1384,6 +1534,19 @@ export class DatabaseStorage implements IStorage {
       .where(eq(disputes.id, id))
       .returning();
     return updated;
+  }
+
+  /**
+   * Gets all disputes for a specific user
+   * @param userId - User ID to fetch disputes for
+   * @returns Promise resolving to array of disputes
+   */
+  async getUserDisputes(userId: string): Promise<Dispute[]> {
+    return await db
+      .select()
+      .from(disputes)
+      .where(eq(disputes.userId, userId))
+      .orderBy(desc(disputes.createdAt));
   }
 
   // Rent log operations

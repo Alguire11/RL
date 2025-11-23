@@ -15,7 +15,10 @@ import {
   ArrowLeft,
   Download,
   FileText,
-  HelpCircle
+  HelpCircle,
+  Clock,
+  Calendar,
+  AlertCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import type { RentPayment, ApiProperty } from "@/types/api";
@@ -26,6 +29,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { PaymentHistoryDialog } from "@/components/payment-history-dialog";
 
 type CombinedPayment = RentPayment & {
   isManual?: boolean;
@@ -36,14 +40,10 @@ type CombinedPayment = RentPayment & {
 export default function CreditBuilder() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [isPaymentHistoryOpen, setIsPaymentHistoryOpen] = useState(false);
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery<RentPayment[]>({
     queryKey: ["/api/payments"],
-    retry: false,
-  });
-
-  const { data: manualPayments = [] } = useQuery<any[]>({
-    queryKey: ["/api/manual-payments"],
     retry: false,
   });
 
@@ -52,32 +52,10 @@ export default function CreditBuilder() {
     retry: false,
   });
 
-  // Merge and sort payments with deduplication
+  // /api/payments already includes manual payments, so no need to merge
   const allPayments = useMemo(() => {
-    const combined = [...payments];
-
-    // Add manual payments only if they don't match an existing payment (by date and amount)
-    manualPayments.forEach(mp => {
-      const isDuplicate = combined.some(p =>
-        Number(p.amount) === Number(mp.amount) &&
-        new Date(p.dueDate).toDateString() === new Date(mp.paymentDate).toDateString()
-      );
-
-      if (!isDuplicate) {
-        combined.push({
-          ...mp,
-          id: `manual-${mp.id}`,
-          dueDate: mp.paymentDate,
-          paidDate: mp.paymentDate,
-          status: mp.needsVerification ? 'pending' : 'paid',
-          isVerified: !mp.needsVerification,
-          isManual: true
-        });
-      }
-    });
-
-    return combined.sort((a: CombinedPayment, b: CombinedPayment) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-  }, [payments, manualPayments]);
+    return [...payments].sort((a: CombinedPayment, b: CombinedPayment) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  }, [payments]);
 
   // Calculate stats based on merged payments
   const today = new Date();
@@ -102,6 +80,35 @@ export default function CreditBuilder() {
       style: 'currency',
       currency: 'GBP',
     }).format(amount);
+  };
+
+  const calculatePaymentStatus = (payment: CombinedPayment) => {
+    const today = new Date();
+    const dueDate = new Date(payment.dueDate);
+    const paidDate = payment.paidDate ? new Date(payment.paidDate) : null;
+
+    if (payment.verified || payment.isVerified) return 'verified';
+    if (paidDate) return 'pending';
+    if (today > dueDate) return 'overdue';
+    return 'pending';
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'verified': return 'text-green-600 bg-green-50 border-green-200';
+      case 'pending': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+      case 'overdue': return 'text-red-600 bg-red-50 border-red-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'verified': return <CheckCircle className="w-5 h-5" />;
+      case 'pending': return <Clock className="w-5 h-5" />;
+      case 'overdue': return <AlertCircle className="w-5 h-5" />;
+      default: return <Calendar className="w-5 h-5" />;
+    }
   };
 
   return (
@@ -211,10 +218,23 @@ export default function CreditBuilder() {
         {/* Payment History */}
         <Card>
           <CardHeader>
-            <CardTitle>Payment History</CardTitle>
-            <CardDescription>
-              Track your verified payments and see your credit-building progress
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Payment History</CardTitle>
+                <CardDescription>
+                  Track your verified payments and see your credit-building progress
+                </CardDescription>
+              </div>
+              {allPayments.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsPaymentHistoryOpen(true)}
+                >
+                  View All
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {paymentsLoading ? (
@@ -250,6 +270,7 @@ export default function CreditBuilder() {
                   allPayments.map((payment: CombinedPayment) => {
                     const isVerified = payment.isVerified || payment.verified;
                     const isManual = payment.isManual;
+                    const status = calculatePaymentStatus(payment);
 
                     return (
                       <div
@@ -257,26 +278,19 @@ export default function CreditBuilder() {
                         className="flex items-center justify-between p-4 bg-white border rounded-lg hover:shadow-md transition-shadow"
                       >
                         <div className="flex items-center space-x-4">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isVerified ? 'bg-green-100' : 'bg-gray-100'
-                            }`}>
-                            {isVerified ? (
-                              <CheckCircle className="h-6 w-6 text-green-600" />
-                            ) : (
-                              <FileText className="h-6 w-6 text-gray-400" />
-                            )}
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getStatusColor(status).split(' ')[1]}`}>
+                            <div className={getStatusColor(status).split(' ')[0]}>
+                              {getStatusIcon(status)}
+                            </div>
                           </div>
                           <div>
                             <div className="flex items-center space-x-2">
                               <h3 className="font-semibold text-gray-900">
                                 {formatCurrency(Number(payment.amount))}
                               </h3>
-                              {isVerified ? (
-                                <Badge className="bg-green-100 text-green-800">
-                                  Verified
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary">Pending</Badge>
-                              )}
+                              <Badge variant="outline" className={`${getStatusColor(status)} border`}>
+                                {status.charAt(0).toUpperCase() + status.slice(1)}
+                              </Badge>
                               {isManual && (
                                 <Badge variant="outline" className="text-xs">Manual</Badge>
                               )}
@@ -288,11 +302,6 @@ export default function CreditBuilder() {
                               }
                             </p>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          {!isVerified && isManual && (
-                            <span className="text-xs text-gray-500">Awaiting Verification</span>
-                          )}
                         </div>
                       </div>
                     );
@@ -328,6 +337,13 @@ export default function CreditBuilder() {
           </Card>
         )}
       </div>
+
+      {/* Payment History Dialog */}
+      <PaymentHistoryDialog
+        isOpen={isPaymentHistoryOpen}
+        onClose={() => setIsPaymentHistoryOpen(false)}
+        payments={allPayments}
+      />
     </div>
   );
 }

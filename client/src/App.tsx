@@ -24,6 +24,7 @@ import AdminDashboard from "@/pages/admin";
 import AdminLogin from "@/pages/admin-login";
 import LandlordLogin from "@/pages/landlord-login";
 import LandlordSignup from "@/pages/landlord-signup";
+import ForgotPassword from "@/pages/forgot-password";
 import LandlordDashboard from "@/pages/landlord-dashboard";
 import LandlordVerification from "@/pages/landlord-verification";
 import LandlordVerify from "@/pages/landlord-verify";
@@ -47,6 +48,7 @@ const AdminRevenue = lazy(() => import("@/pages/admin-revenue"));
 const AdminModeration = lazy(() => import("@/pages/admin-moderation"));
 const AdminProperties = lazy(() => import("@/pages/admin-properties"));
 const AdminAuditLogs = lazy(() => import("@/pages/admin-audit-logs"));
+const Disputes = lazy(() => import("@/pages/disputes"));
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -77,6 +79,7 @@ function Router() {
       <Route path="/admin-login" component={AdminLogin} />
       <Route path="/landlord-login" component={LandlordLogin} />
       <Route path="/landlord-signup" component={LandlordSignup} />
+      <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/about" component={About} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
@@ -147,6 +150,11 @@ function Router() {
         <Route path="/" component={Dashboard} />
       )}
       <Route path="/maintenance" component={MaintenancePage} />
+      <Route path="/disputes" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <Disputes />
+        </Suspense>
+      )} />
       <Route component={NotFound} />
     </Switch>
   );

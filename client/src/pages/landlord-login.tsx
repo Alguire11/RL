@@ -97,7 +97,7 @@ export default function LandlordLogin() {
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="Enter your email"
                   required
                   data-testid="input-landlord-email"
@@ -111,7 +111,7 @@ export default function LandlordLogin() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="Enter password"
                     required
                     data-testid="input-landlord-password"
@@ -130,6 +130,16 @@ export default function LandlordLogin() {
                     )}
                   </Button>
                 </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 font-normal text-xs text-purple-600 h-auto"
+                    onClick={() => setLocation("/forgot-password")}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
               </div>
 
               {error && (
@@ -138,8 +148,8 @@ export default function LandlordLogin() {
                 </Alert>
               )}
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                 disabled={isLoading}
                 data-testid="button-landlord-login"
@@ -163,7 +173,7 @@ export default function LandlordLogin() {
                   Go to Admin Login
                 </Button>
               </div>
-              
+
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-blue-200" />
@@ -172,7 +182,7 @@ export default function LandlordLogin() {
                   <span className="bg-blue-50 px-2 text-blue-600">Or</span>
                 </div>
               </div>
-              
+
               <div>
                 <p className="text-sm font-medium text-blue-900 mb-2">Are you a tenant?</p>
                 <Button

@@ -13,6 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Plus, Save, X, Mail } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UKPostcodeLookup } from "@/components/uk-postcode-lookup";
 
 const propertySchema = z.object({
   address: z.string().min(1, "Property address is required"),
@@ -170,6 +171,13 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
     createPropertyMutation.mutate(data);
   };
 
+  const handlePostcodeSelect = (addressData: { postcode: string; city: string; region: string }) => {
+    form.setValue('postcode', addressData.postcode);
+    if (addressData.city) {
+      form.setValue('city', addressData.city);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -185,7 +193,7 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
           </CardContent>
         </Card>
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
@@ -193,9 +201,16 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
             <span>Add Rental Property</span>
           </DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <UKPostcodeLookup
+                onAddressSelect={handlePostcodeSelect}
+                currentPostcode={form.watch("postcode")}
+              />
+            </div>
+
             <div className="md:col-span-2">
               <Label htmlFor="address">Street Address</Label>
               <Input

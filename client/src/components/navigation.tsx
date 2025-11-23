@@ -4,12 +4,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle, TrendingUp, Upload } from "lucide-react";
@@ -33,7 +33,7 @@ export function Navigation() {
 
   // Don't show Dashboard when already on dashboard
   const isOnDashboard = location === "/" || location === "/dashboard";
-  
+
   const navItems = [
     ...(isOnDashboard ? [] : [{ path: "/", label: "Dashboard", icon: BarChart3 }]),
     { path: "/credit-builder", label: "Credit Builder", icon: TrendingUp },
@@ -82,11 +82,10 @@ export function Navigation() {
               return (
                 <Link key={item.path} href={item.path}>
                   <span
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
-                      isActive(item.path)
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${isActive(item.path)
                         ? "text-blue-600 bg-blue-50"
                         : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                    }`}
+                      }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span>{item.label}</span>
@@ -94,17 +93,16 @@ export function Navigation() {
                 </Link>
               );
             })}
-            
+
             {/* Reports Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                    location === '/report-generator' || location === '/reports'
+                <Button
+                  variant="ghost"
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${location === '/report-generator' || location === '/reports'
                       ? "text-blue-600 bg-blue-50"
                       : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                  }`}
+                    }`}
                 >
                   <FileText className="w-4 h-4" />
                   <span>Reports</span>
@@ -215,17 +213,16 @@ export function Navigation() {
                       </p>
                     </div>
                   </div>
-                  
+
                   {navItems.map((item) => {
                     const Icon = item.icon;
                     return (
                       <Link key={item.path} href={item.path}>
                         <a
-                          className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${
-                            isActive(item.path)
+                          className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-all duration-200 ${isActive(item.path)
                               ? "text-blue-600 bg-blue-50"
                               : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                          }`}
+                            }`}
                           onClick={() => setIsMobileMenuOpen(false)}
                         >
                           <Icon className="w-5 h-5" />
@@ -234,7 +231,7 @@ export function Navigation() {
                       </Link>
                     );
                   })}
-                  
+
                   {/* Reports Section */}
                   <div className="space-y-1">
                     <Link href="/report-generator">
@@ -256,7 +253,7 @@ export function Navigation() {
                       </a>
                     </Link>
                   </div>
-                  
+
                   <div className="pt-4 border-t">
                     <Button
                       variant="ghost"

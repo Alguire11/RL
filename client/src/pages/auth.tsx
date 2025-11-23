@@ -211,6 +211,16 @@ export default function AuthPage() {
                         </AlertDescription>
                       </Alert>
                     )}
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="px-0 font-normal text-xs text-blue-600 h-auto"
+                        onClick={() => navigate("/forgot-password")}
+                      >
+                        Forgot password?
+                      </Button>
+                    </div>
                   </div>
 
                   <Button

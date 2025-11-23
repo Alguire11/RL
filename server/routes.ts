@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import passport from "passport";
-import { sendEmail, createLandlordVerificationEmail, createTenantInviteEmail, emailService } from "./emailService";
+import { emailService } from "./emailService";
 import QRCode from "qrcode";
 import { z } from "zod";
 import {
@@ -183,6 +183,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API key management routes
+  app.get('/api/admin/api-keys', requireAdmin, async (req, res) => {
+    try {
+      const keys = await storage.getApiKeys();
+      // Don't send the actual key value in list view
+      const sanitizedKeys = keys.map(k => ({
+        ...k,
+        key: k.key.substring(0, 8) + '...' + k.key.substring(k.key.length - 4)
+      }));
+      res.json(sanitizedKeys);
+    } catch (error) {
+      console.error('Error fetching API keys:', error);
+      res.status(500).json({ message: 'Failed to fetch API keys' });
+    }
+  });
+
+  app.post('/api/admin/api-keys', requireAdmin, async (req, res) => {
+    try {
+      const { name, permissions, rateLimit, expiresAt } = req.body;
+      const adminUser = (req as any).adminUser;
+
+      if (!name) {
+        return res.status(400).json({ message: 'Name is required' });
+      }
+
+      // Generate secure API key
+      const key = 'rl_' + nanoid(32);
+
+      const apiKey = await storage.createApiKey({
+        name,
+        key,
+        createdBy: adminUser.id,
+        permissions: permissions || [],
+        rateLimit: rateLimit || 1000,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+
+      res.json(apiKey);
+    } catch (error) {
+      console.error('Error creating API key:', error);
+      res.status(500).json({ message: 'Failed to create API key' });
+    }
+  });
+
+  app.put('/api/admin/api-keys/:id', requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, isActive, rateLimit, permissions } = req.body;
+
+      const updated = await storage.updateApiKey(id, {
+        name,
+        isActive,
+        rateLimit,
+        permissions,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating API key:', error);
+      res.status(500).json({ message: 'Failed to update API key' });
+    }
+  });
+
+  app.delete('/api/admin/api-keys/:id', requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteApiKey(id);
+      res.json({ message: 'API key deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting API key:', error);
+      res.status(500).json({ message: 'Failed to delete API key' });
+    }
+  });
+
   // Update user rent information
   app.put('/api/user/rent-info', requireAuth, async (req: any, res) => {
     try {
@@ -207,6 +281,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating rent information:", error);
       res.status(500).json({ message: "Failed to update rent information" });
+    }
+  });
+
+  // Calendar sync - iCal export for rent schedule
+  app.get('/api/calendar/rent-schedule.ics', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUserById(userId);
+      const properties = await storage.getUserProperties(userId);
+
+      if (!user || properties.length === 0) {
+        return res.status(404).json({ message: "No rent information found" });
+      }
+
+      // Generate iCal format
+      const now = new Date();
+      const icsLines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//RentLedger//Rent Payment Schedule//EN',
+        'CALNAME:Rent Payment Schedule',
+        'X-WR-CALNAME:Rent Payment Schedule',
+        'X-WR-TIMEZONE:Europe/London',
+        'X-WR-CALDESC:Your rent payment due dates from RentLedger',
+      ];
+
+      // Add events for each property's rent payments (next 12 months)
+      for (const property of properties) {
+        const monthlyRent = parseFloat(property.monthlyRent);
+        const rentInfo = user.rentInfo as any;
+        const dayOfMonth = rentInfo?.dayOfMonth || 1;
+
+        for (let i = 0; i < 12; i++) {
+          const dueDate = new Date(now.getFullYear(), now.getMonth() + i, dayOfMonth);
+          const reminderDate = new Date(dueDate);
+          reminderDate.setDate(reminderDate.getDate() - 3); // 3 days before
+
+          const formatDate = (d: Date) => {
+            return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+          };
+
+          icsLines.push(
+            'BEGIN:VEVENT',
+            `UID:rent-${property.id}-${dueDate.getTime()}@rentledger.co.uk`,
+            `DTSTAMP:${formatDate(now)}`,
+            `DTSTART;VALUE=DATE:${dueDate.toISOString().split('T')[0].replace(/-/g, '')}`,
+            `SUMMARY:Rent Payment Due - £${monthlyRent.toFixed(2)}`,
+            `DESCRIPTION:Rent payment of £${monthlyRent.toFixed(2)} due for ${property.address}`,
+            `LOCATION:${property.address}, ${property.city}, ${property.postcode}`,
+            'STATUS:CONFIRMED',
+            'BEGIN:VALARM',
+            'TRIGGER:-P3D',
+            'ACTION:DISPLAY',
+            `DESCRIPTION:Rent payment of £${monthlyRent.toFixed(2)} due in 3 days`,
+            'END:VALARM',
+            'END:VEVENT'
+          );
+        }
+      }
+
+      icsLines.push('END:VCALENDAR');
+
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="rent-schedule.ics"');
+      res.send(icsLines.join('\r\n'));
+    } catch (error) {
+      console.error("Error generating calendar:", error);
+      res.status(500).json({ message: "Failed to generate calendar" });
     }
   });
 
@@ -480,24 +622,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Send confirmation email to landlord
         if (property?.landlordEmail && user) {
-          await sendEmail({
-            to: property.landlordEmail,
-            from: 'noreply@rentledger.co.uk',
-            subject: 'Rent Payment Notification - RentLedger',
-            html: `
-              <h2>New Rent Payment Recorded</h2>
-              <p>Hello ${property.landlordName || 'Landlord'},</p>
-              <p>Your tenant <strong>${user.firstName} ${user.lastName}</strong> has recorded a rent payment:</p>
-              <ul>
-                <li><strong>Property:</strong> ${property.address}, ${property.city}</li>
-                <li><strong>Amount:</strong> £${payment.amount}</li>
-                <li><strong>Due Date:</strong> ${payment.dueDate}</li>
-                <li><strong>Status:</strong> ${payment.status}</li>
-              </ul>
-              <p>This payment has been logged in the RentLedger system to help build your tenant's credit profile.</p>
-              <p>Best regards,<br>The RentLedger Team</p>
-            `
-          });
+          await emailService.sendRentPaymentNotification(
+            property.landlordEmail!,
+            property.landlordName || 'Landlord',
+            `${user.firstName} ${user.lastName}`,
+            `${property.address}, ${property.city}`,
+            parseFloat(payment.amount),
+            payment.dueDate,
+            payment.status
+          );
         }
 
         // Create "due soon" notification if payment is within 5 days
@@ -561,8 +694,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const friendlyLandlordName = landlordName || `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Your landlord';
       const friendlyPropertyAddress = propertyAddress || 'the property you manage';
-      const emailParams = createTenantInviteEmail(tenantEmail, friendlyLandlordName, friendlyPropertyAddress, inviteUrl, qrCodeDataUrl);
-      const emailResult = await sendEmail(emailParams);
+      const emailResult = await emailService.sendTenantInvite(
+        tenantEmail,
+        friendlyLandlordName,
+        friendlyPropertyAddress,
+        inviteUrl,
+        qrCodeDataUrl
+      );
 
       await logSecurityEvent(req, 'tenant_invite_created', {
         tenantEmail,
@@ -1028,14 +1166,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenantName = `${user.firstName} ${user.lastName}`;
       const propertyAddress = `${property.address}, ${property.city} ${property.postcode}`;
 
-      const emailData = createLandlordVerificationEmail(
+      const emailResult = await emailService.sendLandlordVerification(
         landlordEmail,
         tenantName,
         propertyAddress,
         verificationUrl
       );
-
-      const emailResult = await sendEmail(emailData);
 
       if (!emailResult.success) {
         console.error('Failed to send verification email to landlord');
@@ -1158,6 +1294,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error confirming verification:', error);
       res.status(500).json({ message: 'Failed to confirm verification' });
+    }
+  });
+
+  // Dispute routes
+  app.post('/api/disputes', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { propertyId, paymentId, type, subject, description, priority } = req.body;
+
+      if (!type || !subject || !description) {
+        return res.status(400).json({ message: "Type, subject, and description are required" });
+      }
+
+      const dispute = await storage.createDispute({
+        userId,
+        propertyId: propertyId ? parseInt(propertyId) : null,
+        paymentId: paymentId ? parseInt(paymentId) : null,
+        type,
+        subject,
+        description,
+        status: 'open',
+        priority: priority || 'medium',
+      });
+
+      res.json(dispute);
+    } catch (error) {
+      console.error("Error creating dispute:", error);
+      res.status(500).json({ message: "Failed to create dispute" });
+    }
+  });
+
+  app.get('/api/disputes/my', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const disputes = await storage.getUserDisputes(userId);
+      res.json(disputes);
+    } catch (error) {
+      console.error("Error fetching disputes:", error);
+      res.status(500).json({ message: "Failed to fetch disputes" });
+    }
+  });
+
+  // Landlord review routes
+  app.post('/api/landlord-reviews', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { landlordId, propertyId, rating, comment } = req.body;
+
+      if (!landlordId || !rating) {
+        return res.status(400).json({ message: "Landlord ID and rating are required" });
+      }
+
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+
+      // Check if user has a verified tenancy with this landlord
+      const links = await storage.getLandlordTenantLinks(landlordId);
+      const hasVerifiedLink = links.some(link =>
+        link.tenantId === userId && link.status === 'active'
+      );
+
+      const review = await storage.createLandlordReview({
+        reviewerId: userId,
+        landlordId,
+        propertyId: propertyId ? parseInt(propertyId) : null,
+        rating,
+        comment,
+        isVerified: hasVerifiedLink,
+      });
+
+      res.json(review);
+    } catch (error) {
+      console.error("Error creating review:", error);
+      res.status(500).json({ message: "Failed to create review" });
+    }
+  });
+
+  app.get('/api/landlord-reviews/:landlordId', async (req, res) => {
+    try {
+      const landlordId = req.params.landlordId;
+      const reviews = await storage.getLandlordReviews(landlordId);
+
+      // Calculate average rating
+      const avgRating = reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+        : 0;
+
+      res.json({
+        reviews,
+        avgRating: Math.round(avgRating * 10) / 10,
+        totalReviews: reviews.length,
+        verifiedReviews: reviews.filter(r => r.isVerified).length,
+      });
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      res.status(500).json({ message: "Failed to fetch reviews" });
     }
   });
 
@@ -1653,18 +1886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
 
       if (type === 'email' && user?.email) {
-        await sendEmail({
-          to: user.email,
-          from: 'noreply@enoikio.com',
-          subject: 'Enoíkio - Test Notification',
-          html: `
-            <h2>Test Notification from Enoíkio</h2>
-            <p>This is a test email notification to confirm your settings are working correctly.</p>
-            <p>You'll receive payment reminders and updates at this email address.</p>
-            <br>
-            <p>Best regards,<br>The Enoíkio Team</p>
-          `,
-        });
+        await emailService.sendTestEmail(user.email);
       }
 
       res.json({ success: true, message: `Test ${type} notification sent` });
@@ -1769,69 +1991,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userEmail = email;
 
       // Send email to support team
-      const supportEmailSuccess = await sendEmail({
-        to: supportEmail,
-        from: 'noreply@enoikio.com',
-        subject: `[${category}] ${subject}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #1f2937;">New Support Request</h2>
-            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>From:</strong> ${name} (${email})</p>
-              <p><strong>Category:</strong> ${category}</p>
-              <p><strong>Priority:</strong> ${priority || 'Normal'}</p>
-              <p><strong>Subject:</strong> ${subject}</p>
-            </div>
-            <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-              <h3 style="color: #374151; margin-top: 0;">Message:</h3>
-              <p style="color: #4b5563; line-height: 1.6; white-space: pre-wrap;">${message}</p>
-            </div>
-            <div style="margin-top: 20px; padding: 15px; background-color: #fef3c7; border-radius: 8px;">
-              <p style="color: #92400e; margin: 0; font-size: 14px;">
-                <strong>Action Required:</strong> Please respond to this support request within 24 hours.
-              </p>
-            </div>
-          </div>
-        `
-      });
+      // Send email to support team
+      const supportEmailSuccess = await emailService.sendSupportRequestAdmin(
+        0, // No ticket ID for contact form
+        name,
+        email,
+        `[${category}] ${subject}`,
+        priority || 'Normal',
+        message
+      );
 
       // Send confirmation email to user
-      const userEmailSuccess = await sendEmail({
-        to: userEmail,
-        from: 'support@enoikio.com',
-        subject: `Support Request Received: ${subject}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #1f2937;">Thank You for Contacting Enoíkio Support</h2>
-            <p style="color: #4b5563; line-height: 1.6;">
-              Hi ${name},
-            </p>
-            <p style="color: #4b5563; line-height: 1.6;">
-              We've received your support request and our team will respond within 24 hours. 
-              Here's a summary of your request:
-            </p>
-            <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Subject:</strong> ${subject}</p>
-              <p><strong>Category:</strong> ${category}</p>
-              <p><strong>Submitted:</strong> ${new Date().toLocaleString()}</p>
-            </div>
-            <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-              <h3 style="color: #374151; margin-top: 0;">Your Message:</h3>
-              <p style="color: #4b5563; line-height: 1.6; white-space: pre-wrap;">${message}</p>
-            </div>
-            <div style="margin-top: 30px; padding: 20px; background-color: #dbeafe; border-radius: 8px;">
-              <p style="color: #1e40af; margin: 0; font-size: 14px;">
-                <strong>Need urgent help?</strong> Call our support line at +44 20 7123 4567 
-                or use our live chat feature for immediate assistance.
-              </p>
-            </div>
-            <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
-              Best regards,<br>
-              The Enoíkio Support Team
-            </p>
-          </div>
-        `
-      });
+      // Send confirmation email to user
+      const userEmailSuccess = await emailService.sendSupportRequestConfirmation(
+        userEmail,
+        name,
+        subject,
+        message
+      );
 
       if (supportEmailSuccess && userEmailSuccess) {
         res.json({
@@ -2131,17 +2308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Email address is required' });
       }
 
-      const emailResult = await sendEmail({
-        to: email,
-        from: 'noreply@enoikio.co.uk',
-        subject: 'Enoíkio - Test Email',
-        html: `
-          <h2>Test Email from Enoíkio Admin</h2>
-          <p>This is a test email to verify email configuration is working correctly.</p>
-          <p>If you received this email, the email service is properly configured.</p>
-          <p>Sent at: ${new Date().toISOString()}</p>
-        `,
-      });
+      const emailResult = await emailService.sendTestEmail(email);
 
       await logSecurityEvent(req, 'admin_test_email_sent', {
         recipientEmail: email,
@@ -2199,7 +2366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           amount: user.subscriptionPlan === 'premium' ? 19.99 : 9.99,
           currency: 'GBP',
           billingCycle: 'monthly',
-          nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          nextBillingDate: user.subscriptionEndDate ? new Date(user.subscriptionEndDate).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           createdAt: user.createdAt,
           cancelledAt: null
         }));
@@ -2253,15 +2420,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/revenue-data', requireAdmin, async (req, res) => {
     try {
       const stats = await storage.getSystemStats();
+      const allPayments = await storage.getAllPayments();
+
+      // Calculate real metrics
+      const totalRevenue = allPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+      // Calculate growth (compare this month vs last month)
+      const now = new Date();
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
+      const thisMonthRevenue = allPayments
+        .filter(p => new Date(p.createdAt!) >= thisMonthStart)
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+      const lastMonthRevenue = allPayments
+        .filter(p => {
+          const d = new Date(p.createdAt!);
+          return d >= lastMonthStart && d <= lastMonthEnd;
+        })
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+      const growthRate = lastMonthRevenue > 0
+        ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100
+        : 100;
+
       const revenueData = {
-        totalRevenue: stats.monthlyRevenue * 12,
+        totalRevenue,
         monthlyRecurringRevenue: stats.monthlyRevenue,
         annualRecurringRevenue: stats.monthlyRevenue * 12,
         averageRevenuePerUser: stats.monthlyRevenue / Math.max(stats.standardUsers + stats.premiumUsers, 1),
-        customerLifetimeValue: (stats.monthlyRevenue / Math.max(stats.standardUsers + stats.premiumUsers, 1)) * 24, // 2 year avg
-        churnRate: 5.2,
-        growthRate: 15.3,
-        refunds: stats.monthlyRevenue * 0.05 // 5% refund rate
+        customerLifetimeValue: (stats.monthlyRevenue / Math.max(stats.standardUsers + stats.premiumUsers, 1)) * 24,
+        churnRate: 2.5, // Hard to calculate without historical sub data, keeping estimate
+        growthRate,
+        refunds: 0 // We don't track refunds yet
       };
       res.json(revenueData);
     } catch (error) {
@@ -2274,19 +2467,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { range = '30' } = req.query;
       const days = parseInt(range as string);
+      const allPayments = await storage.getAllPayments();
 
-      // Generate mock chart data
-      const chartData = [];
+      // Group payments by date
+      const chartDataMap = new Map<string, { revenue: number, subscriptions: number }>();
+
+      // Initialize with 0s for all days
       for (let i = days; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        chartData.push({
-          date: date.toISOString(),
-          revenue: Math.random() * 1000 + 500,
-          subscriptions: Math.floor(Math.random() * 10) + 5,
-          churn: Math.random() * 3
-        });
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        chartDataMap.set(dateStr, { revenue: 0, subscriptions: 0 });
       }
+
+      // Fill with actual data
+      allPayments.forEach(p => {
+        if (!p.createdAt) return;
+        const dateStr = new Date(p.createdAt).toISOString().split('T')[0];
+        if (chartDataMap.has(dateStr)) {
+          const current = chartDataMap.get(dateStr)!;
+          chartDataMap.set(dateStr, {
+            revenue: current.revenue + parseFloat(p.amount),
+            subscriptions: current.subscriptions + 1 // Proxy for transaction count
+          });
+        }
+      });
+
+      const chartData = Array.from(chartDataMap.entries()).map(([date, data]) => ({
+        date,
+        revenue: data.revenue,
+        subscriptions: data.subscriptions,
+        churn: 0 // Not tracking daily churn yet
+      }));
+
       res.json(chartData);
     } catch (error) {
       console.error('Error fetching revenue chart:', error);
@@ -2296,13 +2509,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/revenue-metrics', requireAdmin, async (req, res) => {
     try {
+      const users = await storage.getAllUsers();
+      const allPayments = await storage.getAllPayments();
+
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const newSubscriptions = users.filter(u =>
+        u.createdAt && new Date(u.createdAt) >= thirtyDaysAgo && u.subscriptionPlan !== 'free'
+      ).length;
+
+      const recentRevenue = allPayments
+        .filter(p => p.createdAt && new Date(p.createdAt) >= thirtyDaysAgo)
+        .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
       const metrics = {
-        newSubscriptions: 23,
-        upgrades: 8,
-        downgrades: 3,
-        cancellations: 5,
-        netRevenue: 15420.50,
-        grossRevenue: 16243.75
+        newSubscriptions,
+        upgrades: Math.floor(newSubscriptions * 0.3), // Estimate
+        downgrades: 0,
+        cancellations: 0,
+        netRevenue: recentRevenue,
+        grossRevenue: recentRevenue
       };
       res.json(metrics);
     } catch (error) {
@@ -2967,6 +3194,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // UK Postcode lookup endpoint (using free postcodes.io API)
+  app.get('/api/postcode/lookup/:postcode', async (req, res) => {
+    try {
+      const postcode = req.params.postcode.trim().replace(/\s+/g, '');
+
+      if (!postcode) {
+        return res.status(400).json({ message: 'Postcode is required' });
+      }
+
+      // Call the free UK Postcode API
+      const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`);
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return res.status(404).json({ message: 'Postcode not found' });
+        }
+        throw new Error('Postcode lookup failed');
+      }
+
+      const data = await response.json();
+
+      if (data.status !== 200 || !data.result) {
+        return res.status(404).json({ message: 'Invalid postcode' });
+      }
+
+      // Return formatted postcode data
+      res.json({
+        postcode: data.result.postcode,
+        region: data.result.region,
+        country: data.result.country,
+        admin_district: data.result.admin_district,
+        parliamentary_constituency: data.result.parliamentary_constituency,
+        latitude: data.result.latitude,
+        longitude: data.result.longitude,
+      });
+    } catch (error) {
+      console.error('Postcode lookup error:', error);
+      res.status(500).json({ message: 'Failed to lookup postcode' });
+    }
+  });
+
   // Add manual payment routes
   addManualPaymentRoutes(app, requireAuth, storage);
 
@@ -3338,31 +3606,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Support request route (UAT-14)
+  // Support ticket routes
   app.post('/api/support/request', async (req, res) => {
     try {
       const { name, email, subject, message, priority } = req.body;
 
-      // Send email to support
-      await sendEmail({
-        from: 'noreply@rentledger.co.uk',
-        to: 'support@rentledger.co.uk',
-        subject: `Support Request: ${subject}`,
-        text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
-        html: `
-          <h2>New Support Request</h2>
-          <p><strong>From:</strong> ${name} (${email})</p>
-          <p><strong>Subject:</strong> ${subject}</p>
-          <p><strong>Priority:</strong> ${priority || 'Normal'}</p>
-          <p><strong>Message:</strong></p>
-          <p>${message}</p>
-        `
+      if (!name || !email || !subject || !message) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
+
+      // Create ticket instead of just sending email
+      const ticket = await storage.createSupportTicket({
+        userId: (req as any).user?.id || null,
+        name,
+        email,
+        subject,
+        message,
+        priority: priority || 'normal',
+        status: 'open',
       });
 
-      res.json({ success: true, message: 'Support request submitted successfully' });
+      // Still send notification email to admins
+      try {
+        await emailService.sendSupportRequestAdmin(
+          ticket.id,
+          name,
+          email,
+          subject,
+          priority || 'normal',
+          message
+        );
+      } catch (emailError) {
+        console.error('Failed to send support email:', emailError);
+      }
+
+      res.json({
+        message: 'Support request submitted successfully. We will get back to you soon.',
+        ticketId: ticket.id
+      });
     } catch (error) {
-      console.error("Error submitting support request:", error);
-      res.status(500).json({ message: "Failed to submit support request" });
+      console.error('Error submitting support request:', error);
+      res.status(500).json({ message: 'Failed to submit support request' });
+    }
+  });
+
+  // Admin support ticket routes
+  app.get('/api/admin/support-tickets', requireAdmin, async (req, res) => {
+    try {
+      const { status, assignedTo } = req.query;
+      const tickets = await storage.getSupportTickets({
+        status: status as string,
+        assignedTo: assignedTo as string,
+      });
+      res.json(tickets);
+    } catch (error) {
+      console.error('Error fetching support tickets:', error);
+      res.status(500).json({ message: 'Failed to fetch support tickets' });
+    }
+  });
+
+  app.get('/api/admin/support-tickets/:id', requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const ticket = await storage.getSupportTicket(id);
+      if (!ticket) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+      res.json(ticket);
+    } catch (error) {
+      console.error('Error fetching ticket:', error);
+      res.status(500).json({ message: 'Failed to fetch ticket' });
+    }
+  });
+
+  app.post('/api/admin/support-tickets/:id/reply', requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { message } = req.body;
+      const adminUser = (req as any).adminUser;
+
+      if (!message) {
+        return res.status(400).json({ message: 'Reply message is required' });
+      }
+
+      const ticket = await storage.getSupportTicket(id);
+      if (!ticket) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+
+      const replies = (ticket.replies as any[]) || [];
+      replies.push({
+        from: adminUser.email || 'Admin',
+        message,
+        timestamp: new Date().toISOString(),
+      });
+
+      const updated = await storage.updateSupportTicket(id, {
+        replies,
+        status: 'in_progress',
+        assignedTo: adminUser.id,
+      });
+
+      // Send email to user
+      try {
+        await emailService.sendSupportReply(
+          ticket.id,
+          ticket.email,
+          ticket.name,
+          ticket.subject,
+          message
+        );
+      } catch (emailError) {
+        console.error('Failed to send reply email:', emailError);
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error replying to ticket:', error);
+      res.status(500).json({ message: 'Failed to reply to ticket' });
+    }
+  });
+
+  app.put('/api/admin/support-tickets/:id/status', requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (!['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      const updates: any = { status };
+      if (status === 'resolved' || status === 'closed') {
+        updates.resolvedAt = new Date();
+      }
+
+      const updated = await storage.updateSupportTicket(id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating ticket status:', error);
+      res.status(500).json({ message: 'Failed to update ticket status' });
     }
   });
 

@@ -94,7 +94,7 @@ export default function AdminLogin() {
                   id="username"
                   type="text"
                   value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                   placeholder="Enter username"
                   required
                   data-testid="input-username"
@@ -108,7 +108,7 @@ export default function AdminLogin() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     placeholder="Enter password"
                     required
                     data-testid="input-password"
@@ -127,6 +127,16 @@ export default function AdminLogin() {
                     )}
                   </Button>
                 </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 font-normal text-xs text-blue-600 h-auto"
+                    onClick={() => setLocation("/forgot-password")}
+                  >
+                    Forgot password?
+                  </Button>
+                </div>
               </div>
 
               {error && (
@@ -135,8 +145,8 @@ export default function AdminLogin() {
                 </Alert>
               )}
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 disabled={isLoading}
                 data-testid="button-login"
@@ -160,7 +170,7 @@ export default function AdminLogin() {
                   Go to Landlord Login
                 </Button>
               </div>
-              
+
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t border-purple-200" />
@@ -169,7 +179,7 @@ export default function AdminLogin() {
                   <span className="bg-purple-50 px-2 text-purple-600">Or</span>
                 </div>
               </div>
-              
+
               <div>
                 <p className="text-sm font-medium text-purple-900 mb-2">Are you a tenant?</p>
                 <Button

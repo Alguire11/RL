@@ -8,29 +8,30 @@ import { storage } from "./storage";
 import { pool } from "./db";
 import { User as SelectUser } from "@shared/schema";
 import { nanoid } from "nanoid";
+import { emailService } from "./emailService";
 
 // Helper function to generate unique RLID (RentLedger ID)
 async function generateRLID(role: string): Promise<string> {
   const prefix = role === 'landlord' ? 'LRLID-' : 'TRLID-';
   let rlid: string;
   let exists = true;
-  
+
   // Keep generating until we find a unique ID
   while (exists) {
     const randomNum = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
     rlid = `${prefix}${randomNum}`;
-    
+
     // Check if this RLID already exists
     const allUsers = await storage.getAllUsers();
     exists = allUsers.some(user => user.rlid === rlid);
   }
-  
+
   return rlid!;
 }
 
 declare global {
   namespace Express {
-    interface User extends SelectUser {}
+    interface User extends SelectUser { }
   }
 }
 
@@ -119,7 +120,7 @@ export function setupAuth(app: Express) {
   app.post("/api/register", async (req, res, next) => {
     try {
       const { email, password, firstName, lastName } = req.body;
-      
+
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: "All fields are required" });
       }
@@ -201,6 +202,29 @@ export function setupAuth(app: Express) {
       if (err) return next(err);
       res.status(200).json({ message: "Logged out successfully" });
     });
+  });
+
+  // Forgot Password endpoint
+  app.post("/api/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (user) {
+        const resetUrl = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=simulation`;
+
+        await emailService.sendPasswordReset(user.email, resetUrl);
+      }
+
+      // Always return success to prevent email enumeration
+      res.json({ message: "If an account exists, a reset link has been sent." });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 
   // Get current user

@@ -128,24 +128,11 @@ export default function Dashboard() {
   };
 
   // Calculate payment status
-  // Merge regular and manual payments for the dashboard list
-  const { data: manualPayments = [] } = useQuery<any[]>({
-    queryKey: ["/api/manual-payments"],
-    retry: false,
-  });
-
+  // /api/payments already includes manual payments, so no need to merge
   const allPayments = useMemo(() => {
-    const combined = [...payments, ...manualPayments.map(p => ({
-      ...p,
-      id: `manual-${p.id}`,
-      dueDate: p.paymentDate,
-      paidDate: p.paymentDate,
-      status: p.needsVerification ? 'pending' : 'paid',
-      isVerified: !p.needsVerification,
-      isManual: true
-    }))];
-    return combined.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
-  }, [payments, manualPayments]);
+    return [...payments].sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  }, [payments]);
+
 
   const calculatePaymentStatus = (payment: RentPayment & { isManual?: boolean }) => {
     const today = new Date();

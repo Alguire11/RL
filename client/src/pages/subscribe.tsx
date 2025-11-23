@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Shield, TrendingUp, Users, Building, BarChart3, Crown, ArrowLeft } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { Logo } from "@/components/logo";
 
 // Load Stripe outside of component
-const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY 
+const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY
   ? loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY)
   : null;
 
@@ -60,9 +62,9 @@ const CheckoutForm = ({ selectedPlan }: { selectedPlan: 'standard' | 'premium' }
           googlePay: 'auto',
         }
       }} />
-      <Button 
-        type="submit" 
-        disabled={!stripe || isProcessing} 
+      <Button
+        type="submit"
+        disabled={!stripe || isProcessing}
         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold text-lg py-6"
         data-testid="button-confirm-payment"
       >
@@ -75,11 +77,14 @@ const CheckoutForm = ({ selectedPlan }: { selectedPlan: 'standard' | 'premium' }
 export default function Subscribe() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<'free' | 'standard' | 'premium'>('premium');
   const [clientSecret, setClientSecret] = useState("");
   const [showCheckout, setShowCheckout] = useState(false);
 
-  const plans = [
+  const isLandlord = user?.role === 'landlord';
+
+  const landlordPlans = [
     {
       name: 'Free',
       price: '£0',
@@ -87,10 +92,10 @@ export default function Subscribe() {
       description: 'Perfect for getting started',
       features: [
         '1 property',
-        'Basic tenant management',
-        'Email support',
-        'Document vault (5 documents)',
-        'Limited analytics'
+        'Manual rent tracking',
+        'Basic tenant list',
+        'Document vault (5 docs)',
+        'Email support'
       ],
       color: 'from-gray-500 to-gray-600',
       icon: Building,
@@ -98,17 +103,16 @@ export default function Subscribe() {
     },
     {
       name: 'Standard',
-      price: '£9.99',
+      price: '£19.99',
       period: '/month',
       description: 'Great for growing landlords',
       features: [
-        'Up to 3 properties',
-        'Advanced tenant management',
-        'Priority email support',
-        'Unlimited document vault',
-        'Full analytics dashboard',
-        'Tenant payment verification',
-        'Silver landlord badge'
+        'Up to 5 properties',
+        'Auto-rent collection',
+        'Expense tracking',
+        'Digital lease templates',
+        'Tenant screening (Basic)',
+        'Priority email support'
       ],
       color: 'from-blue-500 to-blue-600',
       icon: Users,
@@ -116,19 +120,17 @@ export default function Subscribe() {
     },
     {
       name: 'Premium',
-      price: '£19.99',
+      price: '£29.99',
       period: '/month',
       description: 'For professional landlords',
       features: [
         'Unlimited properties',
-        'Full tenant management suite',
-        '24/7 priority support',
-        'Unlimited document vault',
-        'Advanced analytics & insights',
-        'Auto payment verification',
-        'Gold landlord badge',
+        'Full legal support',
+        'Advanced analytics',
+        'Priority 24/7 support',
+        'Custom branding',
         'API access',
-        'Custom branding'
+        'Gold landlord badge'
       ],
       color: 'from-purple-500 to-pink-600',
       icon: Crown,
@@ -136,9 +138,62 @@ export default function Subscribe() {
     }
   ];
 
+  const tenantPlans = [
+    {
+      name: 'Free',
+      price: '£0',
+      period: '/month',
+      description: 'Basic rent tracking',
+      features: [
+        'Manual rent tracking',
+        'Payment history view',
+        'Upload receipts',
+        'Basic support'
+      ],
+      color: 'from-gray-500 to-gray-600',
+      icon: Building,
+      popular: false
+    },
+    {
+      name: 'Standard',
+      price: '£4.99',
+      period: '/month',
+      description: 'Build your credit score',
+      features: [
+        'All Free features',
+        'Credit bureau reporting',
+        'Rent reminders',
+        'Verified Tenant badge',
+        'Standard support'
+      ],
+      color: 'from-blue-500 to-blue-600',
+      icon: Shield,
+      popular: true
+    },
+    {
+      name: 'Premium',
+      price: '£9.99',
+      period: '/month',
+      description: 'Maximum benefits',
+      features: [
+        'All Standard features',
+        'Legal document templates',
+        'Priority support',
+        'Partner discounts',
+        'Advanced spending analytics',
+        'Portable rental history'
+      ],
+      color: 'from-purple-500 to-pink-600',
+      icon: Crown,
+      popular: false
+    }
+  ];
+
+  const plans = isLandlord ? landlordPlans : tenantPlans;
+
   const handleSelectPlan = async (planName: 'free' | 'standard' | 'premium') => {
     setSelectedPlan(planName);
-    
+
     if (planName === 'free') {
       toast({
         title: "Free Plan Selected",
@@ -147,11 +202,19 @@ export default function Subscribe() {
       return;
     }
 
+    // Determine amount based on role and plan
+    let amount = 0;
+    if (isLandlord) {
+      amount = planName === 'standard' ? 19.99 : 29.99;
+    } else {
+      amount = planName === 'standard' ? 4.99 : 9.99;
+    }
+
     // Create payment intent for paid plans
     try {
-      const response = await apiRequest("POST", "/api/create-payment-intent", { 
+      const response = await apiRequest("POST", "/api/create-payment-intent", {
         plan: planName,
-        amount: planName === 'standard' ? 9.99 : 19.99
+        amount: amount
       });
       const data = await response.json();
       setClientSecret(data.clientSecret);
@@ -169,8 +232,8 @@ export default function Subscribe() {
     return (
       <div className="min-h-screen bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => setLocation('/dashboard')}
             className="mb-6"
             data-testid="button-back-to-dashboard"
@@ -192,13 +255,15 @@ export default function Subscribe() {
   }
 
   if (showCheckout && clientSecret) {
+    const plan = plans.find(p => p.name.toLowerCase() === selectedPlan);
+
     return (
       <div className="min-h-screen bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Button variant="ghost" onClick={() => setShowCheckout(false)} className="mb-6" data-testid="button-back-to-plans">
             ← Back to Plans
           </Button>
-          
+
           <Card className="border-0 shadow-xl">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
               <CardTitle className="text-2xl flex items-center">
@@ -206,7 +271,7 @@ export default function Subscribe() {
                 Complete Your Subscription
               </CardTitle>
               <CardDescription>
-                Subscribe to {selectedPlan === 'premium' ? 'Premium' : 'Standard'} - {selectedPlan === 'premium' ? '£19.99' : '£9.99'}/month
+                Subscribe to {plan?.name} - {plan?.price}/month
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
@@ -234,21 +299,27 @@ export default function Subscribe() {
       {/* Header */}
       <div className="bg-gradient-to-br from-blue-900 via-purple-900 to-blue-800 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Button 
-            variant="ghost" 
-            onClick={() => setLocation('/dashboard')}
-            className="mb-6 text-white hover:bg-white/10"
-            data-testid="button-back-to-dashboard"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
+          <div className="flex justify-between items-center mb-8">
+            <Logo className="text-white scale-110" />
+            <Button
+              variant="outline"
+              onClick={() => setLocation('/dashboard')}
+              className="text-white border-white/30 bg-white/10 hover:bg-white/20 hover:text-white hover:border-white/50 transition-all"
+              data-testid="button-back-to-dashboard"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               Choose Your Perfect Plan
             </h1>
             <p className="text-xl text-gray-200 max-w-2xl mx-auto">
-              Unlock powerful landlord features and grow your property portfolio with RentLedger
+              {isLandlord
+                ? "Unlock powerful landlord features and grow your property portfolio"
+                : "Build credit, get rewards, and simplify your renting experience"
+              }
             </p>
           </div>
         </div>
@@ -258,11 +329,10 @@ export default function Subscribe() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid md:grid-cols-3 gap-8">
           {plans.map((plan) => (
-            <Card 
+            <Card
               key={plan.name}
-              className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-                plan.popular ? 'ring-2 ring-purple-500 transform scale-105' : ''
-              }`}
+              className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${plan.popular ? 'ring-2 ring-purple-500 transform scale-105' : ''
+                }`}
               data-testid={`card-plan-${plan.name.toLowerCase()}`}
             >
               {plan.popular && (
@@ -291,13 +361,12 @@ export default function Subscribe() {
                 </ul>
                 <Button
                   onClick={() => handleSelectPlan(plan.name.toLowerCase() as 'free' | 'standard' | 'premium')}
-                  className={`w-full ${
-                    plan.popular 
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white' 
-                      : plan.name === 'Free'
+                  className={`w-full ${plan.popular
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+                    : plan.name === 'Free'
                       ? 'bg-gray-600 hover:bg-gray-700 text-white'
                       : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  } font-semibold py-6`}
+                    } font-semibold py-6`}
                   data-testid={`button-select-${plan.name.toLowerCase()}`}
                 >
                   {plan.name === 'Free' ? 'Current Plan' : `Choose ${plan.name}`}
@@ -316,32 +385,38 @@ export default function Subscribe() {
                 <TrendingUp className="h-6 w-6 text-white" />
               </div>
               <h3 className="font-semibold mb-2">Grow Faster</h3>
-              <p className="text-sm text-gray-600">Manage more properties and scale your portfolio with ease</p>
+              <p className="text-sm text-gray-600">
+                {isLandlord
+                  ? "Manage more properties and scale your portfolio with ease"
+                  : "Build your credit score with every rent payment you make"
+                }
+              </p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
                 <BarChart3 className="h-6 w-6 text-white" />
               </div>
               <h3 className="font-semibold mb-2">Better Insights</h3>
-              <p className="text-sm text-gray-600">Advanced analytics help you make smarter decisions</p>
+              <p className="text-sm text-gray-600">
+                {isLandlord
+                  ? "Advanced analytics help you make smarter decisions"
+                  : "Track your spending and manage your budget effectively"
+                }
+              </p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 bg-pink-600 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Shield className="h-6 w-6 text-white" />
               </div>
               <h3 className="font-semibold mb-2">Build Trust</h3>
-              <p className="text-sm text-gray-600">Verified badges boost your credibility with tenants</p>
+              <p className="text-sm text-gray-600">
+                {isLandlord
+                  ? "Verified badges boost your credibility with tenants"
+                  : "Get verified status to stand out to future landlords"
+                }
+              </p>
             </div>
           </div>
-        </div>
-
-        {/* Back to Dashboard */}
-        <div className="text-center mt-12">
-          <Link href="/landlord-dashboard">
-            <Button variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50" data-testid="button-back-dashboard">
-              Back to Dashboard
-            </Button>
-          </Link>
         </div>
       </div>
     </div>
