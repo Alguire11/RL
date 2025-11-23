@@ -273,111 +273,272 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Free</CardTitle>
-                <div className="text-4xl font-bold text-gray-900 mb-2">£0</div>
-                <p className="text-gray-600">per month</p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Basic payment tracking</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Monthly credit reports</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Email support</span>
-                  </li>
-                </ul>
-                <Button
-                  variant="outline"
-                  className="w-full mt-6"
-                  onClick={() => setLocation('/auth')}
+          {/* Pricing Tabs */}
+          <div className="max-w-6xl mx-auto">
+            {/* Tab Buttons */}
+            <div className="flex justify-center mb-12">
+              <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+                <button
+                  onClick={() => {
+                    const tenantSection = document.getElementById('tenant-pricing');
+                    const landlordSection = document.getElementById('landlord-pricing');
+                    if (tenantSection && landlordSection) {
+                      tenantSection.style.display = 'grid';
+                      landlordSection.style.display = 'none';
+                    }
+                  }}
+                  className="px-6 py-3 rounded-md text-sm font-medium transition-colors bg-primary text-white"
+                  id="tenant-tab"
                 >
-                  Get Started
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 relative">
-              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                <Badge className="bg-gradient-to-r from-primary to-secondary text-white">
-                  Most Popular
-                </Badge>
+                  For Tenants
+                </button>
+                <button
+                  onClick={() => {
+                    const tenantSection = document.getElementById('tenant-pricing');
+                    const landlordSection = document.getElementById('landlord-pricing');
+                    if (tenantSection && landlordSection) {
+                      tenantSection.style.display = 'none';
+                      landlordSection.style.display = 'grid';
+                    }
+                    // Update button styles
+                    const tenantTab = document.getElementById('tenant-tab');
+                    const landlordTab = document.getElementById('landlord-tab');
+                    if (tenantTab && landlordTab) {
+                      tenantTab.className = 'px-6 py-3 rounded-md text-sm font-medium transition-colors text-gray-700 hover:text-gray-900';
+                      landlordTab.className = 'px-6 py-3 rounded-md text-sm font-medium transition-colors bg-primary text-white';
+                    }
+                  }}
+                  className="px-6 py-3 rounded-md text-sm font-medium transition-colors text-gray-700 hover:text-gray-900"
+                  id="landlord-tab"
+                >
+                  For Landlords
+                </button>
               </div>
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Professional</CardTitle>
-                <div className="text-4xl font-bold text-gray-900 mb-2">£9.99</div>
-                <p className="text-gray-600">per month</p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Advanced analytics</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Unlimited reports</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Priority support</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Landlord verification</span>
-                  </li>
-                </ul>
-                <GradientButton
-                  className="w-full mt-6"
-                  onClick={() => setLocation('/auth')}
-                >
-                  Start Free Trial
-                </GradientButton>
-              </CardContent>
-            </Card>
+            </div>
 
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Enterprise</CardTitle>
-                <div className="text-4xl font-bold text-gray-900 mb-2">£29.99</div>
-                <p className="text-gray-600">per month</p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Multi-property support</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>API access</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Dedicated support</span>
-                  </li>
-                  <li className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-2" />
-                    <span>Custom integrations</span>
-                  </li>
-                </ul>
-                <Button
-                  variant="outline"
-                  className="w-full mt-6"
-                  onClick={() => setLocation('/contact')}
-                >
-                  Contact Sales
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Tenant Pricing */}
+            <div id="tenant-pricing" className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">Free</CardTitle>
+                  <div className="text-4xl font-bold text-gray-900 mb-2">£0</div>
+                  <p className="text-gray-600">per month</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>1 property</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>1 credit report per month</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Landlord verification</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Email support</span>
+                    </li>
+                  </ul>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-6"
+                    onClick={() => setLocation('/auth')}
+                  >
+                    Get Started
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 relative">
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                  <Badge className="bg-gradient-to-r from-primary to-secondary text-white">
+                    Most Popular
+                  </Badge>
+                </div>
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">Professional</CardTitle>
+                  <div className="text-4xl font-bold text-gray-900 mb-2">£9.99</div>
+                  <p className="text-gray-600">per month</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Up to 3 properties</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Unlimited credit reports</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Advanced analytics</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Priority support</span>
+                    </li>
+                  </ul>
+                  <GradientButton
+                    className="w-full mt-6"
+                    onClick={() => setLocation('/auth')}
+                  >
+                    Start Free Trial
+                  </GradientButton>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">Enterprise</CardTitle>
+                  <div className="text-4xl font-bold text-gray-900 mb-2">£29.99</div>
+                  <p className="text-gray-600">per month</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Unlimited properties</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>API access</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Dedicated support</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Custom integrations</span>
+                    </li>
+                  </ul>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-6"
+                    onClick={() => setLocation('/contact')}
+                  >
+                    Contact Sales
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Landlord Pricing */}
+            <div id="landlord-pricing" className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto" style={{ display: 'none' }}>
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">Starter</CardTitle>
+                  <div className="text-4xl font-bold text-gray-900 mb-2">£0</div>
+                  <p className="text-gray-600">per month</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Up to 3 tenants</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Tenant verification</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Payment tracking</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Email support</span>
+                    </li>
+                  </ul>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-6"
+                    onClick={() => setLocation('/landlord-signup')}
+                  >
+                    Get Started
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 relative">
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                  <Badge className="bg-gradient-to-r from-primary to-secondary text-white">
+                    Most Popular
+                  </Badge>
+                </div>
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">Professional</CardTitle>
+                  <div className="text-4xl font-bold text-gray-900 mb-2">£19.99</div>
+                  <p className="text-gray-600">per month</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Up to 10 tenants</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Automated rent reminders</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Tenant screening reports</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Priority support</span>
+                    </li>
+                  </ul>
+                  <GradientButton
+                    className="w-full mt-6"
+                    onClick={() => setLocation('/landlord-signup')}
+                  >
+                    Start Free Trial
+                  </GradientButton>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">Enterprise</CardTitle>
+                  <div className="text-4xl font-bold text-gray-900 mb-2">£49.99</div>
+                  <p className="text-gray-600">per month</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Unlimited tenants</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Multi-property management</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>API access</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-5 w-5 text-green-500 mr-2" />
+                      <span>Dedicated account manager</span>
+                    </li>
+                  </ul>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-6"
+                    onClick={() => setLocation('/contact')}
+                  >
+                    Contact Sales
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </section>
