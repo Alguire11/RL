@@ -21,6 +21,7 @@ import {
 import { nanoid } from "nanoid";
 import bcrypt from "bcryptjs";
 import { registerSubscriptionRoutes } from "./subscriptionRoutes";
+import { getSubscriptionLimits, normalizePlanName } from "./middleware/subscription";
 
 // Helper function to generate unique RLID (RentLedger ID)
 async function generateRLID(role: string): Promise<string> {
@@ -367,6 +368,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/properties', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      const user = req.user;
+
+      // Check subscription-based property limits
+      const existingProperties = await storage.getUserProperties(userId);
+      const userPlan = normalizePlanName(user.subscriptionPlan || 'free');
+      const limits = getSubscriptionLimits(userPlan);
+
+      if (existingProperties.length >= limits.properties) {
+        return res.status(403).json({
+          message: `Your ${userPlan} plan is limited to ${limits.properties} ${limits.properties === 1 ? 'property' : 'properties'}`,
+          currentCount: existingProperties.length,
+          limit: limits.properties,
+          upgradeUrl: '/pricing',
+          upgradeMessage: limits.properties === 1
+            ? 'Upgrade to Professional to manage up to 3 properties'
+            : 'Upgrade to Enterprise for unlimited properties'
+        });
+      }
 
       // Validate required fields first
       if (!req.body.address || !req.body.city || !req.body.postcode || !req.body.monthlyRent) {
@@ -831,16 +850,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/reports/generate', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      const user = req.user;
       const { propertyId, reportType = 'credit' } = req.body;
 
+      // Check subscription-based report limits for free users
+      const userPlan = normalizePlanName(user.subscriptionPlan || 'free');
+      const limits = getSubscriptionLimits(userPlan);
+
+      if (limits.reportsPerMonth !== Infinity) {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+        const reportsThisMonth = await storage.getUserCreditReportsByMonth(userId, currentMonth);
+
+        if (reportsThisMonth.length >= limits.reportsPerMonth) {
+          const nextMonth = new Date();
+          nextMonth.setMonth(nextMonth.getMonth() + 1);
+          nextMonth.setDate(1);
+
+          return res.status(403).json({
+            message: `Your ${userPlan} plan is limited to ${limits.reportsPerMonth} report${limits.reportsPerMonth === 1 ? '' : 's'} per month`,
+            currentCount: reportsThisMonth.length,
+            limit: limits.reportsPerMonth,
+            nextResetDate: nextMonth.toISOString().slice(0, 10),
+            upgradeUrl: '/pricing',
+            upgradeMessage: 'Upgrade to Professional for unlimited credit reports'
+          });
+        }
+      }
+
       // Get user data
-      const user = await storage.getUser(userId);
+      const userRecord = await storage.getUser(userId);
       const properties = await storage.getUserProperties(userId);
       const property = properties.find(p => p.id === propertyId);
       const payments = await storage.getPropertyRentPayments(propertyId);
       const allPayments = await storage.getUserRentPayments(userId);
 
-      if (!user || !property) {
+      if (!userRecord || !property) {
         return res.status(404).json({ message: "User or property not found" });
       }
 
@@ -893,10 +937,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Common data for all report types
       const userInfo = {
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
-        rlid: user.rlid || 'N/A',
-        email: user.email || 'N/A',
-        phone: user.phone || 'N/A',
+        name: `${userRecord.firstName || ''} ${userRecord.lastName || ''}`.trim() || 'N/A',
+        rlid: userRecord.rlid || 'N/A',
+        email: userRecord.email || 'N/A',
+        phone: userRecord.phone || 'N/A',
       };
 
       const currentAddress = {
@@ -935,7 +979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (reportType === 'credit') {
         reportData = {
           reportType: 'credit',
-          reportId: `${user.rlid}-${Date.now()}`,
+          reportId: `${userRecord.rlid}-${Date.now()}`,
           generatedDate: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           userInfo,
@@ -958,7 +1002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else if (reportType === 'rental') {
         reportData = {
           reportType: 'rental',
-          reportId: `${user.rlid}-${Date.now()}`,
+          reportId: `${userRecord.rlid}-${Date.now()}`,
           generatedDate: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           userInfo,
@@ -984,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else { // landlord verification
         reportData = {
           reportType: 'landlord',
-          reportId: `${user.rlid}-${Date.now()}`,
+          reportId: `${userRecord.rlid}-${Date.now()}`,
           generatedDate: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           tenantInfo: userInfo,

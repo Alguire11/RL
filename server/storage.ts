@@ -98,8 +98,8 @@ import {
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
-import { db } from "./db";
-import { eq, and, desc, asc, sql, or, isNull, gte, lte } from "drizzle-orm";
+import { db, pool } from "./db";
+import { and, eq, desc, or, isNull, gte, lt, sql, asc, lte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -132,6 +132,7 @@ export interface IStorage {
   // Credit report operations
   createCreditReport(report: InsertCreditReport): Promise<CreditReport>;
   getUserCreditReports(userId: string): Promise<CreditReport[]>;
+  getUserCreditReportsByMonth(userId: string, month: string): Promise<CreditReport[]>;
   getCreditReportByReportId(reportId: string): Promise<CreditReport | undefined>;
   updateCreditReport(id: number, report: Partial<InsertCreditReport>): Promise<CreditReport>;
 
@@ -486,6 +487,26 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(creditReports)
       .where(and(eq(creditReports.userId, userId), eq(creditReports.isActive, true)))
+      .orderBy(desc(creditReports.createdAt));
+  }
+
+  async getUserCreditReportsByMonth(userId: string, month: string): Promise<CreditReport[]> {
+    // month format: YYYY-MM
+    const startOfMonth = new Date(`${month}-01T00:00:00Z`);
+    const endOfMonth = new Date(startOfMonth);
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+
+    return await db
+      .select()
+      .from(creditReports)
+      .where(
+        and(
+          eq(creditReports.userId, userId),
+          eq(creditReports.isActive, true),
+          gte(creditReports.createdAt, startOfMonth),
+          lt(creditReports.createdAt, endOfMonth)
+        )
+      )
       .orderBy(desc(creditReports.createdAt));
   }
 

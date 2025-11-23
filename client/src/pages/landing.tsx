@@ -95,13 +95,13 @@ export default function Landing() {
       {/* Hero Section */}
       <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
         {/* Background Image with Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url(${heroBackground})` }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/85 to-blue-800/90"></div>
         </div>
-        
+
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
@@ -112,7 +112,7 @@ export default function Landing() {
               </span>
             </h1>
             <p className="text-xl text-gray-100 mb-8 max-w-3xl mx-auto">
-              RentLedger automatically tracks your on-time rent payments and builds a comprehensive credit portfolio. 
+              RentLedger automatically tracks your on-time rent payments and builds a comprehensive credit portfolio.
               Turn your rental history into a powerful financial asset.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -134,7 +134,7 @@ export default function Landing() {
               Everything you need to build credit through your rental payments
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
@@ -145,12 +145,12 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 text-center">
-                  Connect your bank account and we'll automatically track your rent payments, 
+                  Connect your bank account and we'll automatically track your rent payments,
                   building your credit history with every on-time payment.
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -160,12 +160,12 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 text-center">
-                  Generate professional credit reports showcasing your payment history, 
+                  Generate professional credit reports showcasing your payment history,
                   perfect for landlords, lenders, and mortgage applications.
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
                 <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -175,7 +175,7 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 text-center">
-                  Bank-level security with landlord verification ensures your payment history 
+                  Bank-level security with landlord verification ensures your payment history
                   is accurate and trusted by financial institutions.
                 </p>
               </CardContent>
@@ -186,13 +186,13 @@ export default function Landing() {
       {/* Features Section */}
       <section id="features" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url(${featuresBackground})` }}
         >
           <div className="absolute inset-0 bg-white/80"></div>
         </div>
-        
+
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -203,7 +203,7 @@ export default function Landing() {
               Built for tenants, trusted by landlords and lenders
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               {
@@ -255,13 +255,13 @@ export default function Landing() {
       {/* Pricing Section */}
       <section id="pricing" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url(${pricingBackground})` }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/95 via-blue-50/95 to-purple-50/95"></div>
         </div>
-        
+
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -272,7 +272,7 @@ export default function Landing() {
               Choose the plan that works for you
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
@@ -295,8 +295,8 @@ export default function Landing() {
                     <span>Email support</span>
                   </li>
                 </ul>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full mt-6"
                   onClick={() => setLocation('/auth')}
                 >
@@ -304,7 +304,7 @@ export default function Landing() {
                 </Button>
               </CardContent>
             </Card>
-            
+
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 relative">
               <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
                 <Badge className="bg-gradient-to-r from-primary to-secondary text-white">
@@ -335,7 +335,7 @@ export default function Landing() {
                     <span>Landlord verification</span>
                   </li>
                 </ul>
-                <GradientButton 
+                <GradientButton
                   className="w-full mt-6"
                   onClick={() => setLocation('/auth')}
                 >
@@ -343,7 +343,7 @@ export default function Landing() {
                 </GradientButton>
               </CardContent>
             </Card>
-            
+
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Enterprise</CardTitle>
@@ -369,8 +369,8 @@ export default function Landing() {
                     <span>Custom integrations</span>
                   </li>
                 </ul>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full mt-6"
                   onClick={() => setLocation('/contact')}
                 >
@@ -384,13 +384,13 @@ export default function Landing() {
       {/* Security Section */}
       <section id="security" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url(${securityBackground})` }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-blue-900/85 via-slate-900/90 to-purple-900/85"></div>
         </div>
-        
+
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -401,7 +401,7 @@ export default function Landing() {
               Your financial data is protected with the highest standards
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               {
@@ -439,13 +439,13 @@ export default function Landing() {
       {/* Support Section */}
       <section id="support" className="relative py-20 overflow-hidden">
         {/* Background Image with Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: `url(${supportBackground})` }}
         >
           <div className="absolute inset-0 bg-white/92"></div>
         </div>
-        
+
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mt-[34px] mb-[34px]">
@@ -456,7 +456,7 @@ export default function Landing() {
               Get the support you need when you need it
             </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
@@ -471,7 +471,7 @@ export default function Landing() {
                 </Button>
               </CardContent>
             </Card>
-            
+
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">Contact Support</CardTitle>
@@ -485,7 +485,7 @@ export default function Landing() {
                 </Button>
               </CardContent>
             </Card>
-            
+
             <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
               <CardHeader className="text-center">
                 <CardTitle className="text-2xl">System Status</CardTitle>
