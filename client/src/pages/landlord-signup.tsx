@@ -4,11 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Eye, EyeOff, CheckCircle } from "lucide-react";
+import { Building, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
+import { PasswordStrength } from "@/components/password-strength";
 
 export default function LandlordSignup() {
   const [, setLocation] = useLocation();
@@ -63,7 +63,6 @@ export default function LandlordSignup() {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -78,206 +77,286 @@ export default function LandlordSignup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-xl space-y-8">
-        <div className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-              <Building className="h-6 w-6 text-purple-600 dark:text-purple-300" />
-            </div>
-          </div>
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Create Landlord Account
-          </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Join RentLedger to manage your properties and tenants
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute top-20 left-10 w-64 h-64 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
+        <div className="absolute top-40 right-10 w-64 h-64 bg-pink-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
+        <div className="absolute bottom-20 left-1/2 w-64 h-64 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000" />
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Register as a Landlord</CardTitle>
-            <CardDescription>
-              Fill in your details to create a landlord account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                    placeholder="John"
-                    required
-                    data-testid="input-first-name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                    placeholder="Smith"
-                    required
-                    data-testid="input-last-name"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  placeholder="landlord@example.com"
-                  required
-                  data-testid="input-email"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  placeholder="+44 7700 900000"
-                  required
-                  data-testid="input-phone"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="businessName">Business Name (Optional)</Label>
-                <Input
-                  id="businessName"
-                  type="text"
-                  value={formData.businessName}
-                  onChange={(e) => setFormData({...formData, businessName: e.target.value})}
-                  placeholder="Smith Properties Ltd"
-                  data-testid="input-business-name"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    placeholder="Min. 8 characters"
-                    required
-                    data-testid="input-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                    placeholder="Re-enter password"
-                    required
-                    data-testid="input-confirm-password"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-2">
-                <input 
-                  type="checkbox" 
-                  id="terms" 
-                  required 
-                  className="mt-1"
-                  data-testid="checkbox-terms"
-                />
-                <Label htmlFor="terms" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  I agree to the <a href="/terms" className="text-purple-600 dark:text-purple-400 hover:underline">Terms & Conditions</a> and <a href="/privacy" className="text-purple-600 dark:text-purple-400 hover:underline">Privacy Policy</a>
-                </Label>
-              </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button 
-                type="submit" 
-                className="w-full bg-purple-600 hover:bg-purple-700 dark:bg-purple-700 dark:hover:bg-purple-800 text-white dark:text-white"
-                disabled={signupMutation.isPending}
-                data-testid="button-signup"
-              >
-                {signupMutation.isPending ? "Creating Account..." : "Create Landlord Account"}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Already have an account?{" "}
-                <Button
-                  variant="link"
-                  onClick={() => setLocation('/landlord-login')}
-                  className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 p-0 h-auto"
-                >
-                  Sign in here
-                </Button>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="text-center">
+      <div className="relative min-h-screen flex items-center justify-center p-4 py-12">
+        <div className="w-full max-w-xl space-y-6 animate-fade-in">
+          {/* Back Button */}
           <Button
             variant="ghost"
-            onClick={() => setLocation('/')}
-            className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
+            onClick={() => setLocation("/")}
+            className="text-white/90 hover:text-white hover:bg-white/10 backdrop-blur-sm"
           >
-            ← Back to Home
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Home
           </Button>
+
+          {/* Header */}
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur-xl opacity-75" />
+                <div className="relative bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20">
+                  <Building className="h-12 w-12 text-white" />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold text-white tracking-tight">
+                Create Landlord Account
+              </h1>
+              <p className="text-white/70 text-lg">
+                Join RentLedger to manage your properties and tenants
+              </p>
+            </div>
+          </div>
+
+          {/* Signup Card */}
+          <Card className="border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl">
+            <CardHeader className="space-y-1 pb-4">
+              <CardTitle className="text-2xl font-bold">Register as a Landlord</CardTitle>
+              <CardDescription>
+                Fill in your details to create a landlord account
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
+                    <Input
+                      id="firstName"
+                      type="text"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                      placeholder="John"
+                      className="h-11 transition-all focus:ring-2 focus:ring-purple-500"
+                      required
+                      data-testid="input-first-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      type="text"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                      placeholder="Smith"
+                      className="h-11 transition-all focus:ring-2 focus:ring-purple-500"
+                      required
+                      data-testid="input-last-name"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="landlord@example.com"
+                    className="h-11 transition-all focus:ring-2 focus:ring-purple-500"
+                    required
+                    data-testid="input-email"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+44 7700 900000"
+                    className="h-11 transition-all focus:ring-2 focus:ring-purple-500"
+                    required
+                    data-testid="input-phone"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="businessName" className="text-sm font-medium">Business Name (Optional)</Label>
+                  <Input
+                    id="businessName"
+                    type="text"
+                    value={formData.businessName}
+                    onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                    placeholder="Smith Properties Ltd"
+                    className="h-11 transition-all focus:ring-2 focus:ring-purple-500"
+                    data-testid="input-business-name"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      placeholder="Create strong password"
+                      className="h-11 pr-10 transition-all focus:ring-2 focus:ring-purple-500"
+                      required
+                      data-testid="input-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+                  <PasswordStrength password={formData.password} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                      placeholder="Re-enter password"
+                      className="h-11 pr-10 transition-all focus:ring-2 focus:ring-purple-500"
+                      required
+                      data-testid="input-confirm-password"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    required
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    data-testid="checkbox-terms"
+                  />
+                  <Label htmlFor="terms" className="text-sm leading-relaxed text-gray-600 cursor-pointer">
+                    I agree to the{" "}
+                    <a href="/terms" className="text-purple-600 hover:text-purple-700 underline">
+                      Terms & Conditions
+                    </a>{" "}
+                    and{" "}
+                    <a href="/privacy" className="text-purple-600 hover:text-purple-700 underline">
+                      Privacy Policy
+                    </a>
+                  </Label>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+                  disabled={signupMutation.isPending}
+                  data-testid="button-signup"
+                >
+                  {signupMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Creating Account...
+                    </span>
+                  ) : (
+                    "Create Landlord Account"
+                  )}
+                </Button>
+
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">
+                    Already have an account?{" "}
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => setLocation('/landlord-login')}
+                      className="px-0 h-auto text-sm text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      Sign in here
+                    </Button>
+                  </p>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      <style>{`
+        @keyframes blob {
+          0%, 100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+        }
+        
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        
+        .animate-fade-in {
+          animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
