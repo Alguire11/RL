@@ -37,6 +37,8 @@ interface AdminUser {
   emailVerified: boolean;
   subscriptionPlan: string;
   createdAt: string | null;
+  role: string;
+  businessName?: string;
 }
 
 interface SystemHealth {
@@ -59,6 +61,7 @@ export default function AdminDashboard() {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [editedPlan, setEditedPlan] = useState("");
+  const [viewMode, setViewMode] = useState<'system' | 'landlord-support'>('system');
 
   const isAdmin = user?.role === 'admin';
   const canLoadAdminData = isAuthenticated && isAdmin;
@@ -288,7 +291,7 @@ export default function AdminDashboard() {
       });
       return;
     }
-    
+
     if (newPassword.length < 8) {
       toast({
         title: "Error",
@@ -297,7 +300,7 @@ export default function AdminDashboard() {
       });
       return;
     }
-    
+
     resetPasswordMutation.mutate({ userId: selectedUser.id, newPassword });
   };
 
@@ -419,11 +422,29 @@ export default function AdminDashboard() {
             <p className="text-gray-600">System overview and management</p>
           </div>
           <div className="flex items-center space-x-4">
+            <div className="flex bg-white rounded-lg p-1 border shadow-sm">
+              <Button
+                variant={viewMode === 'system' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('system')}
+                className="text-sm"
+              >
+                System Admin
+              </Button>
+              <Button
+                variant={viewMode === 'landlord-support' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('landlord-support')}
+                className="text-sm"
+              >
+                Landlord Support
+              </Button>
+            </div>
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
               Welcome, {user?.firstName || user?.username || 'Admin'}
             </Badge>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleLogout}
               className="text-red-600 border-red-300 hover:bg-red-50"
             >
@@ -473,14 +494,43 @@ export default function AdminDashboard() {
           />
         </div>
 
+
+
+        {/* Landlord Support View Header */}
+        {viewMode === 'landlord-support' && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Landlord Support Console</h2>
+            <div className="grid md:grid-cols-3 gap-6">
+              <StatCard
+                title="Total Landlords"
+                value={users.filter(u => u.role === 'landlord').length}
+                icon={Building}
+                color="primary"
+              />
+              <StatCard
+                title="Pending Verifications"
+                value={users.filter(u => u.role === 'landlord' && !u.isOnboarded).length}
+                icon={AlertTriangle}
+                color="warning"
+              />
+              <StatCard
+                title="Active Landlords"
+                value={users.filter(u => u.role === 'landlord' && u.isOnboarded).length}
+                icon={Check}
+                color="success"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-2 gap-8 mb-8">
-          {/* Recent Users */}
-          <Card>
+          {/* Recent Users / Landlords */}
+          <Card className={viewMode === 'landlord-support' ? 'lg:col-span-2' : ''}>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Users className="h-5 w-5" />
-                <span>Recent Users</span>
+                <span>{viewMode === 'landlord-support' ? 'Landlord Directory' : 'Recent Users'}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -493,6 +543,7 @@ export default function AdminDashboard() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
+                        {viewMode === 'landlord-support' && <TableHead>Business</TableHead>}
                         <TableHead>Status</TableHead>
                         <TableHead>Plan</TableHead>
                         <TableHead>Joined</TableHead>
@@ -500,53 +551,60 @@ export default function AdminDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users.slice(0, 10).map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">
-                            {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'N/A'}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-600">
-                            {user.email || 'N/A'}
-                          </TableCell>
-                          <TableCell>
-                            {getUserStatusBadge(user)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={
-                              user.subscriptionPlan === 'premium' ? 'bg-purple-100 text-purple-800' :
-                              user.subscriptionPlan === 'standard' ? 'bg-blue-100 text-blue-800' :
-                              'bg-gray-100 text-gray-800'
-                            }>
-                              {user.subscriptionPlan || 'free'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-600">
-                            {formatDate(user.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end space-x-1">
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => handleEditUser(user)}
-                                data-testid={`button-edit-user-${user.id}`}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                onClick={() => handleResetPassword(user)}
-                                data-testid={`button-reset-password-${user.id}`}
-                              >
-                                <Key className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {users
+                        .filter(u => viewMode === 'landlord-support' ? u.role === 'landlord' : true)
+                        .slice(0, 10).map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">
+                              {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'N/A'}
+                            </TableCell>
+                            <TableCell className="text-sm text-gray-600">
+                              {user.email || 'N/A'}
+                            </TableCell>
+                            {viewMode === 'landlord-support' && (
+                              <TableCell className="text-sm text-gray-600">
+                                {user.businessName || '-'}
+                              </TableCell>
+                            )}
+                            <TableCell>
+                              {getUserStatusBadge(user)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={
+                                user.subscriptionPlan === 'premium' ? 'bg-purple-100 text-purple-800' :
+                                  user.subscriptionPlan === 'standard' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-gray-100 text-gray-800'
+                              }>
+                                {user.subscriptionPlan || 'free'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-gray-600">
+                              {formatDate(user.createdAt)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  onClick={() => handleEditUser(user)}
+                                  data-testid={`button-edit-user-${user.id}`}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                  onClick={() => handleResetPassword(user)}
+                                  data-testid={`button-reset-password-${user.id}`}
+                                >
+                                  <Key className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 )}
@@ -554,36 +612,38 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          {/* System Health */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Activity className="h-5 w-5" />
-                <span>System Health</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Database</span>
-                  {systemHealth ? getSystemHealthBadge(systemHealth.database) : <Badge variant="outline">Checking...</Badge>}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Email Service</span>
-                  {systemHealth ? getSystemHealthBadge(systemHealth.emailService) : <Badge variant="outline">Checking...</Badge>}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Payment Processor</span>
-                  {systemHealth ? getSystemHealthBadge(systemHealth.paymentProcessor) : <Badge variant="outline">Checking...</Badge>}
-                </div>
-                {systemHealth && (
-                  <div className="text-xs text-gray-500 pt-2 border-t">
-                    Last checked: {formatDate(systemHealth.lastChecked)}
+          {/* System Health - Hide in Landlord Mode */}
+          {viewMode === 'system' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Activity className="h-5 w-5" />
+                  <span>System Health</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Database</span>
+                    {systemHealth ? getSystemHealthBadge(systemHealth.database) : <Badge variant="outline">Checking...</Badge>}
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Email Service</span>
+                    {systemHealth ? getSystemHealthBadge(systemHealth.emailService) : <Badge variant="outline">Checking...</Badge>}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Payment Processor</span>
+                    {systemHealth ? getSystemHealthBadge(systemHealth.paymentProcessor) : <Badge variant="outline">Checking...</Badge>}
+                  </div>
+                  {systemHealth && (
+                    <div className="text-xs text-gray-500 pt-2 border-t">
+                      Last checked: {formatDate(systemHealth.lastChecked)}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Subscription Analytics */}
@@ -635,8 +695,8 @@ export default function AdminDashboard() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">
                         <p className="font-medium text-sm">{dispute.user || dispute.userName || 'Unknown'}</p>
-                        <Badge variant={dispute.status === 'pending' ? 'secondary' : 'default'} 
-                               className={dispute.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}>
+                        <Badge variant={dispute.status === 'pending' ? 'secondary' : 'default'}
+                          className={dispute.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}>
                           {dispute.status}
                         </Badge>
                       </div>
@@ -646,18 +706,18 @@ export default function AdminDashboard() {
                     <div className="flex space-x-1">
                       {dispute.status === 'pending' && (
                         <>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             className="text-green-600 hover:text-green-700 hover:bg-green-50"
                             onClick={() => handleDisputeAction(dispute.id, 'approve')}
                             data-testid={`button-approve-dispute-${dispute.id}`}
                           >
                             <Check className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={() => handleDisputeAction(dispute.id, 'reject')}
                             data-testid={`button-reject-dispute-${dispute.id}`}
@@ -701,9 +761,9 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full" 
-                        style={{width: `${region.activity}%`}}
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full"
+                        style={{ width: `${region.activity}%` }}
                       ></div>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">{region.activity}% activity rate</p>
@@ -724,89 +784,89 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Button 
-                variant="outline" 
-                className="w-full" 
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => systemCheckMutation.mutate()}
                 disabled={systemCheckMutation.isPending}
               >
                 <Activity className="w-4 h-4 mr-2" />
                 System Check
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => dataExportMutation.mutate()}
                 disabled={dataExportMutation.isPending}
               >
                 <Download className="w-4 h-4 mr-2" />
                 Export Data
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/users')}
               >
                 <Users className="w-4 h-4 mr-2" />
                 Manage Users
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/settings')}
               >
                 <Settings2 className="w-4 h-4 mr-2" />
                 Settings
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/subscriptions')}
               >
                 <CreditCard className="w-4 h-4 mr-2" />
                 Subscriptions
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/revenue')}
               >
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Revenue
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/moderation')}
               >
                 <Shield className="w-4 h-4 mr-2" />
                 Moderation
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/properties')}
               >
                 <Building className="w-4 h-4 mr-2" />
                 Properties
               </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full" 
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/audit-logs')}
               >
                 <Shield className="w-4 h-4 mr-2" />
                 Audit Logs
               </Button>
-              
+
               <Dialog open={showAnnouncementDialog} onOpenChange={setShowAnnouncementDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full">
@@ -833,13 +893,13 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-end space-x-2">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={() => setShowAnnouncementDialog(false)}
                       >
                         Cancel
                       </Button>
-                      <Button 
+                      <Button
                         onClick={() => sendAnnouncementMutation.mutate(announcementText)}
                         disabled={!announcementText.trim() || sendAnnouncementMutation.isPending}
                       >
@@ -870,12 +930,12 @@ export default function AdminDashboard() {
             </div>
             <div>
               <Label>User Name</Label>
-              <Input 
-                value={selectedUser?.firstName && selectedUser?.lastName 
-                  ? `${selectedUser.firstName} ${selectedUser.lastName}` 
-                  : 'N/A'} 
-                disabled 
-                className="mt-1" 
+              <Input
+                value={selectedUser?.firstName && selectedUser?.lastName
+                  ? `${selectedUser.firstName} ${selectedUser.lastName}`
+                  : 'N/A'}
+                disabled
+                className="mt-1"
               />
             </div>
             <div>
@@ -895,7 +955,7 @@ export default function AdminDashboard() {
               <Button variant="outline" onClick={() => setShowEditDialog(false)}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleSaveUserEdit}
                 className="bg-blue-600 hover:bg-blue-700"
                 data-testid="button-save-user-edit"
@@ -919,7 +979,7 @@ export default function AdminDashboard() {
           <div className="space-y-4 py-4">
             <div>
               <Label>New Password</Label>
-              <Input 
+              <Input
                 type="text"
                 placeholder="Enter new password (min 8 characters)"
                 value={newPassword}
@@ -940,7 +1000,7 @@ export default function AdminDashboard() {
               <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 onClick={handleSavePassword}
                 className="bg-orange-600 hover:bg-orange-700"
                 data-testid="button-save-password"
@@ -951,6 +1011,6 @@ export default function AdminDashboard() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   );
 }

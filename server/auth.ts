@@ -11,23 +11,7 @@ import { nanoid } from "nanoid";
 import { emailService } from "./emailService";
 
 // Helper function to generate unique RLID (RentLedger ID)
-async function generateRLID(role: string): Promise<string> {
-  const prefix = role === 'landlord' ? 'LRLID-' : 'TRLID-';
-  let rlid: string;
-  let exists = true;
 
-  // Keep generating until we find a unique ID
-  while (exists) {
-    const randomNum = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
-    rlid = `${prefix}${randomNum}`;
-
-    // Check if this RLID already exists
-    const allUsers = await storage.getAllUsers();
-    exists = allUsers.some(user => user.rlid === rlid);
-  }
-
-  return rlid!;
-}
 
 declare global {
   namespace Express {
@@ -45,14 +29,14 @@ export function setupAuth(app: Express) {
       tableName: "sessions",
       createTableIfMissing: false,
     }),
-    secret: process.env.SESSION_SECRET || "dev-secret-key",
+    secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
     rolling: true,
     cookie: {
       secure: isProduction,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: isProduction ? "strict" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     },
   };
@@ -130,11 +114,10 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Email already registered" });
       }
 
+      // Create user
       const hashedPassword = await hashPassword(password);
-      const rlid = await generateRLID('user'); // Generate TRLID for tenants
-      const user = await storage.upsertUser({
+      const user = await storage.createUserWithRLID({
         id: nanoid(),
-        rlid,
         email,
         username: email, // Use email as username for consistency
         password: hashedPassword,
@@ -143,11 +126,39 @@ export function setupAuth(app: Express) {
         role: 'tenant', // Explicitly set role to tenant
         isOnboarded: false,
         emailVerified: false,
-      });
+        subscriptionPlan: 'free',
+        subscriptionStatus: 'active',
+      }, 'TRLID-'); // Generate TRLID for tenants
 
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json({ ...user, password: undefined });
+      // Send verification email instead of welcome email
+      let verificationToken: string | undefined;
+      try {
+        verificationToken = nanoid(32);
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        const verificationUrl = `${req.protocol}://${req.get('host')}/verify-email/${verificationToken}`;
+
+        await storage.createEmailVerificationToken({
+          userId: user.id,
+          token: verificationToken,
+          expiresAt,
+          used: false,
+        });
+
+        await emailService.sendEmailVerification(
+          user.email,
+          `${user.firstName} ${user.lastName}`,
+          verificationUrl
+        );
+      } catch (emailError) {
+        // Log but don't fail registration if email fails
+        console.error('Failed to send verification email:', emailError);
+      }
+
+      // Don't log user in automatically - they need to verify email first
+      res.status(201).json({
+        message: "Account created! Please check your email to verify your account.",
+        email: user.email,
+        requiresVerification: true
       });
     } catch (error) {
       next(error);

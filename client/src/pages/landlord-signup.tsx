@@ -9,6 +9,8 @@ import { Building, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation } from "@tanstack/react-query";
 import { PasswordStrength } from "@/components/password-strength";
+import { Footer } from "@/components/footer";
+import { Logo } from "@/components/logo";
 
 export default function LandlordSignup() {
   const [, setLocation] = useLocation();
@@ -45,7 +47,7 @@ export default function LandlordSignup() {
     onSuccess: () => {
       toast({
         title: "Account Created!",
-        description: "Your landlord account has been created successfully. Please log in to continue.",
+        description: "Your landlord account has been created successfully. You can now log in.",
       });
       setLocation('/landlord-login');
     },
@@ -77,11 +79,11 @@ export default function LandlordSignup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-20 left-10 w-64 h-64 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
-        <div className="absolute top-40 right-10 w-64 h-64 bg-pink-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
+        <div className="absolute top-20 left-10 w-64 h-64 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
+        <div className="absolute top-40 right-10 w-64 h-64 bg-cyan-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
         <div className="absolute bottom-20 left-1/2 w-64 h-64 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000" />
       </div>
 
@@ -90,29 +92,29 @@ export default function LandlordSignup() {
           {/* Back Button */}
           <Button
             variant="ghost"
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/login")}
             className="text-white/90 hover:text-white hover:bg-white/10 backdrop-blur-sm"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
+            Back to Tenant Login
           </Button>
 
           {/* Header */}
           <div className="text-center space-y-4">
             <div className="flex justify-center">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur-xl opacity-75" />
-                <div className="relative bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20">
-                  <Building className="h-12 w-12 text-white" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur-xl opacity-75" />
+                <div className="relative bg-white/10 backdrop-blur-xl p-4 rounded-2xl border border-white/20">
+                  <Logo className="text-white w-32 h-12" />
                 </div>
               </div>
             </div>
             <div className="space-y-2">
               <h1 className="text-4xl font-bold text-white tracking-tight">
-                Create Landlord Account
+                Landlord Registration
               </h1>
               <p className="text-white/70 text-lg">
-                Join RentLedger to manage your properties and tenants
+                Create your property management account
               </p>
             </div>
           </div>
@@ -254,6 +256,29 @@ export default function LandlordSignup() {
                       )}
                     </Button>
                   </div>
+                  {/* Password Match Indicator */}
+                  {formData.confirmPassword && (
+                    <div className={`text-sm mt-1 flex items-center ${formData.password === formData.confirmPassword
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                      }`}>
+                      {formData.password === formData.confirmPassword ? (
+                        <>
+                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Passwords match
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                          </svg>
+                          Passwords do not match
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-start space-x-2">
@@ -284,7 +309,7 @@ export default function LandlordSignup() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
                   disabled={signupMutation.isPending}
                   data-testid="button-signup"
                 >
@@ -314,6 +339,22 @@ export default function LandlordSignup() {
               </form>
             </CardContent>
           </Card>
+
+          {/* Footer */}
+          <div className="text-center mt-8">
+            <p className="text-xs text-white/60">
+              © 2025 RentLedger. All rights reserved.{" "}
+              <a href="/privacy" className="text-white/80 hover:text-white underline ml-4">
+                Privacy Policy
+              </a>{" "}
+              <a href="/terms" className="text-white/80 hover:text-white underline ml-4">
+                Terms of Service
+              </a>{" "}
+              <a href="mailto:support@rentledger.co.uk" className="text-white/80 hover:text-white underline ml-4">
+                Support
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 

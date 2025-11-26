@@ -38,6 +38,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   phone: varchar("phone"),
+  businessName: varchar("business_name"), // For landlords
   isOnboarded: boolean("is_onboarded").default(false),
   emailVerified: boolean("email_verified").default(false),
   address: jsonb("address"),
@@ -74,7 +75,7 @@ export const properties = pgTable("properties", {
   rentInfo: jsonb("rent_info"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [index("IDX_properties_user_id").on(table.userId)]);
 
 // User badges/certifications table
 export const userBadges = pgTable("user_badges", {
@@ -117,7 +118,10 @@ export const rentPayments = pgTable("rent_payments", {
   isVerified: boolean("is_verified").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("IDX_rent_payments_user_id").on(table.userId),
+  index("IDX_rent_payments_property_id").on(table.propertyId)
+]);
 
 // Bank connections table
 export const bankConnections = pgTable("bank_connections", {
@@ -130,7 +134,7 @@ export const bankConnections = pgTable("bank_connections", {
   connectionData: jsonb("connection_data"), // Store Open Banking connection details
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [index("IDX_bank_connections_user_id").on(table.userId)]);
 
 // Credit reports table
 export const creditReports = pgTable("credit_reports", {
@@ -145,7 +149,10 @@ export const creditReports = pgTable("credit_reports", {
   shareCount: integer("share_count").default(0),
   verificationId: varchar("verification_id").unique(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("IDX_credit_reports_user_id").on(table.userId),
+  index("IDX_credit_reports_property_id").on(table.propertyId)
+]);
 
 // Report shares table
 export const reportShares = pgTable("report_shares", {
@@ -158,7 +165,7 @@ export const reportShares = pgTable("report_shares", {
   expiresAt: timestamp("expires_at"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [index("IDX_report_shares_report_id").on(table.reportId)]);
 
 // Landlord verifications table
 export const landlordVerifications = pgTable("landlord_verifications", {
@@ -171,7 +178,10 @@ export const landlordVerifications = pgTable("landlord_verifications", {
   isVerified: boolean("is_verified").default(false),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("IDX_landlord_verifications_user_id").on(table.userId),
+  index("IDX_landlord_verifications_property_id").on(table.propertyId)
+]);
 
 // Tenant invitations table
 export const tenantInvitations = pgTable("tenant_invitations", {
@@ -188,7 +198,11 @@ export const tenantInvitations = pgTable("tenant_invitations", {
   tenantId: varchar("tenant_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("IDX_tenant_invitations_landlord_id").on(table.landlordId),
+  index("IDX_tenant_invitations_property_id").on(table.propertyId),
+  index("IDX_tenant_invitations_tenant_id").on(table.tenantId)
+]);
 
 // Notifications table
 export const notifications = pgTable("notifications", {
@@ -201,7 +215,7 @@ export const notifications = pgTable("notifications", {
   scheduledFor: timestamp("scheduled_for"),
   sentAt: timestamp("sent_at"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [index("IDX_notifications_user_id").on(table.userId)]);
 
 // User preferences table
 export const userPreferences = pgTable("user_preferences", {
@@ -213,7 +227,7 @@ export const userPreferences = pgTable("user_preferences", {
   reminderDays: integer("reminder_days").default(3),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [index("IDX_user_preferences_user_id").on(table.userId)]);
 
 // Security log table
 export const securityLogs = pgTable("security_logs", {
@@ -224,7 +238,7 @@ export const securityLogs = pgTable("security_logs", {
   userAgent: varchar("user_agent"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [index("IDX_security_logs_user_id").on(table.userId)]);
 
 // Audit logs table (comprehensive system history)
 export const auditLogs = pgTable("audit_logs", {
@@ -236,7 +250,7 @@ export const auditLogs = pgTable("audit_logs", {
   details: jsonb("details"), // Changed fields, snapshot, etc.
   ipAddress: varchar("ip_address"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [index("IDX_audit_logs_user_id").on(table.userId)]);
 
 // Admin users table
 export const adminUsers = pgTable("admin_users", {
@@ -247,7 +261,7 @@ export const adminUsers = pgTable("admin_users", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [index("IDX_admin_users_user_id").on(table.userId)]);
 
 // Data export requests table
 export const dataExportRequests = pgTable("data_export_requests", {
@@ -259,7 +273,7 @@ export const dataExportRequests = pgTable("data_export_requests", {
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
-});
+}, (table) => [index("IDX_data_export_requests_user_id").on(table.userId)]);
 
 // Password reset tokens table
 export const passwordResetTokens = pgTable("password_reset_tokens", {
@@ -269,7 +283,31 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   expiresAt: timestamp("expires_at").notNull(),
   used: boolean("used").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("IDX_password_reset_tokens_user_id").on(table.userId)]);
+
+// Email verification tokens table
+export const emailVerificationTokens = pgTable("email_verification_tokens", {
+  userId: text("user_id").references(() => users.id).notNull(),
+  token: text("token").primaryKey(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Email events table for tracking delivery status
+export const emailEvents = pgTable("email_events", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  eventType: text("event_type").notNull(),
+  messageId: text("message_id"),
+  timestamp: timestamp("timestamp").defaultNow(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("IDX_email_events_email").on(table.email),
+  index("IDX_email_events_type").on(table.eventType),
+  index("IDX_email_events_message_id").on(table.messageId)
+]);
 
 
 // Relations
@@ -297,6 +335,7 @@ export const insertDataExportRequestSchema = createInsertSchema(dataExportReques
 export const insertUserBadgeSchema = createInsertSchema(userBadges);
 export const insertCertificationPortfolioSchema = createInsertSchema(certificationPortfolios);
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens);
+export const insertEmailVerificationTokenSchema = createInsertSchema(emailVerificationTokens);
 
 // Types
 export type UpsertUser = typeof users.$inferInsert;
@@ -328,6 +367,10 @@ export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = typeof adminUsers.$inferInsert;
 export type DataExportRequest = typeof dataExportRequests.$inferSelect;
 export type InsertDataExportRequest = typeof dataExportRequests.$inferInsert;
+export type EmailVerificationToken = typeof emailVerificationTokens.$inferSelect;
+export type InsertEmailVerificationToken = typeof emailVerificationTokens.$inferInsert;
+export type EmailEvent = typeof emailEvents.$inferSelect;
+export type InsertEmailEvent = typeof emailEvents.$inferInsert;
 
 // Achievement badges table for gamification
 export const achievementBadges = pgTable("achievement_badges", {
@@ -477,6 +520,8 @@ export const landlordTenantLinks = pgTable("landlord_tenant_links", {
   tenantId: varchar("tenant_id").references(() => users.id).notNull(),
   propertyId: integer("property_id").references(() => properties.id),
   status: varchar("status", { enum: ["pending", "active", "inactive", "terminated"] }).default("pending"),
+  leaseStartDate: timestamp("lease_start_date"),
+  leaseEndDate: timestamp("lease_end_date"),
   linkedAt: timestamp("linked_at").defaultNow(),
   terminatedAt: timestamp("terminated_at"),
   createdAt: timestamp("created_at").defaultNow(),

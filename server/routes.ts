@@ -16,35 +16,175 @@ import {
   insertDataExportRequestSchema,
   insertLandlordVerificationSchema,
   insertTenantInvitationSchema,
+  insertUserSchema,
   insertMaintenanceRequestSchema,
 } from "@shared/schema";
 import { nanoid } from "nanoid";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "./passwords";
 import { registerSubscriptionRoutes } from "./subscriptionRoutes";
-import { getSubscriptionLimits, normalizePlanName } from "./middleware/subscription";
+import { getSubscriptionLimits, normalizePlanName, requireSubscription } from "./middleware/subscription";
 
 // Helper function to generate unique RLID (RentLedger ID)
-async function generateRLID(role: string): Promise<string> {
-  const prefix = role === 'landlord' ? 'LRLID-' : 'TRLID-';
-  let rlid: string;
-  let exists = true;
 
-  // Keep generating until we find a unique ID
-  while (exists) {
-    const randomNum = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
-    rlid = `${prefix}${randomNum}`;
 
-    // Check if this RLID already exists
-    const allUsers = await storage.getAllUsers();
-    exists = allUsers.some(user => user.rlid === rlid);
-  }
-
-  return rlid!;
-}
+import csurf from "csurf";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   setupAuth(app);
+
+  // CSRF Protection
+  // We use the default session-based storage.
+  // We expose the token via a cookie (XSRF-TOKEN) so the client can read it
+  // and send it back in the X-XSRF-TOKEN header.
+  const csrfProtection = csurf();
+
+  app.use((req, res, next) => {
+    // Skip CSRF for webhook endpoints if any (e.g. Stripe)
+    if (req.path.startsWith('/api/webhooks')) {
+      return next();
+    }
+    csrfProtection(req, res, next);
+  });
+
+  app.use((req, res, next) => {
+    if (req.csrfToken) {
+      const token = req.csrfToken();
+      res.cookie('XSRF-TOKEN', token, {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      });
+      res.locals.csrfToken = token;
+    }
+    next();
+  });
+
+  // Endpoint to get CSRF token explicitly  // CSRF token endpoint
+  app.get('/api/csrf-token', (req, res) => {
+    res.json({ csrfToken: req.csrfToken?.() || '' });
+  });
+
+  // Email verification endpoint
+  app.get('/api/verify-email/:token', async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      // Get verification token
+      const verificationToken = await storage.getEmailVerificationToken(token);
+
+      if (!verificationToken) {
+        return res.status(400).json({ message: "Invalid or expired verification link" });
+      }
+
+      // Check if already used
+      if (verificationToken.used) {
+        return res.status(400).json({ message: "This verification link has already been used" });
+      }
+
+      // Check if expired
+      if (new Date() > new Date(verificationToken.expiresAt)) {
+        return res.status(400).json({ message: "This verification link has expired" });
+      }
+
+      // Mark token as used
+      await storage.markEmailVerificationTokenAsUsed(token);
+
+      // Update user's emailVerified status
+      await storage.updateUser(verificationToken.userId, { emailVerified: true });
+
+      // Get the user
+      const user = await storage.getUser(verificationToken.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Send welcome email now that they're verified
+      try {
+        await emailService.sendWelcomeEmail(
+          user.email,
+          `${user.firstName} ${user.lastName}`,
+          user.role || 'tenant'
+        );
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+      }
+
+      // Log the user in
+      req.login(user, (err) => {
+        if (err) {
+          console.error('Login error after verification:', err);
+          return res.status(500).json({ message: "Email verified but login failed. Please try logging in manually." });
+        }
+        res.json({
+          message: "Email verified successfully! Welcome to RentLedger.",
+          user: { ...user, password: undefined }
+        });
+      });
+    } catch (error) {
+      console.error('Email verification error:', error);
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+
+  // Resend verification email endpoint
+  app.post('/api/resend-verification', async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if user exists or not
+        return res.json({ message: "If an account exists with this email, a verification link has been sent." });
+      }
+
+      if (user.emailVerified) {
+        return res.status(400).json({ message: "Email is already verified" });
+      }
+
+      // Create new verification token
+      const verificationToken = nanoid(32);
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      const verificationUrl = `${req.protocol}://${req.get('host')}/verify-email/${verificationToken}`;
+
+      await storage.createEmailVerificationToken({
+        userId: user.id,
+        token: verificationToken,
+        expiresAt,
+        used: false,
+      });
+
+      await emailService.sendEmailVerification(
+        user.email,
+        `${user.firstName} ${user.lastName}`,
+        verificationUrl
+      );
+
+      res.json({ message: "Verification email sent! Please check your inbox." });
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      res.status(500).json({ message: "Failed to resend verification email" });
+    }
+  });
+
+  // Middleware to check email verification (use this on protected routes)
+  const requireEmailVerification = (req: any, res: any, next: any) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (!req.user.emailVerified) {
+      return res.status(403).json({
+        message: "Please verify your email address to access this feature",
+        requiresVerification: true
+      });
+    }
+
+    next();
+  };
 
   // Middleware to check authentication
   const requireAuth: RequestHandler = (req, res, next) => {
@@ -149,16 +289,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/user/profile', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const updateData = req.body;
-
-      const user = await storage.upsertUser({
-        id: userId,
-        ...updateData,
-        updatedAt: new Date(),
+      // Validate with partial schema
+      const updateSchema = insertUserSchema.partial().pick({
+        firstName: true,
+        lastName: true,
+        phone: true,
+        profileImageUrl: true,
       });
+
+      const updateData = updateSchema.parse(req.body);
+
+      const user = await storage.updateUser(userId, updateData);
 
       res.json(user);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
       console.error("Error updating user profile:", error);
       res.status(500).json({ message: "Failed to update profile" });
     }
@@ -168,7 +315,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/user/address', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { street, city, postcode, country } = req.body;
+
+      const addressSchema = z.object({
+        street: z.string().min(1, "Street is required"),
+        city: z.string().min(1, "City is required"),
+        postcode: z.string().min(1, "Postcode is required"),
+        country: z.string().default("UK"),
+      });
+
+      const { street, city, postcode, country } = addressSchema.parse(req.body);
 
       const user = await storage.updateUserAddress(userId, {
         street, city, postcode, country
@@ -179,6 +334,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         address: user.address
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
       console.error("Error updating user address:", error);
       res.status(500).json({ message: "Failed to update address" });
     }
@@ -262,17 +420,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/user/rent-info', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { amount, dayOfMonth, frequency, firstPaymentDate, nextPaymentDate, landlordName, landlordEmail, landlordPhone } = req.body;
+
+      const rentInfoSchema = z.object({
+        amount: z.number().or(z.string().transform(val => parseFloat(val))),
+        dayOfMonth: z.number().min(1).max(31).or(z.string().transform(val => parseInt(val, 10))),
+        frequency: z.enum(['monthly', 'weekly', 'biweekly']).default('monthly'),
+        firstPaymentDate: z.string().optional(),
+        nextPaymentDate: z.string().optional(),
+        landlordName: z.string().optional(),
+        landlordEmail: z.string().email().optional().or(z.literal('')),
+        landlordPhone: z.string().optional(),
+      });
+
+      const validatedData = rentInfoSchema.parse(req.body);
 
       const user = await storage.updateUserRentInfo(userId, {
-        amount,
-        dayOfMonth,
-        frequency,
-        firstPaymentDate,
-        nextPaymentDate,
-        landlordName,
-        landlordEmail,
-        landlordPhone
+        amount: validatedData.amount,
+        dayOfMonth: validatedData.dayOfMonth,
+        frequency: validatedData.frequency,
+        firstPaymentDate: validatedData.firstPaymentDate,
+        nextPaymentDate: validatedData.nextPaymentDate,
+        landlordName: validatedData.landlordName,
+        landlordEmail: validatedData.landlordEmail,
+        landlordPhone: validatedData.landlordPhone
       });
 
       res.json({
@@ -280,6 +450,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rentInfo: user.rentInfo
       });
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
       console.error("Error updating rent information:", error);
       res.status(500).json({ message: "Failed to update rent information" });
     }
@@ -365,7 +538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/properties', requireAuth, async (req: any, res) => {
+  app.post('/api/properties', requireAuth, requireEmailVerification, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const user = req.user;
@@ -420,7 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Log the incoming request body to debug
-      console.log("Incoming request body:", JSON.stringify(req.body, null, 2));
+
 
       // Add optional string fields only if they exist and are not empty
       if (req.body.landlordName && String(req.body.landlordName).trim()) {
@@ -498,13 +671,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      console.log("Creating property with cleaned data:", JSON.stringify(cleanedPropertyData, null, 2));
+
 
       // Validate with schema
       let validatedData;
       try {
         validatedData = insertPropertySchema.parse(cleanedPropertyData);
-        console.log("Validation passed, validated data:", JSON.stringify(validatedData, null, 2));
+
       } catch (validationError: any) {
         console.error("Schema validation error:", validationError);
         console.error("Validation error issues:", JSON.stringify(validationError?.issues || [], null, 2));
@@ -548,7 +721,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/properties/:id', requireAuth, async (req: any, res) => {
     try {
       const propertyId = parseInt(req.params.id);
-      const updateData = req.body;
+      const userId = req.user.id;
+
+      // Ownership check
+      const existingProperty = await storage.getPropertyById(propertyId);
+      if (!existingProperty) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      if (existingProperty.userId !== userId) {
+        await logSecurityEvent(req, 'unauthorized_property_update_attempt', { propertyId });
+        return res.status(403).json({ message: "You do not have permission to update this property" });
+      }
+
+      // Validation
+      const updateSchema = insertPropertySchema.partial();
+      const updateData = updateSchema.parse(req.body);
 
       const property = await storage.updateProperty(propertyId, updateData);
 
@@ -564,6 +752,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(property);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
       console.error("Error updating property:", error);
       res.status(500).json({ message: "Failed to update property" });
     }
@@ -572,6 +763,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/properties/:id', requireAuth, async (req: any, res) => {
     try {
       const propertyId = parseInt(req.params.id);
+      const userId = req.user.id;
+
+      // Ownership check
+      const existingProperty = await storage.getPropertyById(propertyId);
+      if (!existingProperty) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      if (existingProperty.userId !== userId) {
+        await logSecurityEvent(req, 'unauthorized_property_delete_attempt', { propertyId });
+        return res.status(403).json({ message: "You do not have permission to delete this property" });
+      }
+
       await storage.deleteProperty(propertyId);
 
       // Audit Log
@@ -627,7 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/payments', requireAuth, async (req: any, res) => {
+  app.post('/api/payments', requireAuth, requireEmailVerification, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const paymentData = insertRentPaymentSchema.parse({ ...req.body, userId });
@@ -648,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `${property.address}, ${property.city}`,
             parseFloat(payment.amount),
             payment.dueDate,
-            payment.status
+            payment.status || 'pending'
           );
         }
 
@@ -678,78 +882,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch('/api/payments/:id', requireAuth, async (req: any, res) => {
     try {
       const paymentId = parseInt(req.params.id);
-      const updateData = req.body;
+      const userId = req.user.id;
+
+      // Ownership check
+      const existingPayment = await storage.getRentPayment(paymentId);
+      if (!existingPayment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      // Allow update if user owns the payment OR user is the landlord of the property
+      let isAuthorized = existingPayment.userId === userId;
+
+      if (!isAuthorized && existingPayment.propertyId) {
+        const property = await storage.getPropertyById(existingPayment.propertyId);
+        if (property && property.userId === userId) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        await logSecurityEvent(req, 'unauthorized_payment_update_attempt', { paymentId });
+        return res.status(403).json({ message: "You do not have permission to update this payment" });
+      }
+
+      // Validation
+      const updateSchema = insertRentPaymentSchema.partial();
+      const updateData = updateSchema.parse(req.body);
 
       const payment = await storage.updateRentPayment(paymentId, updateData);
       res.json(payment);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
       console.error("Error updating rent payment:", error);
       res.status(500).json({ message: "Failed to update rent payment" });
     }
   });
 
-  // Landlord routes
-  app.post('/api/landlord/invite-tenant', requireLandlord, async (req: any, res) => {
-    try {
-      const landlordId = req.user.id;
-      const { propertyId, tenantEmail, landlordName, propertyAddress } = req.body;
 
-      const inviteToken = nanoid(32);
-      const inviteUrl = `${req.protocol}://${req.get('host')}/tenant/accept-invite/${inviteToken}`;
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-      const qrCodeDataUrl = await QRCode.toDataURL(inviteUrl);
-
-      const invitation = await storage.createTenantInvitation({
-        landlordId,
-        propertyId: propertyId ? parseInt(propertyId, 10) : null,
-        tenantEmail,
-        inviteToken,
-        inviteUrl,
-        qrCodeData: qrCodeDataUrl,
-        status: 'pending',
-        expiresAt
-      });
-
-      const friendlyLandlordName = landlordName || `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Your landlord';
-      const friendlyPropertyAddress = propertyAddress || 'the property you manage';
-      const emailResult = await emailService.sendTenantInvite(
-        tenantEmail,
-        friendlyLandlordName,
-        friendlyPropertyAddress,
-        inviteUrl,
-        qrCodeDataUrl
-      );
-
-      await logSecurityEvent(req, 'tenant_invite_created', {
-        tenantEmail,
-        propertyId,
-        emailSuccess: emailResult.success,
-      });
-
-      if (!emailResult.success) {
-        await storage.createNotification({
-          userId: landlordId,
-          type: 'system',
-          title: 'Invitation Created - Manual Action Needed',
-          message: `We could not email ${tenantEmail}. Share this link manually: ${inviteUrl}`,
-        });
-      }
-
-      res.status(emailResult.success ? 200 : 202).json({
-        success: emailResult.success,
-        invitation,
-        qrCodeDataUrl,
-        inviteUrl,
-        message: emailResult.success
-          ? 'Invitation email sent successfully'
-          : emailResult.error || 'Invitation created but email delivery failed',
-      });
-    } catch (error) {
-      console.error("Error inviting tenant:", error);
-      res.status(500).json({ message: "Failed to send invitation" });
-    }
-  });
 
   app.get('/api/landlord/:landlordId/tenants', requireLandlord, async (req: any, res) => {
     try {
@@ -796,6 +967,254 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching pending requests:", error);
       res.status(500).json({ message: "Failed to fetch pending requests" });
+    }
+  });
+
+  // Landlord Stats Endpoint - Dashboard Overview
+  app.get('/api/landlord/stats', requireAuth, requireLandlord, async (req: any, res) => {
+    try {
+      const landlordId = req.user.id;
+
+      // Get all properties owned by landlord
+      const properties = await storage.getUserProperties(landlordId);
+      const activeProperties = properties.filter((p: any) => p.status === 'active' || !p.status);
+
+      // Get all tenant links
+      const tenantLinks = await storage.getLandlordTenantLinks(landlordId);
+      const activeTenants = tenantLinks.filter((link: any) => link.status === 'active');
+
+      // Get pending verification requests
+      const pendingVerifications = await storage.getLandlordPendingRequests(landlordId);
+
+      // Calculate monthly revenue from active properties
+      const monthlyRevenue = activeProperties.reduce((sum: number, property: any) => {
+        return sum + (parseFloat(property.monthlyRent) || 0);
+      }, 0);
+
+      // Calculate occupancy rate
+      const totalProperties = properties.length;
+      const occupiedProperties = activeTenants.length;
+      const occupancyRate = totalProperties > 0 ? (occupiedProperties / totalProperties) * 100 : 0;
+
+      // Calculate average rent
+      const averageRent = totalProperties > 0
+        ? properties.reduce((sum: number, p: any) => sum + (parseFloat(p.monthlyRent) || 0), 0) / totalProperties
+        : 0;
+
+      res.json({
+        totalProperties: totalProperties,
+        activeProperties: activeProperties.length,
+        totalTenants: tenantLinks.length,
+        activeTenants: activeTenants.length,
+        monthlyRevenue: Math.round(monthlyRevenue * 100) / 100,
+        pendingVerifications: pendingVerifications.length,
+        occupancyRate: Math.round(occupancyRate * 100) / 100,
+        averageRent: Math.round(averageRent * 100) / 100
+      });
+    } catch (error) {
+      console.error("Error fetching landlord stats:", error);
+      res.status(500).json({ message: "Failed to fetch landlord stats" });
+    }
+  });
+
+  // Landlord Properties with Tenant Info
+  app.get('/api/landlord/properties', requireAuth, requireLandlord, async (req: any, res) => {
+    try {
+      const landlordId = req.user.id;
+      const properties = await storage.getUserProperties(landlordId);
+
+      // Enrich properties with tenant information
+      const enrichedProperties = await Promise.all(properties.map(async (property: any) => {
+        const tenantLinks = await storage.getPropertyTenantLinks(property.id);
+        const activeTenant = tenantLinks.find((link: any) => link.status === 'active');
+
+        let tenantInfo = null;
+        if (activeTenant) {
+          const tenant = await storage.getUser(activeTenant.tenantId);
+          if (tenant) {
+            tenantInfo = {
+              id: tenant.id,
+              name: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim(),
+              email: tenant.email,
+              phone: tenant.phone,
+              leaseStart: activeTenant.leaseStartDate,
+              leaseEnd: activeTenant.leaseEndDate
+            };
+          }
+        }
+
+        return {
+          ...property,
+          tenant: tenantInfo,
+          status: activeTenant ? 'occupied' : 'vacant'
+        };
+      }));
+
+      res.json(enrichedProperties);
+    } catch (error) {
+      console.error("Error fetching landlord properties:", error);
+      res.status(500).json({ message: "Failed to fetch properties" });
+    }
+  });
+
+  // Landlord Revenue Analytics
+  app.get('/api/landlord/revenue', requireAuth, requireLandlord, async (req: any, res) => {
+    try {
+      const landlordId = req.user.id;
+
+      // Get all properties
+      const properties = await storage.getUserProperties(landlordId);
+
+      // Get all payments for landlord's properties
+      const allPayments: any[] = [];
+      for (const property of properties) {
+        const payments = await storage.getPropertyRentPayments(property.id);
+        allPayments.push(...payments.map((p: any) => ({ ...p, propertyId: property.id })));
+      }
+
+      // Calculate monthly revenue for last 12 months
+      const now = new Date();
+      const monthlyData = [];
+
+      for (let i = 11; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
+
+        const monthPayments = allPayments.filter((p: any) => {
+          const paidDate = p.paidDate ? new Date(p.paidDate) : null;
+          if (!paidDate) return false;
+          return paidDate.getFullYear() === monthDate.getFullYear() &&
+            paidDate.getMonth() === monthDate.getMonth();
+        });
+
+        const monthTotal = monthPayments.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+
+        monthlyData.push({
+          month: monthDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+          amount: Math.round(monthTotal * 100) / 100
+        });
+      }
+
+      // Calculate yearly total
+      const yearlyTotal = allPayments
+        .filter((p: any) => {
+          const paidDate = p.paidDate ? new Date(p.paidDate) : null;
+          if (!paidDate) return false;
+          const yearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+          return paidDate >= yearAgo;
+        })
+        .reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+
+      // Calculate growth (compare last month to previous month)
+      const lastMonth = monthlyData[monthlyData.length - 1]?.amount || 0;
+      const previousMonth = monthlyData[monthlyData.length - 2]?.amount || 0;
+      const growth = previousMonth > 0 ? ((lastMonth - previousMonth) / previousMonth) * 100 : 0;
+
+      res.json({
+        monthly: monthlyData,
+        yearly: Math.round(yearlyTotal * 100) / 100,
+        trends: {
+          growth: Math.round(growth * 100) / 100,
+          comparison: growth >= 0 ? 'increase' : 'decrease'
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching landlord revenue:", error);
+      res.status(500).json({ message: "Failed to fetch revenue data" });
+    }
+  });
+
+  // Gold Landlord Status
+  app.get('/api/landlord/gold-status', requireAuth, requireLandlord, async (req: any, res) => {
+    try {
+      const landlordId = req.user.username;
+
+      // Get all verification requests for this landlord
+      const verificationRequests = await storage.getLandlordPendingRequests(landlordId);
+
+      // Calculate verification rate
+      const totalRequests = verificationRequests.length;
+      const approvedRequests = verificationRequests.filter((r: any) => r.status === 'verified').length;
+      const verificationRate = totalRequests > 0 ? (approvedRequests / totalRequests) * 100 : 0;
+
+      // Get tenant satisfaction (placeholder - would need tenant reviews/ratings table)
+      // For now, use a mock value or calculate from tenant feedback if available
+      const tenantSatisfaction = 4.5; // TODO: Implement actual tenant satisfaction calculation
+
+      // Check if landlord has paid subscription
+      const subscription = req.user.subscription;
+      const isPaidMember = subscription && subscription.status === 'active' && subscription.plan !== 'free';
+
+      // Gold Landlord criteria:
+      // 1. Paid subscription
+      // 2. 85%+ verification rate
+      // 3. 4.5/5+ tenant satisfaction
+      // 4. 8+ total verifications
+      const isGold = isPaidMember &&
+        verificationRate >= 85 &&
+        tenantSatisfaction >= 4.5 &&
+        approvedRequests >= 8;
+
+      res.json({
+        isGold,
+        verificationRate: Math.round(verificationRate * 10) / 10,
+        tenantSatisfaction,
+        totalVerifications: approvedRequests,
+        isPaidMember
+      });
+    } catch (error) {
+      console.error('Error fetching gold landlord status:', error);
+      res.status(500).json({ error: 'Failed to fetch gold landlord status' });
+    }
+  });
+
+  app.post('/api/landlord/invite-tenant', requireAuth, requireLandlord, async (req: any, res) => {
+    try {
+      const { email, propertyId, propertyAddress } = req.body;
+      const landlordId = req.user.id;
+      const landlordName = `${req.user.firstName} ${req.user.lastName}`.trim() || req.user.username;
+
+      if (!email || !propertyId) {
+        return res.status(400).json({ error: 'Email and Property ID are required' });
+      }
+
+      // Check if invitation already exists
+      const existingInvite = await storage.getTenantInvitationByEmail(email, propertyId);
+      if (existingInvite && existingInvite.status === 'pending') {
+        return res.status(400).json({ error: 'An active invitation already exists for this tenant' });
+      }
+
+      // Generate token and URL
+      const inviteToken = nanoid(32);
+      const inviteUrl = `${process.env.APP_URL || 'http://localhost:5000'}/signup?invite=${inviteToken}&email=${encodeURIComponent(email)}`;
+
+      // Create invitation record
+      await storage.createTenantInvitation({
+        landlordId,
+        propertyId,
+        tenantEmail: email,
+        inviteToken,
+        inviteUrl,
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      });
+
+      // Send email
+      const emailSent = await emailService.sendTenantInvitation(
+        email,
+        inviteUrl,
+        landlordName,
+        propertyAddress || 'your property'
+      );
+
+      if (!emailSent.success) {
+        console.warn('Failed to send invitation email, but record created');
+      }
+
+      res.json({ success: true, message: 'Invitation sent successfully' });
+    } catch (error) {
+      console.error('Error sending tenant invitation:', error);
+      res.status(500).json({ error: 'Failed to send invitation' });
     }
   });
 
@@ -1625,7 +2044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const checks = {
         database: true,
-        emailService: !!process.env.SENDGRID_API_KEY,
+        emailService: !!process.env.MAILERSEND_API_KEY,
         storage: true,
         authentication: true,
       };
@@ -2168,7 +2587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Password must be at least 8 characters long' });
       }
 
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const hashedPassword = await hashPassword(newPassword);
       const existingUser = await storage.getUser(userId);
       if (!existingUser) {
         return res.status(404).json({ message: 'User not found' });
@@ -2203,7 +2622,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = req.body;
 
       // Validate updates
-      const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'role', 'subscriptionPlan', 'subscriptionStatus', 'isActive', 'isOnboarded', 'emailVerified'];
+      const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'role', 'subscriptionPlan', 'subscriptionStatus', 'isActive', 'isOnboarded', 'emailVerified', 'businessName'];
       const filteredUpdates = Object.keys(updates)
         .filter(key => allowedFields.includes(key))
         .reduce((obj, key) => {
@@ -3124,7 +3543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Manual payment routes
   function addManualPaymentRoutes(app: Express, requireAuth: any, storage: any) {
-    app.post('/api/manual-payments', requireAuth, async (req: any, res) => {
+    app.post('/api/manual-payments', requireAuth, requireEmailVerification, async (req: any, res) => {
       try {
         const userId = req.user.id;
         const { propertyId, amount, paymentDate, paymentMethod, description, receiptUrl, landlordEmail, landlordPhone } = req.body;
@@ -3333,25 +3752,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create landlord user with secure password hashing
       // Use email as username for login compatibility
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const rlid = await generateRLID('landlord'); // Generate LRLID for landlords
-      const landlord = await storage.upsertUser({
+      const hashedPassword = await hashPassword(password);
+      const user = await storage.createUserWithRLID({
         id: nanoid(),
-        rlid,
         email,
-        username: email, // Use email as username for login
+        username: email,
         password: hashedPassword,
         firstName,
         lastName,
         phone,
+        businessName: businessName || null, // Save business name if provided
         role: 'landlord',
-        subscriptionPlan: 'free',
         isOnboarded: false,
-        emailVerified: false,
+        emailVerified: true, // Auto-verify landlords
+        subscriptionPlan: 'free',
+        subscriptionStatus: 'active',
         isActive: true
-      });
+      }, 'LRLID-'); // Generate LRLID for landlords
 
-      res.json({ success: true, landlord: { id: landlord.id, email: landlord.email } });
+      // Send welcome email
+      try {
+        await emailService.sendWelcomeEmail(
+          user.email,
+          `${user.firstName} ${user.lastName}`,
+          'landlord'
+        );
+      } catch (emailError) {
+        console.error('Failed to send welcome email:', emailError);
+      }
+
+      res.json({
+        success: true,
+        message: "Account created successfully! You can now log in.",
+        email: user.email
+      });
     } catch (error) {
       console.error("Error creating landlord account:", error);
       res.status(500).json({ message: "Failed to create landlord account" });
@@ -3366,17 +3800,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return next(err);
       }
       if (!user) {
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+        return res.status(401).json({
+          message: "Invalid email or password. Please check your credentials and try again."
+        });
       }
 
       // Verify user is a landlord
       if (user.role !== "landlord") {
-        return res.status(403).json({ message: "Landlord access required" });
+        return res.status(403).json({
+          message: "This account does not have landlord access. Please use the correct login page for your account type."
+        });
+      }
+
+      // Check if email is verified
+      if (!user.emailVerified) {
+        return res.status(403).json({
+          message: "Please verify your email address before logging in. Check your inbox for the verification link."
+        });
       }
 
       // Verify user is active
       if (!user.isActive) {
-        return res.status(403).json({ message: "Account is inactive" });
+        return res.status(403).json({
+          message: "Your account has been deactivated. Please contact support for assistance."
+        });
       }
 
       // Create session
@@ -3483,7 +3930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // if (payment.userId !== userId) return res.status(403).send("Unauthorized");
 
       // Mock sending email
-      console.log(`Sending verification email for payment ${paymentId} to landlord...`);
+
 
       // Here you would use SendGrid or similar
       // await sendEmail({ to: landlordEmail, subject: "Verify Payment", ... });
@@ -3771,6 +4218,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/payments/:id', requireAuth, async (req: any, res) => {
+    try {
+      const paymentId = parseInt(req.params.id);
+      const userId = req.user.id;
+      const updateData = req.body;
+
+      // Get the payment to verify ownership
+      const payment = await storage.getRentPayment(paymentId);
+      if (!payment) {
+        return res.status(404).json({ message: 'Payment not found' });
+      }
+
+      // Verify ownership
+      if (payment.userId !== userId) {
+        return res.status(403).json({ message: 'Unauthorized to update this payment' });
+      }
+
+      // If updating with receipt and landlord email, send verification email
+      if (updateData.receiptUrl && updateData.landlordEmail) {
+        try {
+          const property = await storage.getPropertyById(payment.propertyId);
+          const tenant = await storage.getUserById(userId);
+
+          if (property && tenant) {
+            await emailService.sendLandlordVerificationRequest({
+              landlordEmail: updateData.landlordEmail,
+              landlordName: property.landlordName || 'Landlord',
+              tenantName: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.email,
+              tenantEmail: tenant.email,
+              propertyAddress: `${property.address}, ${property.city}`,
+              amount: parseFloat(payment.amount),
+              rentAmount: parseFloat(payment.amount),
+              paymentDate: payment.paidDate ? new Date(payment.paidDate).toLocaleDateString() : new Date(payment.dueDate).toLocaleDateString(),
+              paymentMethod: payment.paymentMethod?.replace('_', ' ').toUpperCase() || 'Manual Upload',
+              receiptUrl: updateData.receiptUrl,
+            });
+
+            // Create notification for tenant
+            await storage.createNotification({
+              userId,
+              type: 'system',
+              title: 'Receipt Uploaded Successfully',
+              message: `Your receipt for payment of £${payment.amount} has been uploaded. We've sent a verification request to ${updateData.landlordEmail}.`,
+            });
+          }
+        } catch (emailError) {
+          console.error('Failed to send landlord notification email:', emailError);
+          // Don't fail the whole request if email fails
+        }
+      }
+
+      const updatedPayment = await storage.updateRentPayment(paymentId, updateData);
+      res.json(updatedPayment);
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      res.status(500).json({ message: 'Failed to update payment' });
+    }
+  });
+
   app.put('/api/admin/support-tickets/:id/status', requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -4026,6 +4532,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Ideally check if user owns the request or is the landlord
     const updated = await storage.updateMaintenanceRequest(parseInt(req.params.id), req.body);
     res.json(updated);
+  });
+
+  // API Key Routes (Enterprise only)
+  app.post('/api/keys', requireAuth, requireSubscription('enterprise'), async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { name, permissions } = req.body;
+
+      // Generate a secure API key
+      const key = `rl_${nanoid(32)}`;
+
+      const apiKey = await storage.createApiKey({
+        name,
+        key,
+        createdBy: userId,
+        permissions: permissions || ['read:reports'],
+        isActive: true
+      });
+
+      res.status(201).json(apiKey);
+    } catch (error) {
+      console.error("Error creating API key:", error);
+      res.status(500).json({ message: "Failed to create API key" });
+    }
+  });
+
+  app.get('/api/keys', requireAuth, requireSubscription('enterprise'), async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const keys = await storage.getApiKeys(userId);
+      res.json(keys);
+    } catch (error) {
+      console.error("Error fetching API keys:", error);
+      res.status(500).json({ message: "Failed to fetch API keys" });
+    }
+  });
+
+  app.delete('/api/keys/:id', requireAuth, requireSubscription('enterprise'), async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteApiKey(id);
+      res.sendStatus(204);
+    } catch (error) {
+      console.error("Error deleting API key:", error);
+      res.status(500).json({ message: "Failed to delete API key" });
+    }
+  });
+
+  // Landlord Tenant Management Routes
+  app.post('/api/landlord/tenants/invite', requireAuth, requireLandlord, async (req: any, res) => {
+    try {
+      const landlordId = req.user.id;
+      const { email, propertyId } = req.body;
+
+      // Check subscription limits
+      const user = await storage.getUser(landlordId);
+
+      // Get current tenant count (active links + pending invitations)
+      const links = await storage.getLandlordTenantLinks(landlordId);
+      const invitations = await storage.getLandlordInvitations(landlordId);
+      const currentCount = links.length + invitations.filter(i => i.status === 'pending').length;
+
+      // Define landlord-specific limits
+      let tenantLimit = 3; // Starter
+      if (user?.subscriptionPlan === 'professional') tenantLimit = 10;
+      if (user?.subscriptionPlan === 'enterprise') tenantLimit = Infinity;
+
+      if (currentCount >= tenantLimit) {
+        return res.status(403).json({
+          message: `Your ${user?.subscriptionPlan || 'free'} plan is limited to ${tenantLimit} tenants`,
+          currentCount,
+          limit: tenantLimit,
+          upgradeUrl: '/pricing',
+          upgradeMessage: user?.subscriptionPlan === 'free'
+            ? 'Upgrade to Professional to manage up to 10 tenants'
+            : 'Upgrade to Enterprise for unlimited tenants'
+        });
+      }
+
+      // Proceed with invitation logic
+      const token = nanoid(32);
+      const inviteUrl = `${req.protocol}://${req.get('host')}/tenant/accept-invite/${token}`;
+
+      const invitation = await storage.createTenantInvitation({
+        landlordId,
+        tenantEmail: email,
+        propertyId,
+        inviteToken: token,
+        inviteUrl,
+        status: 'pending',
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      });
+
+      res.status(201).json({ message: "Invitation sent", invitation });
+    } catch (error) {
+      console.error("Error inviting tenant:", error);
+      res.status(500).json({ message: "Failed to invite tenant" });
+    }
+  });
+
+  app.get('/api/landlord/tenants', requireAuth, requireLandlord, async (req: any, res) => {
+    try {
+      const landlordId = req.user.id;
+      const links = await storage.getLandlordTenantLinks(landlordId);
+
+      // Enrich with tenant details
+      const tenants = await Promise.all(links.map(async (link) => {
+        const tenant = await storage.getUser(link.tenantId);
+        const property = link.propertyId ? await storage.getPropertyById(link.propertyId) : null;
+        return { ...link, tenant, property };
+      }));
+
+      res.json(tenants);
+    } catch (error) {
+      console.error("Error fetching tenants:", error);
+      res.status(500).json({ message: "Failed to fetch tenants" });
+    }
+  });
+
+  // Support Ticket Routes
+  app.post('/api/support/tickets', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+
+      const ticketSchema = z.object({
+        subject: z.string().min(1, "Subject is required"),
+        message: z.string().min(1, "Message is required"),
+        name: z.string().optional(),
+        email: z.string().email().optional().or(z.literal('')),
+      });
+
+      const { subject, message, name, email } = ticketSchema.parse(req.body);
+
+      // Determine priority based on subscription
+      const user = await storage.getUser(userId);
+      let priority = 'normal';
+
+      if (user?.subscriptionPlan === 'professional') priority = 'high';
+      if (user?.subscriptionPlan === 'enterprise') priority = 'urgent';
+
+      const ticket = await storage.createSupportTicket({
+        userId,
+        name: name || `${user?.firstName} ${user?.lastName}`,
+        email: email || user?.email || '',
+        subject,
+        message,
+        priority: priority as any,
+        status: 'open'
+      });
+
+      res.status(201).json(ticket);
+    } catch (error) {
+      console.error("Error creating support ticket:", error);
+      res.status(500).json({ message: "Failed to create support ticket" });
+    }
+  });
+
+  app.get('/api/support/tickets', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const tickets = await storage.getSupportTickets({ userId });
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching support tickets:", error);
+      res.status(500).json({ message: "Failed to fetch support tickets" });
+    }
   });
 
   const httpServer: Server = createServer(app);

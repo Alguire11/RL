@@ -6,7 +6,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,10 +16,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Users, CheckCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield, Lock, Info, Sparkles, ArrowRight, Wrench, Loader2 } from "lucide-react";
+import { Building, Users, CheckCircle, XCircle, Clock, Mail, Phone, MapPin, Star, TrendingUp, Calendar, Plus, Send, Link2, QrCode, Copy, FileText, Upload, Download, Award, BarChart3, Shield, Lock, Info, Sparkles, ArrowRight, Wrench, Loader2 } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 
 import { MaintenanceRequestsList } from "@/components/maintenance-requests-list";
+import { StatCard } from "@/components/ui/stat-card";
+import { GradientButton } from "@/components/ui/gradient-button";
+import { LandlordNavigation } from "@/components/landlord-navigation";
+import { Logo } from "@/components/logo";
 
 export default function LandlordDashboard() {
   const [, setLocation] = useLocation();
@@ -87,6 +93,38 @@ export default function LandlordDashboard() {
     return Infinity;
   }, [plan]);
 
+  // Data fetching hooks
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['/api/landlord/stats'],
+  }) as { data: any; isLoading: boolean };
+
+  const { data: properties, isLoading: propertiesLoading } = useQuery({
+    queryKey: ['/api/landlord/properties'],
+  }) as { data: any[]; isLoading: boolean };
+
+  const { data: tenants, isLoading: tenantsLoading } = useQuery({
+    queryKey: ['/api/landlord/tenants'],
+  }) as { data: any[]; isLoading: boolean };
+
+  const { data: verificationRequests, isLoading: verificationsLoading } = useQuery({
+    queryKey: ['/api/landlord/verification-requests'],
+  }) as { data: any[]; isLoading: boolean };
+
+  const { data: revenueData, isLoading: revenueLoading } = useQuery({
+    queryKey: ['/api/landlord/revenue'],
+  }) as { data: any; isLoading: boolean };
+
+  const { data: goldStatus, isLoading: goldLoading } = useQuery({
+    queryKey: ['/api/landlord/gold-status'],
+  }) as { data: any; isLoading: boolean };
+
+  // Update property count from stats
+  useEffect(() => {
+    if (stats?.totalProperties) {
+      setPropertyCount(stats.totalProperties);
+    }
+  }, [stats]);
+
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated || user?.role !== 'landlord') {
@@ -98,8 +136,25 @@ export default function LandlordDashboard() {
 
   const handleLogout = async () => {
     try {
+      // Get CSRF token from cookie
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(';').shift();
+      };
+
+      const csrfToken = getCookie('XSRF-TOKEN');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (csrfToken) {
+        headers['X-XSRF-TOKEN'] = csrfToken;
+      }
+
       await fetch('/api/logout', {
         method: 'POST',
+        headers,
         credentials: 'include',
       });
       toast({
@@ -112,6 +167,10 @@ export default function LandlordDashboard() {
       setLocation('/landlord-login');
     }
   };
+
+
+
+  const landlordId = adminSession?.username || 'landlord';
 
   // Property mutations
   const addPropertyMutation = useMutation({
@@ -356,59 +415,9 @@ export default function LandlordDashboard() {
 
   const badgeTier = calculateBadgeTier();
 
-  const verificationRequests = [
-    {
-      id: 1,
-      tenantName: "Sarah Johnson",
-      tenantEmail: "sarah@example.com",
-      property: "123 Main Street, London SW1A 1AA",
-      requestDate: "2024-01-15",
-      status: "pending",
-      rentAmount: 1200,
-      tenancyStart: "2023-06-01",
-      tenancyEnd: "2024-05-31"
-    },
-    {
-      id: 2,
-      tenantName: "Michael Chen",
-      tenantEmail: "michael@example.com",
-      property: "456 Oak Avenue, Manchester M1 1AA",
-      requestDate: "2024-01-12",
-      status: "verified",
-      rentAmount: 950,
-      tenancyStart: "2023-08-01",
-      tenancyEnd: "2024-07-31"
-    },
-    {
-      id: 3,
-      tenantName: "Emma Williams",
-      tenantEmail: "emma@example.com",
-      property: "789 Pine Road, Birmingham B1 1AA",
-      requestDate: "2024-01-10",
-      status: "rejected",
-      rentAmount: 800,
-      tenancyStart: "2023-09-01",
-      tenancyEnd: "2024-08-31"
-    }
-  ];
 
-  // API queries for tenant management
-  const landlordId = adminSession?.username || 'landlord';
 
-  const { data: tenants = [] } = useQuery({
-    queryKey: ['/api/landlord', landlordId, 'tenants'],
-    enabled: !!adminSession
-  });
 
-  const { data: verifications = [] } = useQuery({
-    queryKey: ['/api/landlord', landlordId, 'verifications'],
-    enabled: !!adminSession
-  });
-
-  const { data: pendingRequests = [] } = useQuery({
-    queryKey: ['/api/landlord', landlordId, 'pending-requests'],
-    enabled: !!adminSession
-  });
 
   const inviteTenantMutation = useMutation({
     mutationFn: async (data: { landlordId: string; propertyId: number | null; tenantEmail: string; landlordName: string; propertyAddress: string }) => {
@@ -439,37 +448,11 @@ export default function LandlordDashboard() {
     }
   });
 
-  const stats = [
-    { title: "Properties", value: propertyCount.toString(), icon: Building, color: "text-blue-600" },
-    { title: "Active Tenants", value: Array.isArray(tenants) ? tenants.length.toString() : "0", icon: Users, color: "text-green-600" },
-    { title: "Verifications", value: Array.isArray(verifications) ? verifications.length.toString() : "0", icon: CheckCircle, color: "text-purple-600" },
-    { title: "Pending Requests", value: Array.isArray(pendingRequests) ? pendingRequests.length.toString() : "0", icon: Clock, color: "text-orange-600" }
-  ];
 
-  const handleVerification = (id: number, action: 'approve' | 'reject') => {
-    toast({
-      title: action === 'approve' ? "Verification Approved" : "Verification Rejected",
-      description: `Tenant verification has been ${action === 'approve' ? 'approved' : 'rejected'}.`,
-    });
-  };
 
-  // Handle stats card clicks - scroll to sections
-  const handleStatsCardClick = (statTitle: string) => {
-    switch (statTitle) {
-      case 'Properties':
-        propertiesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        break;
-      case 'Active Tenants':
-        tenantsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        break;
-      case 'Verifications':
-        verificationsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        break;
-      case 'Pending Requests':
-        pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        break;
-    }
-  };
+
+
+
 
   if (!adminSession) {
     return <div>Loading...</div>;
@@ -478,31 +461,136 @@ export default function LandlordDashboard() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Single row with logo, navigation, and actions */}
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <Building className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Landlord Dashboard</h1>
-                <p className="text-gray-600">Welcome back, {adminSession.username}</p>
-              </div>
+            {/* Logo */}
+            <div className="flex items-center">
+              <Logo />
             </div>
-            <div className="flex items-center space-x-3">
-              <Badge variant="outline" className="bg-white text-blue-700 border-blue-200 font-semibold">
-                {plan?.name ?? "Free"} Plan
-              </Badge>
+
+            {/* Navigation Menu */}
+            <nav className="flex space-x-1 mx-8">
               <Button
-                variant="outline"
-                onClick={handleLogout}
-                className="border-red-200 text-red-600 hover:bg-red-50"
+                variant="ghost"
+                className="text-blue-600 border-b-2 border-blue-600 rounded-none hover:bg-blue-50 hover:text-blue-700"
+                onClick={() => setLocation('/landlord-dashboard')}
               >
-                Logout
+                <Building className="h-4 w-4 mr-2" />
+                Dashboard
               </Button>
+              <Button
+                variant="ghost"
+                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-none border-b-2 border-transparent hover:border-blue-200"
+                onClick={() => setLocation('/landlord-properties')}
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Properties
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-none border-b-2 border-transparent hover:border-blue-200"
+                onClick={() => tenantsRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Tenants
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-none border-b-2 border-transparent hover:border-blue-200"
+                onClick={() => setShowAnalytics(true)}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Reports
+              </Button>
+            </nav>
+
+            {/* Spacer to push right items to the end */}
+            <div className="flex-1"></div>
+
+            {/* Right side actions */}
+            <div className="flex items-center space-x-4">
+              {/* Subscription Badge */}
+              {!goldStatus?.isGold && (
+                <Badge variant="outline" className="bg-white text-blue-700 border-blue-200 font-semibold">
+                  {plan?.name ?? "Free"} Plan
+                </Badge>
+              )}
+
+              {/* Notifications */}
+              <Button variant="ghost" size="icon" className="relative">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </Button>
+
+              {/* User Menu Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                    <Avatar>
+                      <AvatarFallback className="bg-blue-600 text-white">
+                        {user?.firstName?.[0]}{user?.lastName?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{user?.firstName} {user?.lastName}</p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => verificationsRef.current?.scrollIntoView({ behavior: 'smooth' })}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    <span>Verifications</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation('/settings')}>
+                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
+
+          {/* Gold Landlord Badge (conditional) */}
+          {goldStatus?.isGold && (
+            <div className="mb-4 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-yellow-400 rounded-full">
+                    <Award className="h-6 w-6 text-yellow-900" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-lg font-bold text-gray-900">Gold Landlord</h3>
+                      <Badge className="bg-yellow-500 text-yellow-900 border-yellow-600">Trusted</Badge>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {goldStatus.verificationRate}% verification rate · {goldStatus.tenantSatisfaction}/5 tenant satisfaction · {goldStatus.totalVerifications} total verifications
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline">{plan?.name ?? "Free"} Plan</Badge>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -615,26 +703,26 @@ export default function LandlordDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-sm text-gray-600 mb-1">Verification Rate</p>
-                  <p className="text-3xl font-bold text-green-600">85%</p>
+                  <p className="text-sm text-gray-600 mb-1">Occupancy Rate</p>
+                  <p className="text-3xl font-bold text-green-600">{stats?.occupancyRate || 0}%</p>
                   <p className="text-xs text-gray-500 mt-1 flex items-center">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    ↑ 5% from last month
+                    <Users className="h-3 w-3 mr-1" />
+                    {stats?.activeTenants || 0} active tenants
                   </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-sm text-gray-600 mb-1">Avg Response Time</p>
-                  <p className="text-3xl font-bold text-blue-600">2.3h</p>
-                  <p className="text-xs text-gray-500 mt-1">↓ 0.5h faster</p>
+                  <p className="text-sm text-gray-600 mb-1">Average Rent</p>
+                  <p className="text-3xl font-bold text-blue-600">£{stats?.averageRent?.toLocaleString() || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">Per property</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
-                  <p className="text-sm text-gray-600 mb-1">Tenant Satisfaction</p>
-                  <p className="text-3xl font-bold text-purple-600">4.5/5</p>
-                  <p className="text-xs text-gray-500 mt-1">Based on 18 reviews</p>
+                  <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+                  <p className="text-3xl font-bold text-purple-600">£{stats?.monthlyRevenue?.toLocaleString() || 0}</p>
+                  <p className="text-xs text-gray-500 mt-1">This month</p>
                 </CardContent>
               </Card>
             </div>
@@ -656,17 +744,17 @@ export default function LandlordDashboard() {
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Monthly Verification Trends</span>
+                    <span className="text-sm font-medium">Monthly Revenue Trends</span>
                   </div>
                   <div className="space-y-2">
-                    {['January', 'February', 'March'].map((month, idx) => (
-                      <div key={month}>
+                    {revenueData?.monthly?.map((data: any) => (
+                      <div key={data.month}>
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-gray-600">{month}</span>
-                          <span className="text-sm font-semibold">{12 + idx * 2} verifications</span>
+                          <span className="text-sm text-gray-600">{data.month}</span>
+                          <span className="text-sm font-semibold">£{data.amount.toLocaleString()}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${60 + idx * 15}%` }}></div>
+                          <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${(data.amount / (Math.max(...(revenueData?.monthly?.map((d: any) => d.amount) || [1])) || 1)) * 100}%` }}></div>
                         </div>
                       </div>
                     ))}
@@ -677,33 +765,138 @@ export default function LandlordDashboard() {
           </CardContent>
         </Card>
 
-        {/* Stats Grid - Clickable Cards */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat) => (
-            <Card
-              key={stat.title}
-              className="cursor-pointer hover:shadow-lg transition-all duration-300 border-0 shadow-md"
-              onClick={() => handleStatsCardClick(stat.title)}
-              data-testid={`card-stat-${stat.title.toLowerCase().replace(' ', '-')}`}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  </div>
-                  <div className={`p-3 rounded-full bg-gradient-to-br ${stat.title === 'Properties' ? 'from-blue-100 to-blue-200' :
-                    stat.title === 'Active Tenants' ? 'from-green-100 to-green-200' :
-                      stat.title === 'Verifications' ? 'from-purple-100 to-purple-200' :
-                        'from-orange-100 to-orange-200'
-                    } ${stat.color}`}>
-                    <stat.icon className="h-6 w-6" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <StatCard
+            title="Total Properties"
+            value={stats?.totalProperties?.toString() || "0"}
+            icon={Building}
+            color="primary"
+          />
+          <StatCard
+            title="Active Tenants"
+            value={stats?.activeTenants?.toString() || "0"}
+            icon={Users}
+            color="success"
+          />
+          <StatCard
+            title="Monthly Revenue"
+            value={`£${stats?.monthlyRevenue?.toLocaleString() || "0"}`}
+            icon={TrendingUp}
+            color="accent"
+          />
+          <StatCard
+            title="Pending Verifications"
+            value={stats?.pendingVerifications?.toString() || "0"}
+            icon={CheckCircle}
+            color="secondary"
+          />
         </div>
+
+        {/* Revenue Overview */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
+                Revenue Overview
+              </span>
+              <Badge variant="outline">{new Date().getFullYear()}</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">This Month</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  £{stats?.monthlyRevenue?.toLocaleString() || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Occupancy Rate</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {stats?.occupancyRate || 0}%
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Average Rent</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  £{stats?.averageRent?.toLocaleString() || 0}
+                </p>
+              </div>
+            </div>
+
+            {/* Monthly Revenue Chart */}
+            {revenueData?.monthly && revenueData.monthly.length > 0 ? (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-gray-700">Last 6 Months</h4>
+                {revenueData.monthly.slice(0, 6).map((data: any) => (
+                  <div key={data.month} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">{data.month}</span>
+                      <span className="font-semibold">£{data.amount.toLocaleString()}</span>
+                    </div>
+                    <Progress
+                      value={(data.amount / Math.max(...revenueData.monthly.map((d: any) => d.amount))) * 100}
+                      className="h-2"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-sm">No revenue data available yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Sparkles className="h-5 w-5 mr-2 text-blue-600" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <GradientButton
+                onClick={() => setShowAddProperty(true)}
+                variant="primary"
+                className="flex flex-col items-center justify-center h-24 space-y-2"
+              >
+                <Plus className="h-6 w-6" />
+                <span className="text-sm">Add Property</span>
+              </GradientButton>
+              <GradientButton
+                onClick={() => setShowInviteTenant(true)}
+                variant="secondary"
+                className="flex flex-col items-center justify-center h-24 space-y-2"
+              >
+                <Send className="h-6 w-6" />
+                <span className="text-sm">Invite Tenant</span>
+              </GradientButton>
+              <GradientButton
+                onClick={() => setShowDocumentVault(true)}
+                variant="accent"
+                className="flex flex-col items-center justify-center h-24 space-y-2"
+              >
+                <FileText className="h-6 w-6" />
+                <span className="text-sm">Documents</span>
+              </GradientButton>
+              <GradientButton
+                onClick={() => setShowAnalytics(true)}
+                variant="primary"
+                className="flex flex-col items-center justify-center h-24 space-y-2"
+              >
+                <BarChart3 className="h-6 w-6" />
+                <span className="text-sm">Analytics</span>
+              </GradientButton>
+            </div>
+          </CardContent>
+        </Card>
+
 
         {/* Main Content */}
         <div className="grid lg:grid-cols-2 gap-8">
@@ -736,7 +929,7 @@ export default function LandlordDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {verificationRequests.map((request) => (
+                {(verificationRequests as any[] || []).map((request: any) => (
                   <div key={request.id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
                       <div>
@@ -775,16 +968,28 @@ export default function LandlordDashboard() {
                         <Button
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => handleVerification(request.id, 'approve')}
+                          onClick={() => {
+                            toast({
+                              title: "Approved",
+                              description: "Tenant verification approved",
+                            });
+                          }}
                         >
+                          <CheckCircle className="h-4 w-4 mr-1" />
                           Approve
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-red-200 text-red-600 hover:bg-red-50"
-                          onClick={() => handleVerification(request.id, 'reject')}
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={() => {
+                            toast({
+                              title: "Rejected",
+                              description: "Tenant verification rejected",
+                            });
+                          }}
                         >
+                          <XCircle className="h-4 w-4 mr-1" />
                           Reject
                         </Button>
                       </div>
@@ -1006,7 +1211,7 @@ export default function LandlordDashboard() {
                       </DialogHeader>
                       <div className="py-4">
                         <div className="space-y-4">
-                          {verificationRequests.map((tenant) => (
+                          {(verificationRequests as any[] || []).map((tenant: any) => (
                             <div key={tenant.id} className="flex items-center justify-between p-4 border rounded-lg">
                               <div>
                                 <h4 className="font-semibold">{tenant.tenantName}</h4>
@@ -1052,7 +1257,7 @@ export default function LandlordDashboard() {
                               <SelectValue placeholder="Select tenant" />
                             </SelectTrigger>
                             <SelectContent>
-                              {verificationRequests.map((tenant) => (
+                              {(verificationRequests as any[] || []).map((tenant: any) => (
                                 <SelectItem key={tenant.id} value={tenant.tenantName}>
                                   {tenant.tenantName}
                                 </SelectItem>
@@ -1216,7 +1421,7 @@ export default function LandlordDashboard() {
                               <SelectValue placeholder="Select property" />
                             </SelectTrigger>
                             <SelectContent>
-                              {verificationRequests.map((req) => (
+                              {(verificationRequests as any[] || []).map((req: any) => (
                                 <SelectItem key={req.id} value={req.property}>
                                   {req.property}
                                 </SelectItem>
@@ -1417,33 +1622,33 @@ export default function LandlordDashboard() {
                   <CardDescription>Review and verify tenant payment records</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {!Array.isArray(verifications) || verifications.length === 0 ? (
+                  {!Array.isArray(verificationRequests) || (verificationRequests as any[]).length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                       <CheckCircle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                       <p>No payment verifications to review</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {verifications.map((payment: any) => (
-                        <div key={payment.id} className="p-4 border rounded-lg">
+                      {(verificationRequests as any[]).map((verification: any) => (
+                        <div key={verification.id} className="p-4 border rounded-lg">
                           <div className="flex items-center justify-between">
                             <div>
-                              <h4 className="font-semibold">Payment #{payment.id}</h4>
-                              <p className="text-sm text-gray-600">Amount: £{payment.amount}</p>
-                              <p className="text-sm text-gray-500">Due: {new Date(payment.dueDate).toLocaleDateString()}</p>
-                              <Badge className={payment.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                                {payment.status}
+                              <h4 className="font-semibold">Payment #{verification.id}</h4>
+                              <p className="text-sm text-gray-600">Amount: £{verification.amount}</p>
+                              <p className="text-sm text-gray-500">Due: {new Date(verification.dueDate).toLocaleDateString()}</p>
+                              <Badge className={verification.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                {verification.status}
                               </Badge>
                             </div>
-                            {payment.status === 'pending' && (
+                            {verification.status === 'pending' && (
                               <div className="space-x-2">
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="text-green-600 dark:text-green-400"
-                                  onClick={() => verifyPaymentMutation.mutate({ paymentId: payment.id, status: 'approved' })}
+                                  onClick={() => verifyPaymentMutation.mutate({ paymentId: verification.id, status: 'approved' })}
                                   disabled={verifyPaymentMutation.isPending}
-                                  data-testid={`button-approve-payment-${payment.id}`}
+                                  data-testid={`button-approve-payment-${verification.id}`}
                                 >
                                   Approve
                                 </Button>
@@ -1451,9 +1656,9 @@ export default function LandlordDashboard() {
                                   size="sm"
                                   variant="outline"
                                   className="text-red-600 dark:text-red-400"
-                                  onClick={() => verifyPaymentMutation.mutate({ paymentId: payment.id, status: 'rejected' })}
+                                  onClick={() => verifyPaymentMutation.mutate({ paymentId: verification.id, status: 'rejected' })}
                                   disabled={verifyPaymentMutation.isPending}
-                                  data-testid={`button-reject-payment-${payment.id}`}
+                                  data-testid={`button-reject-payment-${verification.id}`}
                                 >
                                   Reject
                                 </Button>
@@ -1476,14 +1681,14 @@ export default function LandlordDashboard() {
                   <CardDescription>Review pending tenant requests and verifications</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {!Array.isArray(pendingRequests) || pendingRequests.length === 0 ? (
+                  {!Array.isArray(verificationRequests) || (verificationRequests as any[]).length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                       <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                       <p>No pending requests</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {pendingRequests.map((request: any) => (
+                      {(verificationRequests as any[]).filter((r: any) => r.status === 'pending').map((request: any) => (
                         <div key={request.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow">
                           <div className="flex items-start justify-between">
                             <div>

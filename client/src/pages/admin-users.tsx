@@ -28,6 +28,7 @@ interface AdminUser {
   role: string;
   phone: string | null;
   createdAt: string | null;
+  businessName?: string | null;
 }
 
 export default function AdminUsers() {
@@ -70,7 +71,7 @@ export default function AdminUsers() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: (userData: { userId: string; updates: any }) => 
+    mutationFn: (userData: { userId: string; updates: any }) =>
       fetch(`/api/admin/users/${userData.userId}`, {
         method: 'PATCH',
         credentials: 'include',
@@ -101,7 +102,7 @@ export default function AdminUsers() {
   });
 
   const suspendUserMutation = useMutation({
-    mutationFn: (userId: string) => 
+    mutationFn: (userId: string) =>
       fetch(`/api/admin/users/${userId}/suspend`, {
         method: 'POST',
         credentials: 'include',
@@ -129,18 +130,18 @@ export default function AdminUsers() {
   });
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       (user.email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (user.firstName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = filterStatus === "all" || 
+
+    const matchesStatus = filterStatus === "all" ||
       (filterStatus === "active" && user.isOnboarded) ||
       (filterStatus === "verified" && user.emailVerified) ||
       (filterStatus === "pending" && !user.emailVerified);
-    
+
     const matchesPlan = filterPlan === "all" || user.subscriptionPlan === filterPlan;
-    
+
     return matchesSearch && matchesStatus && matchesPlan;
   });
 
@@ -263,6 +264,7 @@ export default function AdminUsers() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
+                    <TableHead>Business</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Plan</TableHead>
@@ -276,10 +278,15 @@ export default function AdminUsers() {
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="font-medium">
-                          {user.firstName && user.lastName ? 
+                          {user.firstName && user.lastName ?
                             `${user.firstName} ${user.lastName}` : 'N/A'}
                         </div>
                         <div className="text-sm text-gray-500">{user.id}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-gray-600">
+                          {user.businessName || '-'}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -316,6 +323,13 @@ export default function AdminUsers() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => setLocation(`/admin/users/${user.id}`)}
+                          >
+                            Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => {
                               setSelectedUser(user);
                               setShowEditDialog(true);
@@ -323,6 +337,23 @@ export default function AdminUsers() {
                           >
                             <UserCheck className="w-3 h-3" />
                           </Button>
+                          {user.role === 'landlord' && !user.isOnboarded && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => {
+                                if (confirm(`Verify landlord ${user.email}? This will mark them as onboarded.`)) {
+                                  updateUserMutation.mutate({
+                                    userId: user.id,
+                                    updates: { isOnboarded: true, emailVerified: true }
+                                  });
+                                }
+                              }}
+                            >
+                              Verify
+                            </Button>
+                          )}
                           {user.role !== 'admin' && (
                             <Button
                               variant="outline"
@@ -374,6 +405,14 @@ export default function AdminUsers() {
                   </div>
                 </div>
                 <div>
+                  <Label htmlFor="businessName">Business Name (Landlords)</Label>
+                  <Input
+                    id="businessName"
+                    defaultValue={selectedUser.businessName || ''}
+                    placeholder="e.g. Smith Properties Ltd"
+                  />
+                </div>
+                <div>
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
@@ -421,8 +460,9 @@ export default function AdminUsers() {
                         email: (document.getElementById('email') as HTMLInputElement)?.value || selectedUser.email,
                         subscriptionPlan: (document.querySelector('[data-plan-select]') as HTMLSelectElement)?.value || selectedUser.subscriptionPlan,
                         role: (document.querySelector('[data-role-select]') as HTMLSelectElement)?.value || selectedUser.role,
+                        businessName: (document.getElementById('businessName') as HTMLInputElement)?.value || selectedUser.businessName,
                       };
-                      
+
                       updateUserMutation.mutate({
                         userId: selectedUser.id,
                         updates: formData,

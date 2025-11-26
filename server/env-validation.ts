@@ -26,13 +26,11 @@ export function validateEnvironment(): {
 
   if (!process.env.SESSION_SECRET) {
     errors.push('SESSION_SECRET is required for secure session management');
-  } else if (process.env.SESSION_SECRET === 'dev-secret-key') {
-    warnings.push('SESSION_SECRET is using default development value - set a secure random string for production');
   }
 
   // Check optional but recommended variables
-  if (!process.env.SENDGRID_API_KEY) {
-    warnings.push('SENDGRID_API_KEY not set - email functionality will be disabled');
+  if (!process.env.MAILERSEND_API_KEY) {
+    warnings.push('MAILERSEND_API_KEY not set - email functionality will be disabled');
   }
 
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -41,8 +39,8 @@ export function validateEnvironment(): {
 
   // Check NODE_ENV
   if (process.env.NODE_ENV === 'production') {
-    if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === 'dev-secret-key') {
-      errors.push('SESSION_SECRET must be set to a secure value in production');
+    if (process.env.SESSION_SECRET === 'dev-secret-key') {
+      errors.push('SESSION_SECRET cannot be the default "dev-secret-key" in production');
     }
   }
 
@@ -55,11 +53,11 @@ export function validateEnvironment(): {
 
 export function printEnvironmentStatus() {
   const validation = validateEnvironment();
-  
+
   console.log('\n' + '='.repeat(60));
   console.log('🔍 ENVIRONMENT VALIDATION');
   console.log('='.repeat(60));
-  
+
   if (validation.isValid) {
     console.log('✅ All required environment variables are set\n');
   } else {
@@ -69,7 +67,7 @@ export function printEnvironmentStatus() {
     });
     console.log('');
   }
-  
+
   if (validation.warnings.length > 0) {
     console.log('⚠️  WARNINGS:\n');
     validation.warnings.forEach(warning => {
@@ -77,7 +75,7 @@ export function printEnvironmentStatus() {
     });
     console.log('');
   }
-  
+
   console.log('📋 Configuration Status:');
   console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
   console.log(`   DATABASE: ${process.env.DATABASE_URL ? '✅ Connected' : '❌ Not configured'}`);
@@ -85,6 +83,6 @@ export function printEnvironmentStatus() {
   console.log(`   SENDGRID: ${process.env.SENDGRID_API_KEY ? '✅ Configured' : '⚠️  Not configured'}`);
   console.log(`   STRIPE: ${process.env.STRIPE_SECRET_KEY ? '✅ Configured' : '⚠️  Not configured'}`);
   console.log('='.repeat(60) + '\n');
-  
+
   return validation;
 }

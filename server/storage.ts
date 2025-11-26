@@ -23,8 +23,6 @@ import {
   type Property,
   type InsertProperty,
   passwordResetTokens,
-  type PasswordResetToken,
-  type InsertPasswordResetToken,
   type RentPayment,
   type InsertRentPayment,
   type BankConnection,
@@ -95,6 +93,12 @@ import {
   auditLogs,
   type AuditLog,
   type InsertAuditLog,
+  emailVerificationTokens,
+  type EmailVerificationToken,
+  type InsertEmailVerificationToken,
+  emailEvents,
+  type EmailEvent,
+  type InsertEmailEvent,
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
@@ -107,6 +111,8 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<UpsertUser>): Promise<User>;
+  createUserWithRLID(user: UpsertUser, rolePrefix: 'TRLID-' | 'LRLID-'): Promise<User>;
   getUsersWithPreferences(): Promise<User[]>;
 
   // Property operations
@@ -117,6 +123,7 @@ export interface IStorage {
 
   // Rent payment operations
   createRentPayment(payment: InsertRentPayment): Promise<RentPayment>;
+  getRentPayment(id: number): Promise<RentPayment | undefined>;
   getManualPaymentById(id: number): Promise<ManualPayment | undefined>;
   getUserRentPayments(userId: string): Promise<RentPayment[]>;
   getPropertyRentPayments(propertyId: number): Promise<RentPayment[]>;
@@ -150,6 +157,7 @@ export interface IStorage {
   // Tenant invitation operations
   createTenantInvitation(invitation: InsertTenantInvitation): Promise<TenantInvitation>;
   getTenantInvitation(token: string): Promise<TenantInvitation | undefined>;
+  getTenantInvitationByEmail(email: string, propertyId: number): Promise<TenantInvitation | undefined>;
   getLandlordInvitations(landlordId: string): Promise<TenantInvitation[]>;
   acceptTenantInvitation(id: number, tenantId: string): Promise<TenantInvitation>;
   expireInvitation(id: number): Promise<void>;
@@ -185,6 +193,15 @@ export interface IStorage {
   updateAdminUser(userId: string, updates: Partial<InsertAdminUser>): Promise<AdminUser>;
   deleteAdminUser(userId: string): Promise<void>;
 
+  // Email verification token operations
+  createEmailVerificationToken(token: InsertEmailVerificationToken): Promise<EmailVerificationToken>;
+  getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined>;
+  markEmailVerificationTokenAsUsed(token: string): Promise<void>;
+  deleteExpiredEmailVerificationTokens(): Promise<void>;
+
+  // Email event operations
+  createEmailEvent(event: InsertEmailEvent): Promise<EmailEvent>;
+
   // Data export operations
   createDataExportRequest(request: InsertDataExportRequest): Promise<DataExportRequest>;
   getUserDataExportRequests(userId: string): Promise<DataExportRequest[]>;
@@ -198,6 +215,17 @@ export interface IStorage {
   // Certification portfolio operations
   createCertificationPortfolio(portfolio: InsertCertificationPortfolio): Promise<CertificationPortfolio>;
   getUserCertificationPortfolios(userId: string): Promise<CertificationPortfolio[]>;
+
+  // API Key operations
+  createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
+  getApiKeys(userId?: string): Promise<ApiKey[]>;
+  deleteApiKey(id: number): Promise<void>;
+
+  // Support Ticket operations
+  createSupportTicket(ticket: InsertSupportTicket): Promise<SupportTicket>;
+  getSupportTickets(filters?: { userId?: string; status?: string; assignedTo?: string }): Promise<SupportTicket[]>;
+  updateSupportTicket(id: number, updates: Partial<InsertSupportTicket>): Promise<SupportTicket>;
+
   getCertificationPortfolioByToken(shareToken: string): Promise<CertificationPortfolio | undefined>;
   deleteCertificationPortfolio(id: number, userId: string): Promise<void>;
 
@@ -244,6 +272,7 @@ export interface IStorage {
   createLandlordTenantLink(link: InsertLandlordTenantLink): Promise<LandlordTenantLink>;
   getLandlordTenantLinks(landlordId: string): Promise<LandlordTenantLink[]>;
   getTenantLandlordLinks(tenantId: string): Promise<LandlordTenantLink[]>;
+  getPropertyTenantLinks(propertyId: number): Promise<LandlordTenantLink[]>;
 
   // Admin action operations
   createAdminAction(action: InsertAdminAction): Promise<AdminAction>;
@@ -345,6 +374,42 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: string, userData: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...userData,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
+  async createUserWithRLID(userData: UpsertUser, rolePrefix: 'TRLID-' | 'LRLID-'): Promise<User> {
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        const randomNum = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+        const rlid = `${rolePrefix}${randomNum}`;
+
+        const [user] = await db
+          .insert(users)
+          .values({ ...userData, rlid })
+          .returning();
+        return user;
+      } catch (error: any) {
+        // Postgres unique violation code is 23505
+        if (error.code === '23505' && error.detail?.includes('rlid')) {
+          retries--;
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error("Failed to generate unique RLID after multiple attempts");
+  }
+
   async updateUserAddress(userId: string, address: any): Promise<User> {
     const [user] = await db
       .update(users)
@@ -409,6 +474,14 @@ export class DatabaseStorage implements IStorage {
       .values(payment)
       .returning();
     return newPayment;
+  }
+
+  async getRentPayment(id: number): Promise<RentPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(rentPayments)
+      .where(eq(rentPayments.id, id));
+    return payment;
   }
 
   async getUserRentPayments(userId: string): Promise<RentPayment[]> {
@@ -593,6 +666,19 @@ export class DatabaseStorage implements IStorage {
 
   async getTenantInvitation(token: string): Promise<TenantInvitation | undefined> {
     const [invitation] = await db.select().from(tenantInvitations).where(eq(tenantInvitations.inviteToken, token)).limit(1);
+    return invitation;
+  }
+
+  async getTenantInvitationByEmail(email: string, propertyId: number): Promise<TenantInvitation | undefined> {
+    const [invitation] = await db
+      .select()
+      .from(tenantInvitations)
+      .where(and(
+        eq(tenantInvitations.tenantEmail, email),
+        eq(tenantInvitations.propertyId, propertyId),
+        eq(tenantInvitations.status, 'pending')
+      ))
+      .limit(1);
     return invitation;
   }
 
@@ -1053,8 +1139,11 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getSupportTickets(filters?: { status?: string; assignedTo?: string }): Promise<SupportTicket[]> {
+  async getSupportTickets(filters?: { userId?: string; status?: string; assignedTo?: string }): Promise<SupportTicket[]> {
     const conditions = [];
+    if (filters?.userId) {
+      conditions.push(eq(supportTickets.userId, filters.userId));
+    }
     if (filters?.status) {
       conditions.push(eq(supportTickets.status, filters.status as any));
     }
@@ -1095,7 +1184,14 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getApiKeys(): Promise<ApiKey[]> {
+  async getApiKeys(userId?: string): Promise<ApiKey[]> {
+    if (userId) {
+      return await db
+        .select()
+        .from(apiKeys)
+        .where(and(eq(apiKeys.createdBy, userId), eq(apiKeys.isActive, true)))
+        .orderBy(desc(apiKeys.createdAt));
+    }
     return await db
       .select()
       .from(apiKeys)
@@ -1626,6 +1722,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(landlordTenantLinks.linkedAt));
   }
 
+  async getPropertyTenantLinks(propertyId: number): Promise<LandlordTenantLink[]> {
+    return await db.select().from(landlordTenantLinks)
+      .where(eq(landlordTenantLinks.propertyId, propertyId))
+      .orderBy(desc(landlordTenantLinks.linkedAt));
+  }
+
   // Admin action operations
   async createAdminAction(action: InsertAdminAction): Promise<AdminAction> {
     const [created] = await db.insert(adminActions).values(action).returning();
@@ -1656,6 +1758,41 @@ export class DatabaseStorage implements IStorage {
     await db.update(pendingLandlords)
       .set({ status: status as any, registeredAt: status === 'registered' ? new Date() : undefined })
       .where(eq(pendingLandlords.email, email));
+  }
+
+  // Email verification token operations
+  async createEmailVerificationToken(token: InsertEmailVerificationToken): Promise<EmailVerificationToken> {
+    const [created] = await db.insert(emailVerificationTokens).values(token).returning();
+    return created;
+  }
+
+  async getEmailVerificationToken(token: string): Promise<EmailVerificationToken | undefined> {
+    const [result] = await db
+      .select()
+      .from(emailVerificationTokens)
+      .where(eq(emailVerificationTokens.token, token));
+    return result;
+  }
+
+  async markEmailVerificationTokenAsUsed(token: string): Promise<void> {
+    await db
+      .update(emailVerificationTokens)
+      .set({ used: true })
+      .where(eq(emailVerificationTokens.token, token));
+  }
+
+  async deleteExpiredEmailVerificationTokens(): Promise<void> {
+    await db
+      .delete(emailVerificationTokens)
+      .where(lt(emailVerificationTokens.expiresAt, new Date()));
+  }
+
+  async createEmailEvent(event: InsertEmailEvent): Promise<EmailEvent> {
+    const [created] = await db
+      .insert(emailEvents)
+      .values(event)
+      .returning();
+    return created;
   }
 }
 

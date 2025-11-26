@@ -1,8 +1,9 @@
 import { Link } from "wouter";
+import { cn } from "@/lib/utils";
 
-export function Footer() {
+export function Footer({ className }: { className?: string }) {
   return (
-    <footer className="bg-gray-900 text-white py-12 mt-auto">
+    <footer className={cn("bg-gray-900 text-white py-12 mt-auto", className)}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid md:grid-cols-5 gap-8">
           <div>
@@ -13,7 +14,7 @@ export function Footer() {
               <li><Link href="/terms" className="text-gray-400 hover:text-white">Terms</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="text-xl font-semibold mb-4">Product</h3>
             <ul className="space-y-2">
@@ -22,7 +23,7 @@ export function Footer() {
               <li><Link href="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="text-xl font-semibold mb-4">Support</h3>
             <ul className="space-y-2">
@@ -32,7 +33,7 @@ export function Footer() {
               <li><Link href="/status" className="text-gray-400 hover:text-white">Status</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="text-xl font-semibold mb-4">Legal & Security</h3>
             <ul className="space-y-2">
@@ -41,7 +42,7 @@ export function Footer() {
               <li><Link href="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link></li>
             </ul>
           </div>
-          
+
           <div>
             <h3 className="text-xl font-semibold mb-4">RentLedger</h3>
             <p className="text-gray-400">
@@ -49,9 +50,9 @@ export function Footer() {
             </p>
           </div>
         </div>
-        
+
         <hr className="my-8 border-gray-800" />
-        
+
         <div className="flex flex-col md:flex-row justify-between items-center">
           <p className="text-gray-400">&copy; 2025 RentLedger. All rights reserved.</p>
           <div className="flex space-x-6 mt-4 md:mt-0">

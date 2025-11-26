@@ -12,8 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Logo } from "@/components/logo";
+import { Footer } from "@/components/footer";
 import { PasswordStrength } from "@/components/password-strength";
-import { Eye, EyeOff, ArrowLeft, Building, Sparkles, Shield, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Building, Sparkles, Shield, CheckCircle2, Mail } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -33,16 +34,22 @@ type RegisterData = z.infer<typeof registerSchema>;
 export default function AuthPage() {
   const [location, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState(() => {
-    if (window.location.hash === "#register") return "register";
+    if (location === "/signup") return "register";
     return "login";
   });
 
+  // Sync tab with location
+  if (location === "/signup" && activeTab !== "register") setActiveTab("register");
+  if (location === "/login" && activeTab !== "login") setActiveTab("login");
+
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    window.location.hash = value;
+    if (value === "register") navigate("/signup");
+    else navigate("/login");
   };
 
   const loginForm = useForm<LoginData>({
@@ -90,7 +97,12 @@ export default function AuthPage() {
       const response = await apiRequest("POST", "/api/register", data);
       return await response.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data.requiresVerification) {
+        setVerificationSent(true);
+        return;
+      }
+
       await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       await new Promise(resolve => setTimeout(resolve, 100));
       toast({
@@ -176,222 +188,251 @@ export default function AuthPage() {
           </div>
 
           {/* Auth Forms */}
-          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-white/10 backdrop-blur-xl border border-white/20 p-1">
-              <TabsTrigger
-                value="login"
-                className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white"
-              >
-                Sign In
-              </TabsTrigger>
-              <TabsTrigger
-                value="register"
-                className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white"
-              >
-                Sign Up
-              </TabsTrigger>
-            </TabsList>
+          {verificationSent ? (
+            <Card className="border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl animate-fade-in">
+              <CardHeader className="text-center pb-2">
+                <div className="mx-auto mb-4 bg-green-100 p-3 rounded-full w-fit">
+                  <Mail className="h-8 w-8 text-green-600" />
+                </div>
+                <CardTitle className="text-2xl font-bold text-slate-900">Check your email</CardTitle>
+                <CardDescription className="text-slate-600 text-base">
+                  We've sent a verification link to your email address. Please click the link to activate your account.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 text-center">
+                  <p>Didn't receive the email? Check your spam folder or try logging in to resend.</p>
+                </div>
+                <Button
+                  className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white"
+                  onClick={() => {
+                    setVerificationSent(false);
+                    setActiveTab("login");
+                    navigate("/login");
+                  }}
+                >
+                  Return to Sign In
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-white/10 backdrop-blur-xl border border-white/20 p-1">
+                <TabsTrigger
+                  value="login"
+                  className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white"
+                >
+                  Sign In
+                </TabsTrigger>
+                <TabsTrigger
+                  value="register"
+                  className="data-[state=active]:bg-white data-[state=active]:text-slate-900 text-white"
+                >
+                  Sign Up
+                </TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="login" className="mt-6">
-              <Card className="border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl">
-                <CardHeader className="space-y-1 pb-4">
-                  <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
-                  <CardDescription>
-                    Enter your credentials to access your account
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
-                        {...loginForm.register("email")}
-                      />
-                      {loginForm.formState.errors.email && (
-                        <p className="text-sm text-red-600 flex items-center gap-1">
-                          {loginForm.formState.errors.email.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="login-password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Enter your password"
-                          className="h-11 pr-10 transition-all focus:ring-2 focus:ring-blue-500"
-                          {...loginForm.register("password")}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-gray-400" />
-                          )}
-                        </Button>
-                      </div>
-                      {loginForm.formState.errors.password && (
-                        <p className="text-sm text-red-600">
-                          {loginForm.formState.errors.password.message}
-                        </p>
-                      )}
-                      <div className="flex justify-end">
-                        <Button
-                          type="button"
-                          variant="link"
-                          className="px-0 h-auto text-sm text-blue-600 hover:text-blue-700"
-                          onClick={() => navigate("/forgot-password")}
-                        >
-                          Forgot password?
-                        </Button>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
-                      disabled={loginMutation.isPending}
-                    >
-                      {loginMutation.isPending ? (
-                        <span className="flex items-center gap-2">
-                          <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Signing in...
-                        </span>
-                      ) : (
-                        "Sign In"
-                      )}
-                    </Button>
-                  </form>
-
-
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="register" className="mt-6">
-              <Card className="border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl">
-                <CardHeader className="space-y-1 pb-4">
-                  <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-                  <CardDescription>
-                    Join thousands building credit through rent
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+              <TabsContent value="login" className="mt-6">
+                <Card className="border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl">
+                  <CardHeader className="space-y-1 pb-4">
+                    <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
+                    <CardDescription>
+                      Enter your credentials to access your account
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="register-firstName" className="text-sm font-medium">First Name</Label>
+                        <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
                         <Input
-                          id="register-firstName"
-                          placeholder="John"
+                          id="login-email"
+                          type="email"
+                          placeholder="you@example.com"
                           className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
-                          {...registerForm.register("firstName")}
+                          {...loginForm.register("email")}
                         />
-                        {registerForm.formState.errors.firstName && (
-                          <p className="text-xs text-red-600">
-                            {registerForm.formState.errors.firstName.message}
+                        {loginForm.formState.errors.email && (
+                          <p className="text-sm text-red-600 flex items-center gap-1">
+                            {loginForm.formState.errors.email.message}
                           </p>
                         )}
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="register-lastName" className="text-sm font-medium">Last Name</Label>
+                        <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="login-password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter your password"
+                            className="h-11 pr-10 transition-all focus:ring-2 focus:ring-blue-500"
+                            {...loginForm.register("password")}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                        </div>
+                        {loginForm.formState.errors.password && (
+                          <p className="text-sm text-red-600">
+                            {loginForm.formState.errors.password.message}
+                          </p>
+                        )}
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="px-0 h-auto text-sm text-blue-600 hover:text-blue-700"
+                            onClick={() => navigate("/forgot-password")}
+                          >
+                            Forgot password?
+                          </Button>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+                        disabled={loginMutation.isPending}
+                      >
+                        {loginMutation.isPending ? (
+                          <span className="flex items-center gap-2">
+                            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Signing in...
+                          </span>
+                        ) : (
+                          "Sign In"
+                        )}
+                      </Button>
+                    </form>
+
+
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="register" className="mt-6">
+                <Card className="border-white/20 bg-white/95 backdrop-blur-xl shadow-2xl">
+                  <CardHeader className="space-y-1 pb-4">
+                    <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
+                    <CardDescription>
+                      Join thousands building credit through rent
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={registerForm.handleSubmit(onRegister)} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="register-firstName" className="text-sm font-medium">First Name</Label>
+                          <Input
+                            id="register-firstName"
+                            placeholder="John"
+                            className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
+                            {...registerForm.register("firstName")}
+                          />
+                          {registerForm.formState.errors.firstName && (
+                            <p className="text-xs text-red-600">
+                              {registerForm.formState.errors.firstName.message}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="register-lastName" className="text-sm font-medium">Last Name</Label>
+                          <Input
+                            id="register-lastName"
+                            placeholder="Doe"
+                            className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
+                            {...registerForm.register("lastName")}
+                          />
+                          {registerForm.formState.errors.lastName && (
+                            <p className="text-xs text-red-600">
+                              {registerForm.formState.errors.lastName.message}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="register-email" className="text-sm font-medium">Email</Label>
                         <Input
-                          id="register-lastName"
-                          placeholder="Doe"
+                          id="register-email"
+                          type="email"
+                          placeholder="you@example.com"
                           className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
-                          {...registerForm.register("lastName")}
+                          {...registerForm.register("email")}
                         />
-                        {registerForm.formState.errors.lastName && (
-                          <p className="text-xs text-red-600">
-                            {registerForm.formState.errors.lastName.message}
+                        {registerForm.formState.errors.email && (
+                          <p className="text-sm text-red-600">
+                            {registerForm.formState.errors.email.message}
                           </p>
                         )}
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="register-email" className="text-sm font-medium">Email</Label>
-                      <Input
-                        id="register-email"
-                        type="email"
-                        placeholder="you@example.com"
-                        className="h-11 transition-all focus:ring-2 focus:ring-blue-500"
-                        {...registerForm.register("email")}
-                      />
-                      {registerForm.formState.errors.email && (
-                        <p className="text-sm text-red-600">
-                          {registerForm.formState.errors.email.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="register-password" className="text-sm font-medium">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="register-password"
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Create a strong password"
-                          className="h-11 pr-10 transition-all focus:ring-2 focus:ring-blue-500"
-                          {...registerForm.register("password")}
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4 text-gray-400" />
-                          ) : (
-                            <Eye className="h-4 w-4 text-gray-400" />
-                          )}
-                        </Button>
+                      <div className="space-y-2">
+                        <Label htmlFor="register-password" className="text-sm font-medium">Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="register-password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Create a strong password"
+                            className="h-11 pr-10 transition-all focus:ring-2 focus:ring-blue-500"
+                            {...registerForm.register("password")}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-11 px-3 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                        </div>
+                        {registerForm.formState.errors.password && (
+                          <p className="text-sm text-red-600">
+                            {registerForm.formState.errors.password.message}
+                          </p>
+                        )}
+                        <PasswordStrength password={watchPassword} />
                       </div>
-                      {registerForm.formState.errors.password && (
-                        <p className="text-sm text-red-600">
-                          {registerForm.formState.errors.password.message}
-                        </p>
-                      )}
-                      <PasswordStrength password={watchPassword} />
-                    </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
-                      disabled={registerMutation.isPending}
-                    >
-                      {registerMutation.isPending ? (
-                        <span className="flex items-center gap-2">
-                          <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Creating account...
-                        </span>
-                      ) : (
-                        "Create Account"
-                      )}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                      <Button
+                        type="submit"
+                        className="w-full h-11 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+                        disabled={registerMutation.isPending}
+                      >
+                        {registerMutation.isPending ? (
+                          <span className="flex items-center gap-2">
+                            <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Creating account...
+                          </span>
+                        ) : (
+                          "Create Account"
+                        )}
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          )}
 
           {/* Landlord CTA */}
-          <Card className="border-white/20 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-xl">
+          <Card className="border-white/20 bg-slate-900/60 backdrop-blur-xl shadow-xl">
             <CardContent className="pt-6">
               <div className="text-center space-y-3">
                 <Building className="h-10 w-10 text-white mx-auto" />
@@ -401,7 +442,7 @@ export default function AuthPage() {
                 </p>
                 <Button
                   variant="outline"
-                  className="border-white/30 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+                  className="w-full border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm transition-all"
                   onClick={() => navigate("/landlord-login")}
                 >
                   Landlord Dashboard Access
@@ -411,18 +452,22 @@ export default function AuthPage() {
           </Card>
 
           {/* Footer */}
-          <div className="text-center">
+          <div className="text-center mt-8">
             <p className="text-xs text-white/60">
-              By signing up, you agree to our{" "}
-              <a href="/terms" className="text-white/80 hover:text-white underline">
+              © 2025 RentLedger. All rights reserved.{" "}
+              <a href="/privacy" className="text-white/80 hover:text-white underline ml-4">
+                Privacy Policy
+              </a>{" "}
+              <a href="/terms" className="text-white/80 hover:text-white underline ml-4">
                 Terms of Service
               </a>{" "}
-              and{" "}
-              <a href="/privacy" className="text-white/80 hover:text-white underline">
-                Privacy Policy
+              <a href="mailto:support@rentledger.co.uk" className="text-white/80 hover:text-white underline ml-4">
+                Support
               </a>
             </p>
           </div>
+
+
         </div>
       </div>
 

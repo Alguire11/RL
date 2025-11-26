@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { storage } from '../storage';
 import { emailService } from '../emailService';
+import { cleanupExpiredTokens } from './tokenCleanup';
 
 // Run every day at 9:00 AM
 export function startScheduler() {
@@ -65,5 +66,11 @@ export function startScheduler() {
         } catch (error) {
             console.error('Error in overdue payment check:', error);
         }
+    });
+
+    // Clean up expired email verification tokens (daily at midnight)
+    cron.schedule('0 0 * * *', async () => {
+        console.log('Running email verification token cleanup...');
+        await cleanupExpiredTokens();
     });
 }

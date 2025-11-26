@@ -26,6 +26,11 @@ import LandlordLogin from "@/pages/landlord-login";
 import LandlordSignup from "@/pages/landlord-signup";
 import ForgotPassword from "@/pages/forgot-password";
 import LandlordDashboard from "@/pages/landlord-dashboard";
+import LandlordProperties from "@/pages/landlord-properties";
+import LandlordTenants from "@/pages/landlord-tenants";
+import LandlordMaintenance from "@/pages/landlord-maintenance";
+import LandlordVerifications from "@/pages/landlord-verifications";
+import LandlordAnalytics from "@/pages/landlord-analytics";
 import LandlordVerification from "@/pages/landlord-verification";
 import LandlordVerify from "@/pages/landlord-verify";
 import OnboardingPage from "@/pages/onboarding";
@@ -39,6 +44,7 @@ import PublicPortfolio from "@/pages/public-portfolio";
 import Subscribe from "@/pages/subscribe";
 import SupportRequest from "@/pages/support-request";
 import MaintenancePage from "@/pages/maintenance";
+import VerifyEmail from "@/pages/verify-email";
 
 // Lazy load admin pages
 const AdminUsers = lazy(() => import("@/pages/admin-users"));
@@ -71,14 +77,25 @@ function Router() {
       {/* Public portfolio view route */}
       <Route path="/portfolio/:shareToken" component={PublicPortfolio} />
 
+      {/* Email verification route */}
+      <Route path="/verify-email/:token" component={VerifyEmail} />
+
       {/* Public landlord verification route */}
       <Route path="/landlord/verify/:token" component={LandlordVerify} />
 
       {/* Public routes - available when not authenticated */}
       <Route path="/auth" component={AuthPage} />
+      <Route path="/login" component={AuthPage} />
+      <Route path="/signup" component={AuthPage} />
       <Route path="/admin-login" component={AdminLogin} />
       <Route path="/landlord-login" component={LandlordLogin} />
       <Route path="/landlord-signup" component={LandlordSignup} />
+      <Route path="/landlord-dashboard" component={LandlordDashboard} />
+      <Route path="/landlord-properties" component={LandlordProperties} />
+      <Route path="/landlord-tenants" component={LandlordTenants} />
+      <Route path="/landlord-maintenance" component={LandlordMaintenance} />
+      <Route path="/landlord-verifications" component={LandlordVerifications} />
+      <Route path="/landlord-analytics" component={LandlordAnalytics} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/about" component={About} />
       <Route path="/privacy" component={Privacy} />

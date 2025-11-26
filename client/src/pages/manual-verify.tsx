@@ -76,38 +76,65 @@ export default function ManualVerify() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.propertyId || !formData.rentAmount || !formData.paymentDate || !formData.paymentReference || !formData.landlordEmail || !selectedFile) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields including landlord email, payment reference, and upload a receipt.",
-        variant: "destructive",
-      });
-      return;
+    // Validation based on mode
+    if (mode === "new") {
+      if (!formData.propertyId || !formData.rentAmount || !formData.paymentDate || !formData.paymentReference || !formData.landlordEmail || !selectedFile) {
+        toast({
+          title: "Missing Information",
+          description: "Please fill in all required fields including landlord email, payment reference, and upload a receipt.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // Existing payment mode
+      if (!selectedPaymentId || !formData.landlordEmail || !selectedFile) {
+        toast({
+          title: "Missing Information",
+          description: "Please select a payment, provide landlord email, and upload a receipt.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     try {
-      // Convert file to base64 for now (in production, upload to cloud storage)
+      // Convert file to base64
       const fileReader = new FileReader();
       fileReader.onloadend = async () => {
         const base64File = fileReader.result as string;
 
         try {
-          // Use the existing manual payment API
-          const response = await apiRequest("POST", "/api/manual-payments", {
-            propertyId: parseInt(formData.propertyId),
-            amount: parseFloat(formData.rentAmount),
-            paymentDate: formData.paymentDate,
-            paymentMethod: "manual_upload",
-            description: formData.paymentReference ? `Payment Reference: ${formData.paymentReference}` : "Rent payment",
-            receiptUrl: base64File,
-            landlordEmail: formData.landlordEmail,
-            landlordPhone: formData.landlordPhone,
-          });
+          if (mode === "existing") {
+            // Update existing payment with receipt
+            const response = await apiRequest("PATCH", `/api/payments/${selectedPaymentId}`, {
+              receiptUrl: base64File,
+              landlordEmail: formData.landlordEmail,
+              landlordPhone: formData.landlordPhone,
+              needsVerification: true,
+            });
 
-          if (!response.ok) {
-            throw new Error("Failed to submit rent proof");
+            if (!response.ok) {
+              throw new Error("Failed to upload receipt for existing payment");
+            }
+          } else {
+            // Create new manual payment
+            const response = await apiRequest("POST", "/api/manual-payments", {
+              propertyId: parseInt(formData.propertyId),
+              amount: parseFloat(formData.rentAmount),
+              paymentDate: formData.paymentDate,
+              paymentMethod: "manual_upload",
+              description: formData.paymentReference ? `Payment Reference: ${formData.paymentReference}` : "Rent payment",
+              receiptUrl: base64File,
+              landlordEmail: formData.landlordEmail,
+              landlordPhone: formData.landlordPhone,
+            });
+
+            if (!response.ok) {
+              throw new Error("Failed to submit rent proof");
+            }
           }
 
           queryClient.invalidateQueries({ queryKey: ["/api/manual-payments"] });
@@ -131,6 +158,7 @@ export default function ManualVerify() {
             landlordPhone: "",
           });
           setSelectedFile(null);
+          setSelectedPaymentId("");
 
           // Redirect to credit builder after a short delay
           setTimeout(() => {
@@ -264,6 +292,43 @@ export default function ManualVerify() {
                   )}
                 </div>
               )}
+
+              {/* Landlord Contact Section - Show for BOTH new and existing payments */}
+              <div className="border-t pt-4 space-y-4">
+                <h4 className="text-sm font-medium">Landlord Contact (For Verification)</h4>
+
+                {/* Landlord Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="landlordEmail">
+                    Landlord Email <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="landlordEmail"
+                    type="email"
+                    placeholder="landlord@example.com"
+                    value={formData.landlordEmail}
+                    onChange={(e) => setFormData({ ...formData, landlordEmail: e.target.value })}
+                    required
+                  />
+                  <p className="text-xs text-gray-500">
+                    We'll send a verification request to your landlord to confirm this payment
+                  </p>
+                </div>
+
+                {/* Landlord Phone */}
+                <div className="space-y-2">
+                  <Label htmlFor="landlordPhone">
+                    Landlord Phone <span className="text-gray-400 text-xs">(Optional)</span>
+                  </Label>
+                  <Input
+                    id="landlordPhone"
+                    type="tel"
+                    placeholder="+44 7XXX XXXXXX"
+                    value={formData.landlordPhone}
+                    onChange={(e) => setFormData({ ...formData, landlordPhone: e.target.value })}
+                  />
+                </div>
+              </div>
 
               {/* Only show new payment fields if mode is "new" */}
               {mode === "new" && (

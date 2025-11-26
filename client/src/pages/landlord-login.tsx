@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Building, Eye, EyeOff, ArrowLeft, Home } from "lucide-react";
+import { Footer } from "@/components/footer";
+import { Logo } from "@/components/logo";
+import { queryClient } from "@/lib/queryClient";
 
 export default function LandlordLogin() {
   const [, setLocation] = useLocation();
@@ -18,17 +21,38 @@ export default function LandlordLogin() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch CSRF token on component mount
+  useEffect(() => {
+    fetch('/api/csrf-token', { credentials: 'include' })
+      .then(res => res.json())
+      .catch(err => console.error('Failed to fetch CSRF token:', err));
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
     try {
+      // Get CSRF token from cookie
+      const getCookie = (name: string) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop()?.split(';').shift();
+      };
+
+      const csrfToken = getCookie('XSRF-TOKEN');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (csrfToken) {
+        headers['X-XSRF-TOKEN'] = csrfToken;
+      }
+
       const response = await fetch('/api/landlord/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
           email: formData.email,
@@ -45,29 +69,41 @@ export default function LandlordLogin() {
 
       toast({
         title: "Login Successful",
-        description: `Welcome to the Landlord Dashboard, ${user.firstName || 'Landlord'}!`,
+        description: `Welcome to the Landlord Dashboard, ${user.businessName || user.firstName || 'Landlord'}!`,
       });
 
-      if (user.role === 'landlord') {
-        setLocation('/landlord-dashboard');
-      } else if (user.role === 'admin') {
-        setLocation('/admin');
-      } else {
-        setLocation('/dashboard');
-      }
+      // Invalidate user query to refresh auth state
+      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+
+      // Small delay to ensure session is established
+      setTimeout(() => {
+        if (user.role === 'landlord') {
+          setLocation('/landlord-dashboard');
+        } else if (user.role === 'admin') {
+          setLocation('/admin');
+        } else {
+          setLocation('/dashboard');
+        }
+      }, 100);
     } catch (err: any) {
-      setError(err.message || 'Invalid credentials');
+      const errorMessage = err.message || 'Invalid credentials';
+      setError(errorMessage);
+      toast({
+        title: "Login Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
       {/* Animated background elements */}
       <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-20 left-10 w-64 h-64 bg-purple-400 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
-        <div className="absolute top-40 right-10 w-64 h-64 bg-pink-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
+        <div className="absolute top-20 left-10 w-64 h-64 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
+        <div className="absolute top-40 right-10 w-64 h-64 bg-cyan-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
         <div className="absolute bottom-20 left-1/2 w-64 h-64 bg-indigo-400 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000" />
       </div>
 
@@ -76,20 +112,20 @@ export default function LandlordLogin() {
           {/* Back Button */}
           <Button
             variant="ghost"
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/login")}
             className="text-white/90 hover:text-white hover:bg-white/10 backdrop-blur-sm"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
+            Back to Tenant Login
           </Button>
 
           {/* Header */}
           <div className="text-center space-y-4">
             <div className="flex justify-center">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur-xl opacity-75" />
-                <div className="relative bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20">
-                  <Building className="h-12 w-12 text-white" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur-xl opacity-75" />
+                <div className="relative bg-white/10 backdrop-blur-xl p-4 rounded-2xl border border-white/20">
+                  <Logo className="text-white w-32 h-12" />
                 </div>
               </div>
             </div>
@@ -100,11 +136,6 @@ export default function LandlordLogin() {
               <p className="text-white/70 text-lg">
                 Manage properties, tenants, and verifications
               </p>
-            </div>
-
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-              <Home className="h-4 w-4 text-white/70" />
-              <span className="text-white/70 text-sm">Property Management Portal</span>
             </div>
           </div>
 
@@ -179,7 +210,7 @@ export default function LandlordLogin() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium shadow-lg hover:shadow-xl transition-all"
                   disabled={isLoading}
                   data-testid="button-landlord-login"
                 >
@@ -210,32 +241,21 @@ export default function LandlordLogin() {
             </CardContent>
           </Card>
 
-          {/* Alternative Access */}
-          <Card className="border-white/20 bg-gradient-to-r from-blue-500/10 to-purple-500/10 backdrop-blur-xl">
-            <CardContent className="pt-6 space-y-3">
-              <div className="text-center">
-                <p className="text-sm font-medium text-white mb-3">Alternative Access</p>
-
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setLocation('/admin-login')}
-                    className="w-full border-white/30 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
-                  >
-                    Admin Login
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    onClick={() => setLocation('/auth')}
-                    className="w-full border-white/30 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
-                  >
-                    Tenant Sign Up/Login
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Footer */}
+          <div className="text-center mt-8">
+            <p className="text-xs text-white/60">
+              © 2025 RentLedger. All rights reserved.{" "}
+              <a href="/privacy" className="text-white/80 hover:text-white underline ml-4">
+                Privacy Policy
+              </a>{" "}
+              <a href="/terms" className="text-white/80 hover:text-white underline ml-4">
+                Terms of Service
+              </a>{" "}
+              <a href="mailto:support@rentledger.co.uk" className="text-white/80 hover:text-white underline ml-4">
+                Support
+              </a>
+            </p>
+          </div>
         </div>
       </div>
 

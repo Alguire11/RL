@@ -19,14 +19,14 @@ export default function Landing() {
   const handleGetStarted = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => {
-      window.location.href = "/auth";
+      setLocation("/signup");
     }, 300);
   };
 
   const handleSignIn = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
     setTimeout(() => {
-      window.location.href = "/auth";
+      setLocation("/login");
     }, 300);
   };
 
@@ -346,7 +346,7 @@ export default function Landing() {
                   <Button
                     variant="outline"
                     className="w-full mt-6"
-                    onClick={() => setLocation('/auth')}
+                    onClick={() => setLocation('/signup')}
                   >
                     Get Started
                   </Button>
@@ -385,7 +385,7 @@ export default function Landing() {
                   </ul>
                   <GradientButton
                     className="w-full mt-6"
-                    onClick={() => setLocation('/auth')}
+                    onClick={() => setLocation('/signup')}
                   >
                     Start Free Trial
                   </GradientButton>

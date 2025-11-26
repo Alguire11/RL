@@ -55,20 +55,32 @@ const CheckoutForm = ({ selectedPlan }: { selectedPlan: 'standard' | 'premium' }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement options={{
-        layout: 'tabs',
-        wallets: {
-          applePay: 'auto',
-          googlePay: 'auto',
-        }
-      }} />
+      <div className="bg-white rounded-lg">
+        <PaymentElement options={{
+          layout: 'tabs',
+          wallets: {
+            applePay: 'auto',
+            googlePay: 'auto',
+          }
+        }} />
+      </div>
       <Button
         type="submit"
         disabled={!stripe || isProcessing}
-        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold text-lg py-6"
+        className="w-full bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white font-bold text-lg py-7 shadow-lg hover:shadow-xl transition-all duration-300"
         data-testid="button-confirm-payment"
       >
-        {isProcessing ? 'Processing...' : `Subscribe to ${selectedPlan === 'premium' ? 'Premium' : 'Standard'}`}
+        {isProcessing ? (
+          <span className="flex items-center justify-center">
+            <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3" />
+            Processing Payment...
+          </span>
+        ) : (
+          <span className="flex items-center justify-center">
+            <Sparkles className="h-5 w-5 mr-2" />
+            Subscribe to {selectedPlan === 'premium' ? 'Premium' : 'Standard'}
+          </span>
+        )}
       </Button>
     </form>
   );
@@ -258,32 +270,43 @@ export default function Subscribe() {
     const plan = plans.find(p => p.name.toLowerCase() === selectedPlan);
 
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <Button variant="ghost" onClick={() => setShowCheckout(false)} className="mb-6" data-testid="button-back-to-plans">
-            ← Back to Plans
+          <Button
+            variant="ghost"
+            onClick={() => setShowCheckout(false)}
+            className="mb-6 hover:bg-white/50"
+            data-testid="button-back-to-plans"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Plans
           </Button>
 
-          <Card className="border-0 shadow-xl">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50">
-              <CardTitle className="text-2xl flex items-center">
-                <Sparkles className="h-6 w-6 mr-2 text-purple-600" />
+          <Card className="border-0 shadow-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white py-8">
+              <div className="flex items-center justify-center mb-4">
+                <div className={`w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center`}>
+                  {plan?.icon && <plan.icon className="h-8 w-8 text-white" />}
+                </div>
+              </div>
+              <CardTitle className="text-3xl text-center font-bold flex items-center justify-center">
+                <Sparkles className="h-7 w-7 mr-3" />
                 Complete Your Subscription
               </CardTitle>
-              <CardDescription>
-                Subscribe to {plan?.name} - {plan?.price}/month
+              <CardDescription className="text-center text-white/90 text-lg mt-2">
+                Subscribe to {plan?.name} - {plan?.price}{plan?.period}
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-8 bg-white">
               <Elements stripe={stripePromise} options={{ clientSecret }}>
                 <CheckoutForm selectedPlan={selectedPlan as 'standard' | 'premium'} />
               </Elements>
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
                 <div className="flex items-start">
-                  <Shield className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
+                  <Shield className="h-6 w-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-semibold text-blue-900">Secure Payment</p>
-                    <p className="text-xs text-blue-700">Your payment information is encrypted and secure. Supports Apple Pay, Google Pay, and all major cards.</p>
+                    <p className="text-sm font-semibold text-gray-900 mb-1">Secure Payment</p>
+                    <p className="text-xs text-gray-600">Your payment information is encrypted and secure. Supports Apple Pay, Google Pay, and all major cards.</p>
                   </div>
                 </div>
               </div>
