@@ -99,6 +99,9 @@ import {
   emailEvents,
   type EmailEvent,
   type InsertEmailEvent,
+  rentScoreHistory,
+  type RentScoreHistory,
+  type InsertRentScoreHistory,
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
@@ -340,6 +343,10 @@ export interface IStorage {
     limit?: number;
   }): Promise<SecurityLog[]>;
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+
+  // Rent Score History
+  createRentScoreSnapshot(userId: string, score: number): Promise<RentScoreHistory>;
+  getRentScoreHistory(userId: string): Promise<RentScoreHistory[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1047,6 +1054,38 @@ export class DatabaseStorage implements IStorage {
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
     const [newLog] = await db.insert(auditLogs).values(log).returning();
     return newLog;
+  }
+
+  // Rent Score History
+  async createRentScoreSnapshot(userId: string, score: number): Promise<RentScoreHistory> {
+    // Get the last recorded score to calculate change
+    const [lastRecord] = await db
+      .select()
+      .from(rentScoreHistory)
+      .where(eq(rentScoreHistory.userId, userId))
+      .orderBy(desc(rentScoreHistory.recordedAt))
+      .limit(1);
+
+    const change = lastRecord ? score - lastRecord.score : 0;
+
+    const [snapshot] = await db
+      .insert(rentScoreHistory)
+      .values({
+        userId,
+        score,
+        change,
+        recordedAt: new Date()
+      })
+      .returning();
+    return snapshot;
+  }
+
+  async getRentScoreHistory(userId: string): Promise<RentScoreHistory[]> {
+    return await db
+      .select()
+      .from(rentScoreHistory)
+      .where(eq(rentScoreHistory.userId, userId))
+      .orderBy(asc(rentScoreHistory.recordedAt));
   }
 
   // Maintenance request operations

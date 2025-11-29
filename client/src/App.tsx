@@ -160,12 +160,8 @@ function Router() {
       <Route path="/report-generator" component={ReportGenerator} />
       <Route path="/portfolio" component={Portfolio} />
 
-      {/* Root route - conditional based on auth */}
-      {!isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : (
-        <Route path="/" component={Dashboard} />
-      )}
+      {/* Root route - always show landing page, dashboard is at /dashboard */}
+      <Route path="/" component={Landing} />
       <Route path="/maintenance" component={MaintenancePage} />
       <Route path="/disputes" component={() => (
         <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>

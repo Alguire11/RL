@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling, Play, HelpCircle, Shield, Award, CreditCard } from "lucide-react";
+import { CheckCircle, Calendar, TrendingUp, Plus, FileText, Share2, PoundSterling, Play, HelpCircle, Shield, Award, CreditCard, History, Clock } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { ManualPaymentList } from "@/components/manual-payment-form";
 import { PaymentStreakCard } from "@/components/payment-streak-card";
@@ -26,6 +26,7 @@ import { PropertyForm } from "@/components/property-form";
 import { Footer } from "@/components/footer";
 import type { DashboardStats } from "@shared/dashboard";
 import type { ApiProperty, RentPayment } from "@/types/api";
+import type { CreditReport } from "@shared/schema";
 import { getQueryFn } from "@/lib/queryClient";
 
 import { PaymentHistoryDialog } from "@/components/payment-history-dialog";
@@ -75,6 +76,13 @@ export default function Dashboard() {
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     staleTime: 30000, // Consider data stale after 30 seconds
+  });
+
+  // Fetch reports for snapshot
+  const { data: reports = [], isLoading: reportsLoading } = useQuery<CreditReport[]>({
+    queryKey: ["/api/reports"],
+    retry: false,
+    enabled: isAuthenticated,
   });
 
   useEffect(() => {
@@ -288,7 +296,7 @@ export default function Dashboard() {
               Take Tour
             </Button>
             <Button
-              onClick={() => handleInternalNavigation('/report-generator')}
+              onClick={() => handleInternalNavigation('/reports')}
               className="hidden sm:flex items-center bg-blue-600 hover:bg-blue-700 text-white"
             >
               <FileText className="mr-2 h-4 w-4" />
@@ -478,6 +486,89 @@ export default function Dashboard() {
 
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-2 gap-8">
+          {/* Report Snapshot */}
+          <Card className="report-snapshot">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-xl font-semibold flex items-center">
+                <FileText className="h-5 w-5 mr-2 text-blue-600" />
+                Report Snapshot
+              </CardTitle>
+              <Button 
+                size="sm" 
+                className="bg-blue-600 hover:bg-blue-700 text-white" 
+                onClick={() => handleInternalNavigation('/reports')}
+              >
+                View All
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {reportsLoading ? (
+                <div className="space-y-4">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="animate-pulse p-4 bg-gray-50 rounded-lg">
+                      <div className="h-4 bg-gray-300 rounded w-32 mb-2"></div>
+                      <div className="h-3 bg-gray-300 rounded w-24"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : reports.length > 0 ? (
+                <div className="space-y-4">
+                  {reports.slice(0, 3).map((report) => (
+                    <div
+                      key={report.id}
+                      className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer"
+                      onClick={() => handleInternalNavigation('/reports')}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          <p className="font-medium text-sm">
+                            {report.generatedAt 
+                              ? format(new Date(report.generatedAt), 'dd MMM yyyy')
+                              : 'Pending'}
+                          </p>
+                        </div>
+                        <Badge 
+                          variant={report.isActive ? 'default' : 'secondary'}
+                          className={report.isActive ? 'bg-green-100 text-green-800' : ''}
+                        >
+                          {report.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-4 text-xs text-gray-600">
+                        <span className="flex items-center">
+                          <Clock className="h-3 w-3 mr-1" />
+                          ID: {report.verificationId?.slice(0, 8) || 'N/A'}
+                        </span>
+                        {report.shareCount > 0 && (
+                          <span className="flex items-center">
+                            <Share2 className="h-3 w-3 mr-1" />
+                            {report.shareCount} share{report.shareCount !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>No reports yet</p>
+                  <p className="text-sm mb-4">Generate your first report to get started</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleInternalNavigation('/report-generator')}
+                    className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Generate Report
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Payment History */}
           <Card className="payment-history">
             <CardHeader className="flex flex-row items-center justify-between">

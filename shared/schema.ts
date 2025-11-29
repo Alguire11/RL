@@ -414,6 +414,18 @@ export const paymentStreaks = pgTable("payment_streaks", {
   lastUpdateAt: timestamp("last_update_at").defaultNow(),
 });
 
+// Rent score history for tracking credit builder progress
+export const rentScoreHistory = pgTable("rent_score_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  score: integer("score").notNull(),
+  change: integer("change").default(0), // Change from previous record
+  recordedAt: timestamp("recorded_at").defaultNow(),
+}, (table) => [
+  index("IDX_rent_score_history_user_id").on(table.userId),
+  index("IDX_rent_score_history_recorded_at").on(table.recordedAt)
+]);
+
 // Enhanced report shares with more options
 export const enhancedReportShares = pgTable("enhanced_report_shares", {
   id: serial("id").primaryKey(),
@@ -437,6 +449,8 @@ export type ManualPayment = typeof manualPayments.$inferSelect;
 export type InsertManualPayment = typeof manualPayments.$inferInsert;
 export type PaymentStreak = typeof paymentStreaks.$inferSelect;
 export type InsertPaymentStreak = typeof paymentStreaks.$inferInsert;
+export type RentScoreHistory = typeof rentScoreHistory.$inferSelect;
+export type InsertRentScoreHistory = typeof rentScoreHistory.$inferInsert;
 export type EnhancedReportShare = typeof enhancedReportShares.$inferSelect;
 export type InsertEnhancedReportShare = typeof enhancedReportShares.$inferInsert;
 export type UserBadge = typeof userBadges.$inferSelect;

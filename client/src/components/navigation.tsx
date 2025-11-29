@@ -94,36 +94,19 @@ export function Navigation() {
               );
             })}
 
-            {/* Reports Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${location === '/report-generator' || location === '/reports'
-                      ? "text-blue-600 bg-blue-50"
-                      : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                    }`}
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>Reports</span>
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/report-generator">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    <span>Generate New Report</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/reports">
-                    <History className="mr-2 h-4 w-4" />
-                    <span>My Report History</span>
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Reports Link - Direct to Reports Page */}
+            <Link href="/reports">
+              <Button
+                variant="ghost"
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${location === '/reports'
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                  }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Reports</span>
+              </Button>
+            </Link>
           </div>
 
           {/* User Menu */}

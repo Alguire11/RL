@@ -16,10 +16,11 @@ const stripePromise = import.meta.env.VITE_STRIPE_PUBLIC_KEY
   ? loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY)
   : null;
 
-const CheckoutForm = ({ selectedPlan }: { selectedPlan: 'standard' | 'premium' }) => {
+const CheckoutForm = ({ selectedPlan, userRole }: { selectedPlan: 'standard' | 'premium'; userRole?: string }) => {
   const stripe = useStripe();
   const elements = useElements();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,11 +32,17 @@ const CheckoutForm = ({ selectedPlan }: { selectedPlan: 'standard' | 'premium' }
 
     setIsProcessing(true);
 
-    const { error } = await stripe.confirmPayment({
+    // Determine return URL based on user role
+    const returnUrl = userRole === 'landlord' 
+      ? window.location.origin + "/landlord-dashboard"
+      : window.location.origin + "/dashboard";
+
+    const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: window.location.origin + "/landlord-dashboard",
+        return_url: returnUrl,
       },
+      redirect: 'if_required', // Don't redirect if payment succeeds immediately
     });
 
     if (error) {
@@ -45,11 +52,45 @@ const CheckoutForm = ({ selectedPlan }: { selectedPlan: 'standard' | 'premium' }
         variant: "destructive",
       });
       setIsProcessing(false);
+    } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      // Payment succeeded immediately, activate subscription
+      try {
+        const { apiRequest } = await import("@/lib/queryClient");
+        await apiRequest("POST", "/api/confirm-payment", {
+          paymentIntentId: paymentIntent.id,
+          plan: selectedPlan
+        });
+
+        toast({
+          title: "Payment Successful",
+          description: "Welcome to " + (selectedPlan === 'premium' ? 'Premium' : 'Standard') + "! Your subscription is now active.",
+        });
+        
+        // Invalidate queries to refresh subscription status
+        const { queryClient } = await import("@/lib/queryClient");
+        queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/landlord/gold-status"] });
+        
+        // Navigate to appropriate dashboard after a short delay
+        setTimeout(() => {
+          setLocation(userRole === 'landlord' ? '/landlord-dashboard' : '/dashboard');
+        }, 1500);
+      } catch (err) {
+        console.error("Error activating subscription:", err);
+        toast({
+          title: "Payment Successful",
+          description: "Your payment was processed. Please refresh the page to see your updated subscription.",
+        });
+        setTimeout(() => {
+          setLocation(userRole === 'landlord' ? '/landlord-dashboard' : '/dashboard');
+        }, 1500);
+      }
+      setIsProcessing(false);
     } else {
-      toast({
-        title: "Payment Successful",
-        description: "Welcome to " + (selectedPlan === 'premium' ? 'Premium' : 'Standard') + "!",
-      });
+      // Payment requires redirect (3D Secure, etc.)
+      // Stripe will handle the redirect
+      setIsProcessing(false);
     }
   };
 
@@ -246,7 +287,7 @@ export default function Subscribe() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Button
             variant="ghost"
-            onClick={() => setLocation('/dashboard')}
+            onClick={() => setLocation(isLandlord ? '/landlord-dashboard' : '/dashboard')}
             className="mb-6"
             data-testid="button-back-to-dashboard"
           >
@@ -299,7 +340,7 @@ export default function Subscribe() {
             </CardHeader>
             <CardContent className="p-8 bg-white">
               <Elements stripe={stripePromise} options={{ clientSecret }}>
-                <CheckoutForm selectedPlan={selectedPlan as 'standard' | 'premium'} />
+                <CheckoutForm selectedPlan={selectedPlan as 'standard' | 'premium'} userRole={user?.role} />
               </Elements>
               <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
                 <div className="flex items-start">
@@ -326,7 +367,7 @@ export default function Subscribe() {
             <Logo className="text-white scale-110" />
             <Button
               variant="outline"
-              onClick={() => setLocation('/dashboard')}
+              onClick={() => setLocation(isLandlord ? '/landlord-dashboard' : '/dashboard')}
               className="text-white border-white/30 bg-white/10 hover:bg-white/20 hover:text-white hover:border-white/50 transition-all"
               data-testid="button-back-to-dashboard"
             >

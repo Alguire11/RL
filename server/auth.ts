@@ -137,6 +137,8 @@ export function setupAuth(app: Express) {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
         const verificationUrl = `${req.protocol}://${req.get('host')}/verify-email/${verificationToken}`;
 
+        console.log('📧 Creating email verification token for:', user.email);
+
         await storage.createEmailVerificationToken({
           userId: user.id,
           token: verificationToken,
@@ -144,14 +146,24 @@ export function setupAuth(app: Express) {
           used: false,
         });
 
-        await emailService.sendEmailVerification(
+        console.log('📧 Sending verification email to:', user.email);
+        console.log('📧 Verification URL:', verificationUrl);
+
+        const emailResult = await emailService.sendEmailVerification(
           user.email,
           `${user.firstName} ${user.lastName}`,
           verificationUrl
         );
-      } catch (emailError) {
+
+        if (emailResult.success) {
+          console.log('✅ Verification email sent successfully to:', user.email);
+        } else {
+          console.error('❌ Failed to send verification email:', emailResult.error);
+        }
+      } catch (emailError: any) {
         // Log but don't fail registration if email fails
-        console.error('Failed to send verification email:', emailError);
+        console.error('❌ Email verification error:', emailError);
+        console.error('❌ Error details:', emailError.message || emailError);
       }
 
       // Don't log user in automatically - they need to verify email first

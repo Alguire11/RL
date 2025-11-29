@@ -1,13 +1,13 @@
-import { MailerSend, EmailParams, Sender, Recipient } from "mailersend";
+import { Resend } from 'resend';
 
-const API_KEY = process.env.MAILERSEND_API_KEY;
+// Use Resend API Key from environment
+const API_KEY = process.env.RESEND_API_KEY;
 
 // Using verified myrentledger.co.uk domain
-const FROM_EMAIL = process.env.MAILERSEND_FROM_EMAIL || 'noreply@myrentledger.co.uk';
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'info@myrentledger.co.uk';
+const FROM_NAME = 'RentLedger';
 
-const mailerSend = API_KEY ? new MailerSend({
-  apiKey: API_KEY,
-}) : null;
+const resend = API_KEY ? new Resend(API_KEY) : null;
 
 interface SendEmailParams {
   to: string;
@@ -17,31 +17,54 @@ interface SendEmailParams {
   html?: string;
   fromName?: string;
   toName?: string;
+  replyTo?: string;
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; error?: string }> {
-  if (!API_KEY || !mailerSend) {
-    const message = `Email service not configured - MAILERSEND_API_KEY is missing. Would have sent to ${params.to}`;
+  if (!API_KEY || !resend) {
+    const message = `Email service not configured - RESEND_API_KEY is missing. Would have sent to ${params.to}`;
     console.warn(`⚠️  ${message}`);
     return { success: false, error: message };
   }
 
   try {
-    const sentFrom = new Sender(params.from, params.fromName || "RentLedger");
-    const recipients = [new Recipient(params.to, params.toName || "")];
+    // Resend uses a simpler API structure
+    const emailData: any = {
+      from: `${params.fromName || FROM_NAME} <${params.from}>`,
+      to: [params.to],
+      subject: params.subject,
+    };
 
-    const emailParams = new EmailParams()
-      .setFrom(sentFrom)
-      .setTo(recipients)
-      .setSubject(params.subject)
-      .setHtml(params.html || params.text || "")
-      .setText(params.text || "");
+    // Add reply-to if provided
+    if (params.replyTo) {
+      emailData.reply_to = params.replyTo;
+    }
 
-    await mailerSend.email.send(emailParams);
-    console.log(`✅ Email sent successfully to ${params.to}`);
+    // Set content - HTML takes priority, fallback to text
+    if (params.html) {
+      emailData.html = params.html;
+    }
+    if (params.text) {
+      emailData.text = params.text;
+    }
+
+    // Send the email using Resend
+    const { data, error } = await resend.emails.send(emailData);
+
+    if (error) {
+      console.error(`❌ Resend email error:`, error);
+      console.error(`   To: ${params.to}`);
+      console.error(`   Subject: ${params.subject}`);
+      return { success: false, error: error.message || "Unknown error" };
+    }
+
+    console.log(`✅ Email sent successfully to ${params.to} - Subject: "${params.subject}"`);
+    console.log(`   Email ID: ${data?.id}`);
     return { success: true };
   } catch (error: any) {
-    console.error(`❌ MailerSend email error:`, error);
+    console.error(`❌ Resend email error:`, error);
+    console.error(`   To: ${params.to}`);
+    console.error(`   Subject: ${params.subject}`);
     return { success: false, error: error.message || "Unknown error" };
   }
 }

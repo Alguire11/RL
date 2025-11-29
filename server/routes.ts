@@ -18,11 +18,16 @@ import {
   insertTenantInvitationSchema,
   insertUserSchema,
   insertMaintenanceRequestSchema,
+  rentLogs,
 } from "@shared/schema";
 import { nanoid } from "nanoid";
+import { generateLedgerPDF } from "./ledgerPdfGenerator";
+import { format } from "date-fns";
 import { hashPassword } from "./passwords";
 import { registerSubscriptionRoutes } from "./subscriptionRoutes";
 import { getSubscriptionLimits, normalizePlanName, requireSubscription } from "./middleware/subscription";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Helper function to generate unique RLID (RentLedger ID)
 
@@ -39,29 +44,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // and send it back in the X-XSRF-TOKEN header.
   const csrfProtection = csurf();
 
+  // Generate CSRF token for all requests and set in cookie
   app.use((req, res, next) => {
-    // Skip CSRF for webhook endpoints if any (e.g. Stripe)
-    if (req.path.startsWith('/api/webhooks')) {
+    // Skip CSRF validation for excluded paths
+    const shouldSkipValidation = req.path.startsWith('/api/webhooks') ||
+      req.path === '/api/login' ||
+      req.path === '/api/admin-login' ||
+      req.path === '/api/landlord/login' ||
+      req.path === '/api/register' ||
+      req.path === '/api/csrf-token';
+
+    if (shouldSkipValidation) {
+      // Skip CSRF validation for auth endpoints
       return next();
     }
-    csrfProtection(req, res, next);
+
+    // Apply full CSRF protection for other routes
+    csrfProtection(req, res, () => {
+      if (req.csrfToken) {
+        const token = req.csrfToken();
+        res.cookie('XSRF-TOKEN', token, {
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+          httpOnly: false, // Must be readable by JavaScript
+        });
+        res.locals.csrfToken = token;
+      }
+      next();
+    });
   });
 
-  app.use((req, res, next) => {
-    if (req.csrfToken) {
-      const token = req.csrfToken();
-      res.cookie('XSRF-TOKEN', token, {
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
-      });
-      res.locals.csrfToken = token;
-    }
-    next();
-  });
-
-  // Endpoint to get CSRF token explicitly  // CSRF token endpoint
+  // Endpoint to get CSRF token explicitly (excluded from CSRF protection)
   app.get('/api/csrf-token', (req, res) => {
-    res.json({ csrfToken: req.csrfToken?.() || '' });
+    try {
+      // Generate token using csurf - create a middleware instance that only generates
+      const tokenGenerator = csurf({ ignoreMethods: ['GET', 'HEAD', 'OPTIONS'] });
+      tokenGenerator(req, res, () => {
+        const token = req.csrfToken ? req.csrfToken() : '';
+        res.cookie('XSRF-TOKEN', token, {
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+          httpOnly: false, // Must be readable by JavaScript
+        });
+        res.json({ csrfToken: token });
+      });
+    } catch (error) {
+      // If CSRF token generation fails, return empty string
+      console.error('CSRF token generation error:', error);
+      res.json({ csrfToken: '' });
+    }
   });
 
   // Email verification endpoint
@@ -278,10 +309,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const stats = await storage.getUserStats(userId);
+
+      // Rent Score Persistence: Save daily snapshot
+      try {
+        // Check if we already have a snapshot for today to avoid duplicates
+        // We can do this by checking the last record's date
+        const history = await storage.getRentScoreHistory(userId);
+        const today = new Date().toDateString();
+        const lastRecord = history[history.length - 1];
+
+        if (!lastRecord || new Date(lastRecord.recordedAt!).toDateString() !== today) {
+          await storage.createRentScoreSnapshot(userId, stats.creditScore);
+        }
+      } catch (err) {
+        console.error('Failed to persist rent score:', err);
+        // Don't fail the request if persistence fails
+      }
+
       res.json(stats);
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       res.status(500).json({ message: 'Failed to fetch dashboard stats' });
+    }
+  });
+
+  // Rent Score History Route
+  app.get('/api/rent-score/history', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const history = await storage.getRentScoreHistory(userId);
+      res.json(history);
+    } catch (error) {
+      console.error('Error fetching rent score history:', error);
+      res.status(500).json({ message: 'Failed to fetch rent score history' });
     }
   });
 
@@ -834,7 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/payments', requireAuth, requireEmailVerification, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const paymentData = insertRentPaymentSchema.parse({ ...req.body, userId });
+      const paymentData = insertRentPaymentSchema.parse({ ...req.body, userId, isVerified: false });
 
       const payment = await storage.createRentPayment(paymentData);
 
@@ -1127,39 +1187,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Gold Landlord Status
   app.get('/api/landlord/gold-status', requireAuth, requireLandlord, async (req: any, res) => {
     try {
-      const landlordId = req.user.username;
+      const landlordId = req.user.id;
 
-      // Get all verification requests for this landlord
-      const verificationRequests = await storage.getLandlordPendingRequests(landlordId);
+      // Get all rent logs for this landlord from the rentLogs table
+      const allRentLogs = await db.select().from(rentLogs)
+        .where(eq(rentLogs.landlordId, landlordId));
 
-      // Calculate verification rate
-      const totalRequests = verificationRequests.length;
-      const approvedRequests = verificationRequests.filter((r: any) => r.status === 'verified').length;
-      const verificationRate = totalRequests > 0 ? (approvedRequests / totalRequests) * 100 : 0;
+      // Calculate verification metrics from rent logs
+      const totalRentLogs = allRentLogs.length;
+      const verifiedRentLogs = allRentLogs.filter(log => log.verified === true);
+      const verifiedCount = verifiedRentLogs.length;
+
+      // Calculate verification rate: (verifiedCount / totalCount) * 100
+      const verificationRate = totalRentLogs > 0 ? (verifiedCount / totalRentLogs) * 100 : 0;
 
       // Get tenant satisfaction (placeholder - would need tenant reviews/ratings table)
       // For now, use a mock value or calculate from tenant feedback if available
       const tenantSatisfaction = 4.5; // TODO: Implement actual tenant satisfaction calculation
 
       // Check if landlord has paid subscription
-      const subscription = req.user.subscription;
-      const isPaidMember = subscription && subscription.status === 'active' && subscription.plan !== 'free';
+      // Use subscriptionPlan and subscriptionStatus fields from user object
+      const subscriptionPlan = req.user.subscriptionPlan || 'free';
+      const subscriptionStatus = req.user.subscriptionStatus || 'active';
+      const isPaidMember = subscriptionPlan !== 'free' && subscriptionStatus === 'active';
 
       // Gold Landlord criteria:
-      // 1. Paid subscription
+      // 1. Paid subscription (subscriptionPlan !== 'free' AND subscriptionStatus === 'active')
       // 2. 85%+ verification rate
       // 3. 4.5/5+ tenant satisfaction
       // 4. 8+ total verifications
       const isGold = isPaidMember &&
         verificationRate >= 85 &&
         tenantSatisfaction >= 4.5 &&
-        approvedRequests >= 8;
+        verifiedCount >= 8;
+
+      // Log for debugging
+      console.log('Gold Landlord Status Check:', {
+        landlordId,
+        subscriptionPlan,
+        subscriptionStatus,
+        isPaidMember,
+        verificationRate,
+        verifiedCount,
+        isGold
+      });
 
       res.json({
-        isGold,
+        isGold: isGold || false, // Ensure it's always a boolean
         verificationRate: Math.round(verificationRate * 10) / 10,
         tenantSatisfaction,
-        totalVerifications: approvedRequests,
+        totalVerifications: verifiedCount,
         isPaidMember
       });
     } catch (error) {
@@ -1854,6 +1931,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching reviews:", error);
       res.status(500).json({ message: "Failed to fetch reviews" });
+    }
+  });
+
+  // Export Rent Ledger PDF
+  app.get('/api/export-ledger/:tenantId', requireAuth, async (req: any, res) => {
+    try {
+      const tenantId = req.params.tenantId;
+      const requesterId = req.user.id;
+      const requesterRole = req.user.role;
+
+      // Authorization check
+      let isAuthorized = false;
+
+      // 1. Self-access
+      if (requesterId === tenantId) {
+        isAuthorized = true;
+      }
+      // 2. Admin access
+      else if (requesterRole === 'admin') {
+        isAuthorized = true;
+      }
+      // 3. Landlord access (must be linked)
+      else if (requesterRole === 'landlord') {
+        const links = await storage.getLandlordTenantLinks(requesterId);
+        const isLinked = links.some(link => link.tenantId === tenantId && (link.status === 'active' || link.status === 'pending'));
+        if (isLinked) {
+          isAuthorized = true;
+        } else {
+          // Also check if landlord owns a property where this user is a tenant (via payments)
+          const landlordTenants = await storage.getLandlordTenants(requesterId);
+          if (landlordTenants.some(t => t.tenant.id === tenantId)) {
+            isAuthorized = true;
+          }
+        }
+      }
+
+      if (!isAuthorized) {
+        return res.status(403).json({ message: "Unauthorized to export this ledger" });
+      }
+
+      const tenant = await storage.getUser(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      // Get Payments
+      const payments = await storage.getUserRentPayments(tenantId);
+
+      // Get Property (Active one or from last payment)
+      let property: any = {
+        address: 'Unknown Address',
+        city: '',
+        postcode: '',
+        monthlyRent: 0
+      };
+
+      if (payments.length > 0) {
+        const lastPayment = payments[0];
+        const prop = await storage.getPropertyById(lastPayment.propertyId);
+        if (prop) {
+          property = prop;
+        }
+      } else if (tenant.rentInfo) {
+        // Fallback to rentInfo
+        const rentInfo = tenant.rentInfo as any;
+        // Try to construct property info if available in address
+        if (tenant.address) {
+          const addr = tenant.address as any;
+          property = {
+            address: addr.street || '',
+            city: addr.city || '',
+            postcode: addr.postcode || '',
+            monthlyRent: rentInfo.amount || 0
+          };
+        }
+      }
+
+      // Landlord Info
+      let landlord = { name: 'Unknown', email: '' };
+      if (property.landlordName) {
+        landlord.name = property.landlordName;
+        landlord.email = property.landlordEmail || '';
+      } else if (property.userId) {
+        const landlordUser = await storage.getUser(property.userId);
+        if (landlordUser) {
+          landlord.name = `${landlordUser.firstName} ${landlordUser.lastName}`;
+          landlord.email = landlordUser.email;
+        }
+      }
+
+      const pdfBuffer = await generateLedgerPDF({
+        tenant: {
+          name: `${tenant.firstName} ${tenant.lastName}`,
+          email: tenant.email
+        },
+        property: {
+          address: property.address,
+          city: property.city,
+          postcode: property.postcode,
+          monthlyRent: Number(property.monthlyRent),
+          tenancyStartDate: property.tenancyStartDate,
+          tenancyEndDate: property.tenancyEndDate
+        },
+        landlord,
+        payments: payments.map(p => ({
+          date: p.dueDate,
+          amount: Number(p.amount),
+          status: p.status || 'pending',
+          verified: p.isVerified || false,
+          method: p.paymentMethod || 'Direct Debit'
+        })),
+        generatedAt: new Date(),
+        ledgerId: nanoid(10).toUpperCase()
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="rent-ledger-${tenant.lastName}-${format(new Date(), 'yyyy-MM-dd')}.pdf"`);
+      res.send(pdfBuffer);
+
+    } catch (error) {
+      console.error('Error generating ledger PDF:', error);
+      res.status(500).json({ message: "Failed to generate PDF" });
     }
   });
 
@@ -3702,7 +3901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   addManualPaymentRoutes(app, requireAuth, storage);
 
   // Stripe payment intent endpoint
-  app.post("/api/create-payment-intent", async (req, res) => {
+  app.post("/api/create-payment-intent", requireAuth, async (req: any, res) => {
     try {
       // Check if Stripe is configured
       if (!process.env.STRIPE_SECRET_KEY) {
@@ -3717,6 +3916,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const { amount, plan } = req.body;
+      const userId = req.user.id;
+      const userRole = req.user.role;
       const paymentAmount = amount || (plan === 'standard' ? 9.99 : 19.99);
 
       const paymentIntent = await stripe.paymentIntents.create({
@@ -3726,7 +3927,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           enabled: true, // Enables Apple Pay, Google Pay, and cards
         },
         metadata: {
-          plan: plan || 'unknown'
+          plan: plan || 'unknown',
+          userId: userId,
+          userRole: userRole || 'tenant'
         }
       });
 
@@ -3736,6 +3939,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         message: "Error creating payment intent: " + error.message
       });
+    }
+  });
+
+  // Payment confirmation endpoint (called after successful payment)
+  app.post("/api/confirm-payment", requireAuth, async (req: any, res) => {
+    try {
+      const { paymentIntentId, plan } = req.body;
+      const userId = req.user.id;
+
+      if (!paymentIntentId || !plan) {
+        return res.status(400).json({ message: "Missing payment information" });
+      }
+
+      // Verify payment with Stripe
+      if (process.env.STRIPE_SECRET_KEY) {
+        const { default: Stripe } = await import('stripe');
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+          apiVersion: "2025-06-30.basil",
+        });
+
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        if (paymentIntent.status === 'succeeded') {
+          // Activate subscription
+          await storage.updateUserSubscription(userId, {
+            subscriptionPlan: plan,
+            subscriptionStatus: 'active',
+            subscriptionEndDate: null
+          });
+
+          res.json({
+            success: true,
+            message: "Subscription activated successfully",
+            plan: plan
+          });
+        } else {
+          res.status(400).json({ message: "Payment not completed" });
+        }
+      } else {
+        // For development/testing without Stripe
+        await storage.updateUserSubscription(userId, {
+          subscriptionPlan: plan,
+          subscriptionStatus: 'active',
+          subscriptionEndDate: null
+        });
+
+        res.json({
+          success: true,
+          message: "Subscription activated successfully",
+          plan: plan
+        });
+      }
+    } catch (error: any) {
+      console.error("Error confirming payment:", error);
+      res.status(500).json({ message: "Failed to confirm payment" });
+    }
+  });
+
+  // Stripe webhook handler for payment success
+  app.post("/api/webhooks/stripe", async (req, res) => {
+    try {
+      // Check if Stripe is configured
+      if (!process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({ message: "Payment system not configured" });
+      }
+
+      const { default: Stripe } = await import('stripe');
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: "2025-06-30.basil",
+      });
+
+      const sig = req.headers['stripe-signature'];
+      const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+      if (!webhookSecret) {
+        console.warn("Stripe webhook secret not configured, skipping webhook verification");
+        return res.status(400).json({ message: "Webhook secret not configured" });
+      }
+
+      let event;
+      try {
+        event = stripe.webhooks.constructEvent(req.body, sig as string, webhookSecret);
+      } catch (err: any) {
+        console.error("Webhook signature verification failed:", err.message);
+        return res.status(400).json({ message: `Webhook Error: ${err.message}` });
+      }
+
+      // Handle the event
+      if (event.type === 'payment_intent.succeeded') {
+        const paymentIntent = event.data.object as any;
+        const userId = paymentIntent.metadata?.userId;
+        const plan = paymentIntent.metadata?.plan;
+
+        if (userId && plan && plan !== 'free') {
+          try {
+            // Activate subscription
+            await storage.updateUserSubscription(userId, {
+              subscriptionPlan: plan,
+              subscriptionStatus: 'active',
+              subscriptionEndDate: null // Set to null for active subscriptions
+            });
+
+            console.log(`Subscription activated for user ${userId}: ${plan}`);
+          } catch (error) {
+            console.error("Error activating subscription:", error);
+          }
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error: any) {
+      console.error("Webhook error:", error);
+      res.status(500).json({ message: "Webhook processing failed" });
     }
   });
 
@@ -3942,31 +4258,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/payments/:id/verify', async (req, res) => {
+  app.post('/api/payments/:id/verify', requireAuth, async (req: any, res) => {
     try {
       const paymentId = parseInt(req.params.id);
       const { status, notes } = req.body;
+      const landlordId = req.user.id;
 
-      const payment = await storage.updateRentPayment(paymentId, {
+      // 1. Get the payment
+      const payment = await storage.getRentPayment(paymentId);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      // 2. Verify Landlord Ownership
+      // The landlord must own the property associated with this payment
+      const property = await storage.getPropertyById(payment.propertyId);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      if (property.userId !== landlordId) {
+        // Double check if it's an admin?
+        if (req.user.role !== 'admin') {
+          return res.status(403).json({ message: "Unauthorized: You do not own this property" });
+        }
+      }
+
+      // 3. Update Payment
+      const updatedPayment = await storage.updateRentPayment(paymentId, {
         status: status === 'approved' ? 'paid' : status === 'rejected' ? 'missed' : 'pending',
         isVerified: status === 'approved',
         updatedAt: new Date()
       });
 
-      // Create notification for tenant
-      if (payment.userId) {
+      // 4. Create notification for tenant
+      if (updatedPayment.userId) {
         await storage.createNotification({
-          userId: payment.userId,
+          userId: updatedPayment.userId,
           type: 'system',
           title: status === 'approved' ? 'Payment Verified' : 'Payment Status Updated',
           message: status === 'approved'
-            ? `Your rent payment of £${payment.amount} has been verified by your landlord.`
+            ? `Your rent payment of £${updatedPayment.amount} has been verified by your landlord.`
             : `Your rent payment status has been updated to: ${status}`,
           isRead: false
         });
       }
 
-      res.json({ success: true, payment });
+      res.json({ success: true, payment: updatedPayment });
     } catch (error) {
       console.error("Error verifying payment:", error);
       res.status(500).json({ message: "Failed to verify payment" });
@@ -4233,6 +4571,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify ownership
       if (payment.userId !== userId) {
         return res.status(403).json({ message: 'Unauthorized to update this payment' });
+      }
+
+      // Record Locking: Prevent editing if already verified
+      if (payment.isVerified) {
+        return res.status(403).json({ message: 'Cannot edit a verified payment record. Please contact your landlord or support.' });
       }
 
       // If updating with receipt and landlord email, send verification email

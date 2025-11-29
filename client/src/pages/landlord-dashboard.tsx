@@ -116,6 +116,9 @@ export default function LandlordDashboard() {
 
   const { data: goldStatus, isLoading: goldLoading } = useQuery({
     queryKey: ['/api/landlord/gold-status'],
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0, // Always fetch fresh data
   }) as { data: any; isLoading: boolean };
 
   // Update property count from stats
@@ -398,22 +401,7 @@ export default function LandlordDashboard() {
     }
   };
 
-  // Calculate landlord badge tier
-  const calculateBadgeTier = () => {
-    const verificationRate = 85; // Mock: 85% verification rate
-    const tenantSatisfaction = 4.5; // Mock: 4.5/5 satisfaction
-    const totalVerifications = 8;
 
-    if (verificationRate >= 80 && tenantSatisfaction >= 4.0 && totalVerifications >= 5) {
-      return { tier: "Gold", color: "text-yellow-600", bgColor: "bg-yellow-100" };
-    } else if (verificationRate >= 60 && tenantSatisfaction >= 3.5) {
-      return { tier: "Silver", color: "text-gray-600", bgColor: "bg-gray-100" };
-    } else {
-      return { tier: "Bronze", color: "text-orange-600", bgColor: "bg-orange-100" };
-    }
-  };
-
-  const badgeTier = calculateBadgeTier();
 
 
 
@@ -569,8 +557,8 @@ export default function LandlordDashboard() {
             </div>
           </div>
 
-          {/* Gold Landlord Badge (conditional) */}
-          {goldStatus?.isGold && (
+          {/* Gold Landlord Badge (conditional) - Only show if isGold is explicitly true AND user is paid member */}
+          {goldStatus?.isGold === true && goldStatus?.isPaidMember === true && (
             <div className="mb-4 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -653,32 +641,7 @@ export default function LandlordDashboard() {
           </Alert>
         )}
 
-        {/* Trusted Landlord Badge */}
-        <Card className="mb-6 border-2" style={{ borderColor: badgeTier.tier === 'Gold' ? '#ca8a04' : badgeTier.tier === 'Silver' ? '#71717a' : '#ea580c' }}>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-              <div className="flex items-center space-x-4">
-                <div className={`w-16 h-16 ${badgeTier.bgColor} rounded-full flex items-center justify-center`}>
-                  <Award className={`h-8 w-8 ${badgeTier.color}`} />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2 mb-1">
-                    <h3 className="text-2xl font-bold">{badgeTier.tier} Landlord</h3>
-                    <Badge className={`${badgeTier.bgColor} ${badgeTier.color} border-0`}>
-                      Trusted
-                    </Badge>
-                  </div>
-                  <p className="text-gray-600">85% verification rate • 4.5/5 tenant satisfaction • 8 total verifications</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="text-sm">
-                  {plan?.name ?? 'Free'} Plan
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+
 
         {/* Analytics Dashboard - Visible Section */}
         <Card className="mb-8 border-blue-200">
@@ -969,9 +932,9 @@ export default function LandlordDashboard() {
                           size="sm"
                           className="bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => {
-                            toast({
-                              title: "Approved",
-                              description: "Tenant verification approved",
+                            verifyPaymentMutation.mutate({
+                              paymentId: request.id,
+                              status: 'approved'
                             });
                           }}
                         >
@@ -983,9 +946,9 @@ export default function LandlordDashboard() {
                           variant="outline"
                           className="text-red-600 border-red-200 hover:bg-red-50"
                           onClick={() => {
-                            toast({
-                              title: "Rejected",
-                              description: "Tenant verification rejected",
+                            verifyPaymentMutation.mutate({
+                              paymentId: request.id,
+                              status: 'rejected'
                             });
                           }}
                         >
@@ -1891,7 +1854,7 @@ export default function LandlordDashboard() {
                 <div className="space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Current: {badgeTier.tier}</span>
+                      <span className="text-sm font-medium">Current: {goldStatus?.tier || 'Gold'}</span>
                       <span className="text-sm text-gray-500">Next: Platinum</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
