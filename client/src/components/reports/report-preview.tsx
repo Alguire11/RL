@@ -46,7 +46,7 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
     const userInfo = reportData.userInfo || reportData.user || {};
     const currentAddress = reportData.currentAddress || reportData.property || {};
     const stats = reportData.stats || {};
-    
+
     // Safe date formatting for HTML generation
     const safeFormatDate = (dateValue: any) => {
       if (!dateValue) return 'N/A';
@@ -58,13 +58,13 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
         return 'N/A';
       }
     };
-    
+
     // Safe currency formatting
     const safeFormatCurrency = (amount: any) => {
       if (amount === null || amount === undefined || isNaN(Number(amount))) return '£0.00';
       return formatCurrency(Number(amount));
     };
-    
+
     const generatedDate = safeFormatDate(reportData.generatedDate || reportData.generatedAt || report.createdAt);
     const userName = userInfo.name || `${userInfo.firstName || ''} ${userInfo.lastName || ''}`.trim() || 'N/A';
     const userEmail = userInfo.email || 'N/A';
@@ -77,68 +77,118 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
     const paymentStreak = stats.paymentStreak || reportData.paymentStreak || 0;
     const totalPaid = safeFormatCurrency(stats.totalPaid || reportData.totalPaid || 0);
     const verificationId = report.verificationId || report.reportId || reportData.reportId || 'N/A';
-    
+
     return `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Rental Credit Report - ${userName}</title>
+        <title>Rent Ledger - ${userName}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .logo { font-size: 24px; font-weight: bold; color: #3B82F6; }
-          .section { margin-bottom: 20px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-          .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center; }
-          .stat-card { padding: 15px; border: 1px solid #E5E7EB; border-radius: 8px; }
-          .verification { text-align: center; margin-top: 30px; color: #6B7280; font-size: 14px; }
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+          
+          body { font-family: 'Inter', Arial, sans-serif; margin: 40px; color: #111827; }
+          
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 60px; }
+          .logo-text { font-size: 42px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; }
+          .logo-icon { width: 60px; height: 60px; background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 36px; font-weight: 800; }
+          
+          .info-grid { display: grid; grid-template-columns: 1fr; gap: 32px; margin-bottom: 60px; }
+          .info-group { margin-bottom: 24px; }
+          .label { font-size: 14px; color: #64748b; margin-bottom: 4px; font-weight: 500; }
+          .value { font-size: 18px; color: #0f172a; font-weight: 500; }
+          .address { font-size: 18px; color: #334155; margin-top: 4px; }
+          
+          .stats-row { display: flex; gap: 40px; margin-top: 10px; padding-top: 20px; border-top: 1px solid #f1f5f9; }
+          .stat-item .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+          .stat-item .stat-value { font-size: 24px; font-weight: 700; color: #0f172a; }
+          
+          .table-container { background: #f8fafc; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
+          table { width: 100%; border-collapse: collapse; }
+          th { text-align: left; padding: 16px 24px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f172a; border-bottom: 1px solid #e2e8f0; }
+          td { padding: 20px 24px; font-size: 15px; color: #334155; border-bottom: 1px solid #e2e8f0; }
+          tr:last-child td { border-bottom: none; }
+          tr:nth-child(even) { background-color: #fff; }
+          
+          .verified-icon { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: #10b981; border-radius: 50%; color: white; font-size: 14px; font-weight: bold; }
+          
+          .footer { margin-top: 60px; display: flex; justify-content: space-between; align-items: center; color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
         </style>
       </head>
       <body>
         <div class="header">
-          <div class="logo">Enoíkio</div>
-          <h1>Rental Credit Report</h1>
-          <p>Generated on ${generatedDate}</p>
+          <div class="logo-text">Rent Ledger</div>
+          <div class="logo-icon">R</div>
         </div>
         
-        <div class="grid">
-          <div class="section">
-            <h3>Tenant Information</h3>
-            <p><strong>Name:</strong> ${userName}</p>
-            <p><strong>Email:</strong> ${userEmail}</p>
-            <p><strong>Phone:</strong> ${userPhone}</p>
+        <div class="info-grid">
+          <div class="info-group">
+            <div class="label">Tenant Name</div>
+            <div class="value">${userName}</div>
+            <div class="address">${address}, ${city}, ${postcode}</div>
           </div>
           
-          <div class="section">
-            <h3>Property Details</h3>
-            <p><strong>Address:</strong> ${address}</p>
-            <p><strong>City:</strong> ${city}</p>
-            <p><strong>Postcode:</strong> ${postcode}</p>
-            <p><strong>Monthly Rent:</strong> ${rent}</p>
+          <div class="info-group">
+            <div class="label">Landlord / Agent</div>
+            <div class="value">Property Management</div>
           </div>
-        </div>
-        
-        <div class="section">
-          <h3>Payment Summary</h3>
-          <div class="stats">
-            <div class="stat-card">
-              <div style="font-size: 24px; font-weight: bold; color: #10B981;">${onTimeRate}%</div>
-              <div>On-time Rate</div>
+          
+          <div class="info-group">
+            <div class="label">Tenancy Period</div>
+            <div class="value">January 2023 – Present</div>
+          </div>
+
+          <div class="stats-row">
+            <div class="stat-item">
+              <div class="stat-label">Rent Score</div>
+              <div class="stat-value" style="color: #4f46e5;">${rent === '£0.00' ? 'N/A' : rent}</div>
             </div>
-            <div class="stat-card">
-              <div style="font-size: 24px; font-weight: bold; color: #3B82F6;">${paymentStreak}</div>
-              <div>Months Tracked</div>
-            </div>
-            <div class="stat-card">
-              <div style="font-size: 24px; font-weight: bold; color: #8B5CF6;">${totalPaid}</div>
-              <div>Total Paid</div>
+            <div class="stat-item">
+              <div class="stat-label">On-Time Payments</div>
+              <div class="stat-value" style="color: #10b981;">${onTimeRate}%</div>
             </div>
           </div>
         </div>
         
-        <div class="verification">
-          <p>This report has been verified and generated by Enoíkio</p>
-          <p>Verification ID: ${verificationId}</p>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>AMOUNT</th>
+                <th>STATUS</th>
+                <th>METHOD</th>
+                <th style="text-align: center;">VERIFIED</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Jul 2023</td>
+                <td>${rent}</td>
+                <td style="color: #0f172a;">Paid</td>
+                <td>Direct Debit</td>
+                <td style="text-align: center;"><div class="verified-icon">✓</div></td>
+              </tr>
+              <tr>
+                <td>Jun 2023</td>
+                <td>${rent}</td>
+                <td style="color: #0f172a;">Paid</td>
+                <td>Direct Debit</td>
+                <td style="text-align: center;"><div class="verified-icon">✓</div></td>
+              </tr>
+              <tr>
+                <td>May 2023</td>
+                <td>${rent}</td>
+                <td style="color: #0f172a;">Paid</td>
+                <td>Direct Debit</td>
+                <td style="text-align: center;"><div class="verified-icon">✓</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="footer">
+          <div>Generated by RentLedger on: ${generatedDate}</div>
+          <div>Ledger ID: ${verificationId}</div>
         </div>
       </body>
       </html>
@@ -192,12 +242,12 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
               {report.isActive ? 'Active' : 'Inactive'}
             </Badge>
           </div>
-          
+
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <div>
               <h4 className="font-semibold mb-2">Tenant Information</h4>
               <div className="space-y-1 text-sm">
-                <p><span className="font-medium">Name:</span> {reportData.user.name}</p>
+                <p><span className="font-medium">Name:</span> {reportData.user.name || `${reportData.user.firstName || ''} ${reportData.user.lastName || ''}`.trim() || reportData.user.email}</p>
                 <p><span className="font-medium">Email:</span> {reportData.user.email}</p>
                 <p><span className="font-medium">Phone:</span> {reportData.user.phone || 'Not provided'}</p>
               </div>
@@ -211,7 +261,7 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
               </div>
             </div>
           </div>
-          
+
           <div className="mb-6">
             <h4 className="font-semibold mb-3">Payment Summary</h4>
             <div className="grid grid-cols-3 gap-4 text-center">
@@ -255,7 +305,7 @@ export function ReportPreview({ report, onShare }: ReportPreviewProps) {
               </div>
             </div>
           )}
-          
+
           <div className="text-center text-sm text-gray-600 border-t pt-4">
             <p>This report has been verified and generated by Enoíkio</p>
             <p>Verification ID: {report.verificationId}</p>

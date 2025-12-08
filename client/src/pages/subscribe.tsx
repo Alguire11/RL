@@ -214,9 +214,10 @@ export default function Subscribe() {
       description: 'Build your credit score',
       features: [
         'All Free features',
-        'Credit bureau reporting',
+        'Credit bureau reporting(Batch reporting)',
         'Rent reminders',
         'Verified Tenant badge',
+        'Contact to landlord to verify payment',
         'Standard support'
       ],
       color: 'from-blue-500 to-blue-600',
@@ -230,11 +231,12 @@ export default function Subscribe() {
       description: 'Maximum benefits',
       features: [
         'All Standard features',
+        'Auto rent collection',
         'Legal document templates',
         'Priority support',
         'Partner discounts',
         'Advanced spending analytics',
-        'Portable rental history'
+        'Unlimited rental history report and sharing'
       ],
       color: 'from-purple-500 to-pink-600',
       icon: Crown,

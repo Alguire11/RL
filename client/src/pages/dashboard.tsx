@@ -33,11 +33,30 @@ import { PaymentHistoryDialog } from "@/components/payment-history-dialog";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const [, setLocation] = useLocation();
   const { showTour, startTour, closeTour, completeTour, shouldShowTour } = useDashboardTour();
   const { plan, isLoading: subLoading, subscription } = useSubscription();
   const [isPaymentHistoryOpen, setIsPaymentHistoryOpen] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Check session storage for welcome banner state
+  useEffect(() => {
+    const hasSeenWelcome = sessionStorage.getItem('hasSeenWelcome');
+    if (!hasSeenWelcome) {
+      setShowWelcome(true);
+      // Auto-hide after 2 minutes (120000ms)
+      const timer = setTimeout(() => {
+        handleDismissWelcome();
+      }, 120000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleDismissWelcome = () => {
+    setShowWelcome(false);
+    sessionStorage.setItem('hasSeenWelcome', 'true');
+  };
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -207,14 +226,14 @@ export default function Dashboard() {
       tasks.push({
         id: "verify-payments",
         title: "Verify pending payments",
-        description: "Ask your landlord to confirm pending records to boost your credit score.",
+        description: "Ask your landlord to confirm pending records to boost your Rent score.",
       });
     }
 
     if (stats && stats.verificationStatus === "unverified") {
       tasks.push({
         id: "connect-bank",
-        title: "Connect a bank account",
+        title: "Connect a bank account - Coming soon!",
         description: "Link your bank to automatically track rent and build verified history.",
       });
     }
@@ -246,7 +265,11 @@ export default function Dashboard() {
         }
         break;
       case 'verify-payments':
-        setLocation('/credit-builder');
+        const path = location.pathname;
+        if (path === '/') setLocation('/dashboard');
+        else if (path === '/reports') setLocation('/reports');
+        else if (path === '/settings') setLocation('/settings');
+        setLocation('/rent-score-builder');
         break;
       case 'connect-bank':
         setLocation('/bank-connections');
@@ -281,7 +304,33 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
       <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Dashboard Header */}
+        {/* Dashboard Header - Welcome Banner */}
+        {showWelcome && (
+          <div className="relative">
+            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-none shadow-sm mb-8 transition-opacity duration-500">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-xl text-blue-900">Welcome back, {user?.firstName || 'User'}!</CardTitle>
+                    <p className="text-gray-600">Track your rental payments and build your rent score portfolio</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-gray-600 h-8 w-8 p-0"
+                    onClick={handleDismissWelcome}
+                  >
+                    <span className="sr-only">Dismiss</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+          </div>
+        )}
+
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
@@ -374,7 +423,7 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Monthly Summary & Credit Score */}
+        {/* Monthly Summary & Rent Score */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Monthly Summary Card */}
           <Card>
@@ -410,34 +459,37 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Credit Growth</span>
-                  <div className="flex items-center space-x-2">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="font-semibold text-green-600">{stats?.creditGrowth ? `${stats.creditGrowth >= 0 ? '+' : ''}${stats.creditGrowth} points` : '+0 points'}</span>
+                <div className="flex items-center justify-between mt-4 text-sm">
+                  <span className="text-gray-600">Rent Score Growth</span>
+                  <div className="flex items-center">
+                    <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+                    <span className="font-semibold text-green-600">{stats?.rentScoreGrowth ? `${stats.rentScoreGrowth >= 0 ? '+' : ''}${stats.rentScoreGrowth} points` : '+0 points'}</span>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Credit Score Tracker */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center text-xl">
-                <Award className="h-5 w-5 mr-2 text-purple-600" />
-                Credit Score
+          {/* Rent Score Tracker */}
+          <Card className="md:col-span-1 shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-gray-500">
+                Rent Score
               </CardTitle>
+              <Award className="h-4 w-4 text-purple-600" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="text-center">
-                  <div className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                    {stats?.creditScore ?? 0}
-                  </div>
-                  <p className="text-sm text-gray-600">out of 1000</p>
+              <div className="flex flex-col space-y-4">
+                <div className="text-3xl font-bold text-gray-900">
+                  {stats?.rentScore ?? 0}
                 </div>
-                <Progress value={(stats?.creditScore ?? 0) / 10} className="h-3" />
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Progress to next tier</span>
+                    <span>{stats?.rentScore ?? 0}/1000</span>
+                  </div>
+                  <Progress value={(stats?.rentScore ?? 0) / 10} className="h-3" />
+                </div>
                 <div className="grid grid-cols-3 gap-2 text-center text-sm">
                   <div>
                     <p className="text-gray-500">On-Time</p>
@@ -493,9 +545,9 @@ export default function Dashboard() {
                 <FileText className="h-5 w-5 mr-2 text-blue-600" />
                 Report Snapshot
               </CardTitle>
-              <Button 
-                size="sm" 
-                className="bg-blue-600 hover:bg-blue-700 text-white" 
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleInternalNavigation('/reports')}
               >
                 View All
@@ -523,12 +575,12 @@ export default function Dashboard() {
                         <div className="flex items-center space-x-2">
                           <FileText className="h-4 w-4 text-blue-600" />
                           <p className="font-medium text-sm">
-                            {report.generatedAt 
+                            {report.generatedAt
                               ? format(new Date(report.generatedAt), 'dd MMM yyyy')
                               : 'Pending'}
                           </p>
                         </div>
-                        <Badge 
+                        <Badge
                           variant={report.isActive ? 'default' : 'secondary'}
                           className={report.isActive ? 'bg-green-100 text-green-800' : ''}
                         >
@@ -540,7 +592,7 @@ export default function Dashboard() {
                           <Clock className="h-3 w-3 mr-1" />
                           ID: {report.verificationId?.slice(0, 8) || 'N/A'}
                         </span>
-                        {report.shareCount > 0 && (
+                        {(report.shareCount || 0) > 0 && (
                           <span className="flex items-center">
                             <Share2 className="h-3 w-3 mr-1" />
                             {report.shareCount} share{report.shareCount !== 1 ? 's' : ''}
@@ -689,20 +741,21 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <GradientButton
-                  className="w-full h-12 justify-center"
-                  onClick={() => handleInternalNavigation('/credit-builder')}
+                <Button
+                  variant="outline"
+                  className="w-full h-12 border-2 border-[#1e3a8a] bg-gray-100 text-[#1e3a8a] hover:bg-[#1e3a8a] hover:!text-white transition-colors"
+                  onClick={() => handleInternalNavigation('/manual-verify')}
                 >
                   <Plus className="w-5 h-5 mr-3" />
                   Add Payment Record
-                </GradientButton>
+                </Button>
                 <Button
                   variant="outline"
                   className="w-full h-12 border-2 border-[#1e3a8a] bg-gray-100 text-[#1e3a8a] hover:bg-[#1e3a8a] hover:!text-white transition-colors"
                   onClick={() => handleInternalNavigation('/report-generator')}
                 >
                   <FileText className="w-5 h-5 mr-3" />
-                  Generate Report
+                  Generate Rent Report
                 </Button>
                 <Button
                   variant="outline"

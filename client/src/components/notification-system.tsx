@@ -4,14 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Bell, BellRing, Mail, MessageSquare, Smartphone } from "lucide-react";
 import type { NotificationSettings } from "@/types/api";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export function NotificationCenter() {
   const { toast } = useToast();
+  const { plan } = useSubscription();
   const [settings, setSettings] = useState<NotificationSettings>({
     emailEnabled: true,
     smsEnabled: false,
@@ -135,6 +138,11 @@ export function NotificationCenter() {
           <CardTitle className="flex items-center space-x-2">
             <BellRing className="h-5 w-5" />
             <span>Payment Reminders</span>
+            {plan.id === 'free' && (
+              <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer" onClick={() => window.location.href = '/subscribe'}>
+                Premium Feature
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>
             Get notified before your rent is due to maintain your payment streak
@@ -142,13 +150,14 @@ export function NotificationCenter() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
+            <div className={plan.id === 'free' ? 'opacity-50' : ''}>
               <Label htmlFor="reminder-days">Remind me</Label>
               <p className="text-sm text-gray-600">Days before rent is due</p>
             </div>
             <Select
               value={settings.reminderDays.toString()}
               onValueChange={(value) => handleSettingChange("reminderDays", parseInt(value))}
+              disabled={plan.id === 'free'}
             >
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -164,13 +173,14 @@ export function NotificationCenter() {
           </div>
 
           <div className="flex items-center justify-between">
-            <div>
+            <div className={plan.id === 'free' ? 'opacity-50' : ''}>
               <Label htmlFor="reminder-time">Reminder time</Label>
               <p className="text-sm text-gray-600">What time to send reminders</p>
             </div>
             <Select
               value={settings.reminderTime}
               onValueChange={(value) => handleSettingChange("reminderTime", value)}
+              disabled={plan.id === 'free'}
             >
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -185,6 +195,16 @@ export function NotificationCenter() {
               </SelectContent>
             </Select>
           </div>
+
+          {plan.id === 'free' && (
+            <div className="mt-4 p-4 bg-blue-50 text-blue-800 rounded-md text-sm">
+              <p className="font-semibold">Upgrade to Standard to enable reminders</p>
+              <p>Never miss a payment again with custom notifications.</p>
+              <Button size="sm" variant="link" className="p-0 h-auto font-bold text-blue-900" onClick={() => window.location.href = '/subscribe'}>
+                View Plans &rarr;
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

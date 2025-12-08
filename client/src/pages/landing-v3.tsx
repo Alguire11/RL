@@ -185,7 +185,7 @@ export default function Landing() {
             {[
               { label: "Active Users", value: "10k+" },
               { label: "Rent Tracked", value: "£50M+" },
-              { label: "Credit Score Avg", value: "+45pts" },
+              { label: "Rent Score Avg", value: "+45pts" },
               { label: "Partner Landlords", value: "500+" },
             ].map((stat, i) => (
               <div key={i} className="text-center">
@@ -213,14 +213,14 @@ export default function Landing() {
             {[
               {
                 icon: <Building className="h-8 w-8 text-blue-400" />,
-                title: "Automatic Tracking",
+                title: "Automatic Tracking(Coming soon)",
                 desc: "Connect your bank account and we'll automatically track your rent payments, building your credit history with every on-time payment.",
                 gradient: "from-blue-500/20 to-blue-600/5"
               },
               {
                 icon: <FileText className="h-8 w-8 text-purple-400" />,
-                title: "Credit Reports",
-                desc: "Generate professional credit reports showcasing your payment history, perfect for landlords, lenders, and mortgage applications.",
+                title: "Rent Reports",
+                desc: "Generate professional Rent Reports showcasing your payment history, perfect for landlords, lenders, and mortgage applications.",
                 gradient: "from-purple-500/20 to-purple-600/5"
               },
               {
@@ -272,7 +272,7 @@ export default function Landing() {
               {
                 icon: <Clock className="h-6 w-6 text-blue-400" />,
                 title: "On-Time Rate Analytics",
-                desc: "Track your payment punctuality with detailed analytics and insights."
+                desc: "Track your rent payment punctuality with detailed analytics and insights."
               },
               {
                 icon: <Share2 className="h-6 w-6 text-purple-400" />,
@@ -501,7 +501,7 @@ export default function Landing() {
 
           <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-sm">
             <p>&copy; 2025 RentLedger. All rights reserved.</p>
-            <p>Made with ❤️ in London</p>
+            <p>Made with ❤️ in Yorkshire</p>
           </div>
         </div>
       </footer>

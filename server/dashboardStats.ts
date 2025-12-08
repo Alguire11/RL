@@ -63,7 +63,7 @@ export function computeDashboardStats(
     : 0;
   const streakBonus = Math.min(paymentStreak / 12, 0.5);
   const rentToIncomeScore = (consistencyFactor * 0.5 + streakBonus) * 200;
-  const creditScore = Math.round(onTimeScore + verificationScore + rentToIncomeScore);
+  const rentScore = Math.round(onTimeScore + verificationScore + rentToIncomeScore);
 
   // Month specific aggregations for tenant-facing widgets.
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -92,10 +92,10 @@ export function computeDashboardStats(
   const previousMonthPayments = sorted.filter((p) => {
     return new Date(p.dueDate).getTime() < monthStart.getTime();
   });
-  const previousCreditScore = previousMonthPayments.length
-    ? computeDashboardStats(previousMonthPayments, new Date(now.getFullYear(), now.getMonth() - 1, 1)).creditScore
+  const previousRentScore = previousMonthPayments.length
+    ? computeDashboardStats(previousMonthPayments, new Date(now.getFullYear(), now.getMonth() - 1, 1)).rentScore
     : 0;
-  const creditGrowth = creditScore - previousCreditScore;
+  const rentScoreGrowth = rentScore - previousRentScore;
 
   return {
     paymentStreak,
@@ -104,7 +104,7 @@ export function computeDashboardStats(
     awaitingVerificationCount: awaitingVerification.length,
     onTimePercentage,
     nextPaymentDue,
-    creditScore,
+    rentScore,
     onTimeScore: Math.round(onTimeScore),
     verificationScore: Math.round(verificationScore),
     rentToIncomeScore: Math.round(rentToIncomeScore),
@@ -112,6 +112,6 @@ export function computeDashboardStats(
     verificationStatus,
     verified: verifiedPayments.length,
     pendingVerificationCount,
-    creditGrowth,
+    rentScoreGrowth,
   };
 }

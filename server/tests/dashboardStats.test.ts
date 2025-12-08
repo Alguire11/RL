@@ -62,7 +62,7 @@ describe("computeDashboardStats", () => {
     assert.equal(stats.monthlyRentPaid, 1200);
     assert.equal(stats.pendingVerificationCount, 1);
     assert.equal(stats.nextPaymentDue, "2024-07-01T00:00:00.000Z");
-    assert.equal(typeof stats.creditGrowth, "number");
+    assert.equal(typeof stats.rentScoreGrowth, "number");
   });
 
   it("handles empty payment histories without crashing", () => {
@@ -71,6 +71,6 @@ describe("computeDashboardStats", () => {
     assert.equal(stats.totalPaid, 0);
     assert.equal(stats.monthlyRentPaid, 0);
     assert.equal(stats.verificationStatus, "unverified");
-    assert.equal(stats.creditScore, 0);
+    assert.equal(stats.rentScore, 0);
   });
 });

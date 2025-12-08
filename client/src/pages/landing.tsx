@@ -112,7 +112,7 @@ export default function Landing() {
               </span>
             </h1>
             <p className="text-xl text-gray-100 mb-8 max-w-3xl mx-auto">
-              RentLedger automatically tracks your on-time rent payments and builds a comprehensive credit portfolio.
+              RentLedger manually/automatically tracks your on-time rent payments and builds a comprehensive credit portfolio.
               Turn your rental history into a powerful financial asset.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -128,7 +128,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Complete Credit Building Solution
+              Complete Rent Credit Building Solution
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Everything you need to build credit through your rental payments
@@ -141,7 +141,7 @@ export default function Landing() {
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Building className="h-8 w-8 text-white" />
                 </div>
-                <CardTitle className="text-2xl">Automatic Tracking</CardTitle>
+                <CardTitle className="text-2xl">Automatic Tracking(Coming soon)</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 text-center">
@@ -156,12 +156,12 @@ export default function Landing() {
                 <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <FileText className="h-8 w-8 text-white" />
                 </div>
-                <CardTitle className="text-2xl">Credit Reports</CardTitle>
+                <CardTitle className="text-2xl">Rent Reports</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-600 text-center">
-                  Generate professional credit reports showcasing your payment history,
-                  perfect for landlords, lenders, and mortgage applications.
+                  Generate professional rent reports showcasing your payment history,
+                  perfect for landlords, tenants,lenders and mortgage applications.
                 </p>
               </CardContent>
             </Card>
@@ -209,17 +209,17 @@ export default function Landing() {
               {
                 icon: <TrendingUp className="h-8 w-8 text-primary" />,
                 title: "Payment Streak Tracking",
-                description: "Monitor your consecutive on-time payments to build a strong credit foundation."
+                description: "Monitor your consecutive on-time payments to build a strong rent credit foundation through your ledger."
               },
               {
                 icon: <Clock className="h-8 w-8 text-primary" />,
                 title: "On-Time Rate Analytics",
-                description: "Track your payment punctuality with detailed analytics and insights."
+                description: "Track your rent payment punctuality with detailed analytics and insights."
               },
               {
                 icon: <Share2 className="h-8 w-8 text-primary" />,
                 title: "Easy Report Sharing",
-                description: "Share your credit reports instantly with landlords, lenders, or agencies."
+                description: "Share your rentcredit reports instantly with landlords, lenders, or agencies."
               },
               {
                 icon: <Users className="h-8 w-8 text-primary" />,
@@ -228,13 +228,13 @@ export default function Landing() {
               },
               {
                 icon: <Award className="h-8 w-8 text-primary" />,
-                title: "Credit Score Impact",
-                description: "See how your rent payments positively impact your overall credit score."
+                title: "Rent Score Impact",
+                description: "See how your rent payments positively impact your overall rent score."
               },
               {
                 icon: <Calendar className="h-8 w-8 text-primary" />,
                 title: "Payment Reminders",
-                description: "Never miss a payment with smart reminders and notifications."
+                description: "Never miss a rent payment with smart reminders and notifications."
               }
             ].map((feature, index) => (
               <Card key={index} className="border-0 shadow-md hover:shadow-lg transition-all duration-300">
@@ -613,7 +613,7 @@ export default function Landing() {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               We're Here to Help
             </h2>
-            <p className="text-gray-600 max-w-3xl mx-auto ml-[74px] mr-[74px] text-[15px]">
+            <p className="text-gray-600 max-w-3xl mx-auto text-[20px]">
               Get the support you need when you need it
             </p>
           </div>

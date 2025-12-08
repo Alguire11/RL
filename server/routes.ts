@@ -313,14 +313,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Rent Score Persistence: Save daily snapshot
       try {
         // Check if we already have a snapshot for today to avoid duplicates
-        // We can do this by checking the last record's date
-        const history = await storage.getRentScoreHistory(userId);
-        const today = new Date().toDateString();
-        const lastRecord = history[history.length - 1];
-
-        if (!lastRecord || new Date(lastRecord.recordedAt!).toDateString() !== today) {
-          await storage.createRentScoreSnapshot(userId, stats.creditScore);
-        }
+        // Save daily snapshot (idempotent for the day)
+        // Calculate change if possible, for now passing 0 to fix crash
+        await storage.createRentScoreSnapshot(userId, stats.rentScore, 0);
       } catch (err) {
         console.error('Failed to persist rent score:', err);
         // Don't fail the request if persistence fails
@@ -751,8 +746,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create property
-      // Create property
-      const property = await storage.createProperty(validatedData);
+      const verificationToken = nanoid(32);
+      const propertyDataWithToken = {
+        ...validatedData,
+        verificationToken,
+        isVerified: false
+      };
+
+      const property = await storage.createProperty(propertyDataWithToken);
+
+      // Send verification email to landlord if email is provided
+      if (property.landlordEmail && property.landlordName) {
+        const verificationUrl = `${process.env.APP_URL || 'https://rentledger.co.uk'}/landlord/verify-property/${verificationToken}`;
+
+        // Get tenant info
+        const tenant = await storage.getUserById(userId);
+        if (!tenant) {
+          console.error(`Tenant not found for user ID: ${userId}`);
+          // Continue without sending email or throw? 
+          // Better to log and continue to avoid failing property creation, but email won't be sent.
+          // Or throw to fail the request.
+          // Let's throw to be safe.
+          throw new Error("Tenant user not found");
+        }
+
+        await emailService.sendPropertyVerificationRequest({
+          landlordEmail: property.landlordEmail,
+          landlordName: property.landlordName,
+          tenantName: `${tenant.firstName} ${tenant.lastName}`,
+          tenantEmail: tenant.email,
+          propertyAddress: `${property.address}, ${property.city}`,
+          monthlyRent: parseFloat(property.monthlyRent),
+          leaseType: property.leaseType || 'Not specified',
+          tenancyStartDate: property.tenancyStartDate ? new Date(property.tenancyStartDate).toLocaleDateString() : 'Not specified',
+          verificationUrl
+        });
+      }
 
       // Audit Log
       await storage.createAuditLog({
@@ -775,6 +804,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: error?.issues || error?.code || error,
         stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
       });
+    }
+  });
+
+  // Property verification route (public/token based)
+  app.get('/api/properties/verify/:token', async (req, res) => {
+    try {
+      const { token } = req.params;
+
+      // Find property by token
+      // We need to add a method to storage for this or scan properties (inefficient)
+      // Ideally, add getPropertyByToken to storage.ts. For now, we can use a raw query or add the method.
+      // Let's assume we add getPropertyByVerificationToken to storage.ts
+      const property = await storage.getPropertyByVerificationToken(token);
+
+      if (!property) {
+        return res.status(404).send('Invalid or expired verification link.');
+      }
+
+      if (property.isVerified) {
+        return res.send('Property is already verified.');
+      }
+
+      // Update property
+      await storage.updateProperty(property.id, {
+        isVerified: true,
+        verificationToken: null // Optional: clear token to prevent reuse
+      });
+
+      // Notify tenant
+      await storage.createNotification({
+        userId: property.userId,
+        type: 'landlord_verified',
+        title: 'Property Verified',
+        message: `Your property at ${property.address} has been verified by the landlord.`,
+        isRead: false
+      });
+
+      res.send('<h1>Property Verified Successfully</h1><p>Thank you for verifying the property details. The tenant has been notified.</p>');
+    } catch (error) {
+      console.error("Error verifying property:", error);
+      res.status(500).send('Verification failed. Please try again later.');
+    }
+  });
+
+  // Admin property verification
+  app.post('/api/admin/verify-property/:id', requireAdmin, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getPropertyById(propertyId);
+
+      if (!property) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+
+      await storage.updateProperty(propertyId, { isVerified: true });
+
+      // Notify tenant
+      await storage.createNotification({
+        userId: property.userId,
+        type: 'system',
+        title: 'Property Verified by Admin',
+        message: `Your property at ${property.address} has been verified by an administrator.`,
+        isRead: false
+      });
+
+      res.json({ success: true, message: 'Property verified successfully' });
+    } catch (error) {
+      console.error("Error verifying property:", error);
+      res.status(500).json({ message: 'Failed to verify property' });
     }
   });
 
@@ -1345,6 +1443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/reports/generate', requireAuth, async (req: any, res) => {
     try {
+      console.log(`Generating report for user ${req.user.id}`);
       const userId = req.user.id;
       const user = req.user;
       const { propertyId, reportType = 'credit' } = req.body;
@@ -1774,6 +1873,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const property = properties.find(p => p.id === verification.propertyId);
 
       if (!user || !property) {
+        console.error(`User or property not found for verification ID: ${verification.id}, userId: ${verification.userId}, propertyId: ${verification.propertyId}`);
         return res.status(404).json({ message: 'User or property not found' });
       }
 
@@ -2606,6 +2706,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           monthlyRent: 0,
         };
 
+      // Fetch user stats for rent score
+      const userStats = await storage.getUserStats(user.id);
+
+      // Calculate tenancy period
+      let tenancyStartDate: string | undefined;
+      let tenancyEndDate: string | undefined;
+
+      if (payments.length > 0) {
+        // Sort payments by date to find the first one
+        const sortedPayments = [...payments].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        tenancyStartDate = sortedPayments[0].dueDate;
+      } else if (primaryProperty) {
+        // Fallback to property creation date if no payments
+        tenancyStartDate = primaryProperty.createdAt?.toISOString();
+      }
+
+      // Get landlord info
+      let landlordInfo;
+      if (primaryProperty?.landlordName) {
+        landlordInfo = {
+          name: primaryProperty.landlordName,
+          email: primaryProperty.landlordEmail || '',
+          verifiedAt: primaryProperty.isVerified ? new Date().toISOString() : undefined
+        };
+      } else {
+        landlordInfo = {
+          name: 'Property Management',
+          email: '',
+        };
+      }
       const reportData = {
         user: {
           id: user.id,
@@ -2622,14 +2752,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dueDate: p.dueDate,
           paidDate: p.paidDate ?? undefined,
           status: p.status ?? 'pending',
+          method: 'Direct Debit', // Default to Direct Debit as per design, or fetch from payment if available
         })),
         reportId: report.reportId,
         generatedAt: (report.createdAt ?? new Date()).toISOString(),
         verificationStatus: 'verified' as const,
-        landlordInfo: {
-          name: 'Property Manager',
-          email: 'landlord@example.com',
-        },
+        landlordInfo,
+        rentScore: userStats?.creditScore || 0,
+        tenancyStartDate,
+        tenancyEndDate,
       };
 
       const { generateCreditReportPDF } = await import('./pdfGenerator');
@@ -2641,6 +2772,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating PDF:", error);
       res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
+  // Sample credit report endpoint
+  app.get('/api/reports/sample', async (req, res) => {
+    try {
+      const sampleData = {
+        user: {
+          id: 'sample-user',
+          firstName: 'Alex',
+          lastName: 'Johnson',
+          email: 'alex.johnson@example.com',
+          phone: '07700 900000'
+        },
+        property: {
+          address: '42 Park Road',
+          city: 'London',
+          postcode: 'SW19 2HZ',
+          monthlyRent: 1200
+        },
+        payments: [
+          { id: 1, amount: 1200, dueDate: '2023-07-01', paidDate: '2023-07-01', status: 'paid', method: 'Direct Debit' },
+          { id: 2, amount: 1200, dueDate: '2023-06-01', paidDate: '2023-06-01', status: 'paid', method: 'Direct Debit' },
+          { id: 3, amount: 1200, dueDate: '2023-05-01', paidDate: '2023-05-01', status: 'paid', method: 'Direct Debit' },
+          { id: 4, amount: 1200, dueDate: '2023-04-01', paidDate: '2023-04-01', status: 'paid', method: 'Direct Debit' },
+          { id: 5, amount: 1200, dueDate: '2023-03-01', paidDate: '2023-03-01', status: 'paid', method: 'Direct Debit' },
+          { id: 6, amount: 1200, dueDate: '2023-02-01', paidDate: '2023-02-01', status: 'paid', method: 'Direct Debit' },
+          { id: 7, amount: 1200, dueDate: '2023-01-01', paidDate: '2023-01-01', status: 'paid', method: 'Direct Debit' },
+        ],
+        reportId: 'SAMPLE-001',
+        generatedAt: new Date().toISOString(),
+        verificationStatus: 'verified' as const,
+        landlordInfo: {
+          name: 'Citywide Estates',
+          email: 'agents@citywide.co.uk',
+          verifiedAt: '2023-01-15'
+        },
+        rentScore: 850,
+        tenancyStartDate: '2023-01-01',
+        tenancyEndDate: new Date().toISOString()
+      };
+
+      const { generateCreditReportPDF } = await import('./pdfGenerator');
+      const pdfBuffer = await generateCreditReportPDF(sampleData);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="sample-rent-credit-report.pdf"');
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating sample PDF:", error);
+      res.status(500).json({ message: "Failed to generate sample PDF" });
     }
   });
 
@@ -3754,6 +3936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Use provided landlord email or fall back to property landlord email
         const verificationEmail = landlordEmail || property.landlordEmail;
         const verificationPhone = landlordPhone || property.landlordPhone;
+        const verificationToken = nanoid(32);
 
         const manualPayment = await storage.createManualPayment({
           userId,
@@ -3765,6 +3948,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           receiptUrl,
           landlordEmail: verificationEmail,
           landlordPhone: verificationPhone,
+          verificationToken,
           needsVerification: true,
         });
 
@@ -3782,6 +3966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               paymentDate: new Date(manualPayment.paymentDate).toLocaleDateString(),
               paymentMethod: paymentMethod.replace('_', ' ').toUpperCase(),
               receiptUrl,
+              verificationToken,
             });
           } catch (emailError) {
             console.error('Failed to send landlord notification email:', emailError);
@@ -3818,16 +4003,235 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         res.json({
-          manualPayment,
-          newBadges,
-          currentStreak,
+          success: true,
+          payment: manualPayment,
           message: verificationEmail
-            ? 'Manual payment logged successfully and landlord has been notified for verification'
-            : 'Manual payment logged successfully'
+            ? 'Payment logged and verification request sent'
+            : 'Payment logged successfully'
         });
       } catch (error) {
-        console.error('Error creating manual payment:', error);
-        res.status(500).json({ message: 'Failed to log manual payment' });
+        console.error("Error creating manual payment:", error);
+        res.status(500).json({ message: "Failed to create manual payment" });
+      }
+    });
+
+    // Update manual payment (e.g. adding receipt)
+    app.patch('/api/manual-payments/:id', requireAuth, async (req: any, res) => {
+      try {
+        const paymentId = parseInt(req.params.id);
+        const userId = req.user.id;
+        const updateData = req.body;
+
+        // Get the payment to verify ownership
+        const payment = await storage.getManualPaymentById(paymentId);
+        if (!payment) {
+          return res.status(404).json({ message: 'Payment not found' });
+        }
+
+        // Verify ownership
+        if (payment.userId !== userId) {
+          return res.status(403).json({ message: 'Unauthorized to update this payment' });
+        }
+
+        // Prevent editing if already verified
+        if (!payment.needsVerification && payment.verifiedAt) {
+          return res.status(403).json({ message: 'Cannot edit a verified payment record.' });
+        }
+
+        // If updating with receipt and landlord email, send verification email
+        if (updateData.receiptUrl && updateData.landlordEmail) {
+          try {
+            const property = await storage.getPropertyById(payment.propertyId);
+            const tenant = await storage.getUserById(userId);
+            const verificationToken = nanoid(32);
+            updateData.verificationToken = verificationToken;
+
+            if (property && tenant) {
+              await emailService.sendLandlordVerificationRequest({
+                landlordEmail: updateData.landlordEmail,
+                landlordName: property.landlordName || 'Landlord',
+                tenantName: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.email,
+                tenantEmail: tenant.email,
+                propertyAddress: `${property.address}, ${property.city}`,
+                amount: parseFloat(payment.amount),
+                rentAmount: parseFloat(payment.amount),
+                paymentDate: new Date(payment.paymentDate).toLocaleDateString(),
+                paymentMethod: payment.paymentMethod?.replace('_', ' ').toUpperCase() || 'Manual Upload',
+                receiptUrl: updateData.receiptUrl,
+                verificationToken,
+              });
+
+              // Create notification for tenant
+              await storage.createNotification({
+                userId,
+                type: 'system',
+                title: 'Receipt Uploaded Successfully',
+                message: `Your receipt for payment of £${payment.amount} has been uploaded. We've sent a verification request to ${updateData.landlordEmail}.`,
+              });
+            }
+          } catch (emailError) {
+            console.error('Failed to send landlord notification email:', emailError);
+          }
+        }
+
+        const updatedPayment = await storage.updateManualPayment(paymentId, updateData);
+        res.json(updatedPayment);
+      } catch (error) {
+        console.error('Error updating manual payment:', error);
+        res.status(500).json({ message: 'Failed to update manual payment' });
+      }
+    });
+
+    // Get payment verification details
+    app.get('/api/landlord/verify-payment/:token', async (req, res) => {
+      try {
+        const { token } = req.params;
+        const payment = await storage.getManualPaymentByToken(token);
+
+        if (!payment) {
+          return res.status(404).json({ message: 'Verification link invalid or expired' });
+        }
+
+        if (!payment.needsVerification && payment.verifiedAt) {
+          return res.json({
+            isVerified: true,
+            payment,
+            message: 'This payment has already been verified.'
+          });
+        }
+
+        const tenant = await storage.getUserById(payment.userId);
+        const property = await storage.getPropertyById(payment.propertyId);
+
+        res.json({
+          payment: {
+            id: payment.id,
+            amount: payment.amount,
+            date: payment.paymentDate,
+            receiptUrl: payment.receiptUrl,
+            description: payment.description
+          },
+          tenant: {
+            name: `${tenant?.firstName || ''} ${tenant?.lastName || ''}`.trim() || tenant?.email,
+            email: tenant?.email
+          },
+          property: {
+            address: property?.address,
+            city: property?.city,
+            postcode: property?.postcode
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching verification details:', error);
+        res.status(500).json({ message: 'Failed to fetch verification details' });
+      }
+    });
+
+    // Confirm payment verification
+    app.post('/api/landlord/verify-payment/:token/confirm', async (req, res) => {
+      try {
+        const { token } = req.params;
+        const payment = await storage.getManualPaymentByToken(token);
+
+        if (!payment) {
+          return res.status(404).json({ message: 'Verification link invalid or expired' });
+        }
+
+        if (!payment.needsVerification && payment.verifiedAt) {
+          return res.status(400).json({ message: 'Payment already verified' });
+        }
+
+        // Update payment status
+        const updatedPayment = await storage.updateManualPayment(payment.id, {
+          needsVerification: false,
+          verifiedAt: new Date(),
+          verifiedBy: payment.landlordEmail || 'Landlord (Email Verification)',
+          // verificationToken: null // Keep token to allow "Already Verified" message
+        });
+
+        // Create notification for tenant
+        await storage.createNotification({
+          userId: payment.userId,
+          type: 'system',
+          title: 'Payment Verified!',
+          message: `Your payment of £${payment.amount} has been verified by your landlord.`,
+        });
+
+        // Update rent score
+        const stats = await storage.getUserStats(payment.userId);
+        const currentScore = stats.rentScore || 0;
+        await storage.createRentScoreSnapshot(payment.userId, currentScore + 5, 5);
+
+        res.json({ success: true, message: 'Payment verified successfully' });
+      } catch (error) {
+        console.error('Error confirming verification:', error);
+        res.status(500).json({ message: 'Failed to confirm verification' });
+      }
+    });
+
+    // Reverify - Resend verification email to landlord
+    app.post('/api/manual-payments/:id/reverify', requireAuth, async (req: any, res) => {
+      try {
+        const paymentId = parseInt(req.params.id);
+        const userId = req.user.id;
+
+        const payment = await storage.getManualPaymentById(paymentId);
+        if (!payment) {
+          return res.status(404).json({ message: 'Payment not found' });
+        }
+
+        // Verify ownership
+        if (payment.userId !== userId) {
+          return res.status(403).json({ message: 'Unauthorized' });
+        }
+
+        // Check if already verified
+        if (!payment.needsVerification && payment.verifiedAt) {
+          return res.status(400).json({ message: 'Payment is already verified' });
+        }
+
+        // Check if landlord email exists
+        if (!payment.landlordEmail) {
+          return res.status(400).json({ message: 'No landlord email on file. Please update the payment with landlord contact information.' });
+        }
+
+        // Generate new token
+        const verificationToken = nanoid(32);
+        await storage.updateManualPayment(paymentId, { verificationToken });
+
+        // Get property and tenant info
+        const property = await storage.getPropertyById(payment.propertyId);
+        const tenant = await storage.getUserById(userId);
+
+        if (property && tenant) {
+          await emailService.sendLandlordVerificationRequest({
+            landlordEmail: payment.landlordEmail,
+            landlordName: property.landlordName || 'Landlord',
+            tenantName: `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || tenant.email,
+            tenantEmail: tenant.email,
+            propertyAddress: `${property.address}, ${property.city}`,
+            amount: parseFloat(payment.amount),
+            rentAmount: parseFloat(payment.amount),
+            paymentDate: new Date(payment.paymentDate).toLocaleDateString(),
+            paymentMethod: payment.paymentMethod?.replace('_', ' ').toUpperCase() || 'Manual Upload',
+            receiptUrl: payment.receiptUrl || undefined,
+            verificationToken,
+          });
+
+          await storage.createNotification({
+            userId,
+            type: 'system',
+            title: 'Verification Email Resent',
+            message: `A new verification request has been sent to ${payment.landlordEmail}.`,
+          });
+
+          res.json({ success: true, message: 'Verification email resent successfully' });
+        } else {
+          throw new Error('Property or tenant not found');
+        }
+      } catch (error) {
+        console.error('Error resending verification:', error);
+        res.status(500).json({ message: 'Failed to resend verification email' });
       }
     });
 

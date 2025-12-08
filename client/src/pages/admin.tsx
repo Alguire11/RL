@@ -511,7 +511,7 @@ export default function AdminDashboard() {
                 title="Pending Verifications"
                 value={users.filter(u => u.role === 'landlord' && !u.isOnboarded).length}
                 icon={AlertTriangle}
-                color="warning"
+                color="primary"
               />
               <StatCard
                 title="Active Landlords"

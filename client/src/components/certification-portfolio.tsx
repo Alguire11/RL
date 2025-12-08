@@ -13,8 +13,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { FileText, Share2, Award, Clock, DollarSign, Star, Copy, Check, ExternalLink, Plus } from "lucide-react";
+import { FileText, Share2, Award, Clock, DollarSign, Star, Copy, Check, ExternalLink, Plus, Lock } from "lucide-react";
 import { BadgeSystem } from "./badge-system";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface CertificationPortfolio {
   id: number;
@@ -43,6 +44,7 @@ type PortfolioFormData = z.infer<typeof portfolioSchema>;
 export function CertificationPortfolio({ userId }: CertificationPortfolioProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { plan } = useSubscription();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedPortfolio, setSelectedPortfolio] = useState<CertificationPortfolio | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -129,6 +131,7 @@ export function CertificationPortfolio({ userId }: CertificationPortfolioProps) 
       toast({
         title: "Link Copied",
         description: "Portfolio share link copied to clipboard.",
+        variant: "default",
       });
       setTimeout(() => setCopiedToken(null), 2000);
     } catch (error) {
@@ -138,6 +141,21 @@ export function CertificationPortfolio({ userId }: CertificationPortfolioProps) 
         variant: "destructive",
       });
     }
+  };
+
+  const handleLockedClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toast({
+      title: "Premium Feature",
+      description: "Upgrade to Premium to create and share certification portfolios.",
+      variant: "default",
+      action: (
+        <Button variant="outline" size="sm" onClick={() => window.location.href = '/subscribe'}>
+          Upgrade
+        </Button>
+      ),
+    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -184,13 +202,20 @@ export function CertificationPortfolio({ userId }: CertificationPortfolioProps) 
             Create professional portfolios showcasing your payment history and achievements to share with potential landlords.
           </p>
         </div>
-        
+
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Portfolio
-            </Button>
+            {plan.id === 'premium' ? (
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Portfolio
+              </Button>
+            ) : (
+              <Button className="bg-gray-200 text-gray-600 hover:bg-gray-300" onClick={handleLockedClick}>
+                <Lock className="w-4 h-4 mr-2" />
+                Unlock Portfolios
+              </Button>
+            )}
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
@@ -199,7 +224,7 @@ export function CertificationPortfolio({ userId }: CertificationPortfolioProps) 
                 Create a professional portfolio to showcase your rental payment history and achievements.
               </DialogDescription>
             </DialogHeader>
-            
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -215,7 +240,7 @@ export function CertificationPortfolio({ userId }: CertificationPortfolioProps) 
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="description"
@@ -223,27 +248,27 @@ export function CertificationPortfolio({ userId }: CertificationPortfolioProps) 
                     <FormItem>
                       <FormLabel>Description (Optional)</FormLabel>
                       <FormControl>
-                        <Textarea 
+                        <Textarea
                           placeholder="Briefly describe your portfolio..."
                           rows={3}
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
+
                 <div className="flex justify-end space-x-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsCreateDialogOpen(false)}
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={createPortfolioMutation.isPending}
                   >
                     {createPortfolioMutation.isPending ? "Creating..." : "Create Portfolio"}
@@ -320,7 +345,7 @@ export function CertificationPortfolio({ userId }: CertificationPortfolioProps) 
                       <p className="text-sm text-gray-600 mt-1">{portfolio.description}</p>
                     )}
                   </div>
-                  <Badge 
+                  <Badge
                     variant={portfolio.isActive ? "default" : "secondary"}
                   >
                     {portfolio.isActive ? "Active" : "Inactive"}

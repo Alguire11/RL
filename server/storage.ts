@@ -128,6 +128,7 @@ export interface IStorage {
   createRentPayment(payment: InsertRentPayment): Promise<RentPayment>;
   getRentPayment(id: number): Promise<RentPayment | undefined>;
   getManualPaymentById(id: number): Promise<ManualPayment | undefined>;
+  getManualPaymentByToken(token: string): Promise<ManualPayment | undefined>;
   getUserRentPayments(userId: string): Promise<RentPayment[]>;
   getPropertyRentPayments(propertyId: number): Promise<RentPayment[]>;
   updateRentPayment(id: number, payment: Partial<InsertRentPayment>): Promise<RentPayment>;
@@ -345,8 +346,9 @@ export interface IStorage {
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
 
   // Rent Score History
-  createRentScoreSnapshot(userId: string, score: number): Promise<RentScoreHistory>;
+  createRentScoreSnapshot(userId: string, score: number, change: number): Promise<RentScoreHistory>;
   getRentScoreHistory(userId: string): Promise<RentScoreHistory[]>;
+  getPropertyByVerificationToken(token: string): Promise<Property | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1057,17 +1059,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Rent Score History
-  async createRentScoreSnapshot(userId: string, score: number): Promise<RentScoreHistory> {
-    // Get the last recorded score to calculate change
-    const [lastRecord] = await db
-      .select()
-      .from(rentScoreHistory)
-      .where(eq(rentScoreHistory.userId, userId))
-      .orderBy(desc(rentScoreHistory.recordedAt))
-      .limit(1);
-
-    const change = lastRecord ? score - lastRecord.score : 0;
-
+  async createRentScoreSnapshot(userId: string, score: number, change: number): Promise<RentScoreHistory> {
     const [snapshot] = await db
       .insert(rentScoreHistory)
       .values({
@@ -1086,6 +1078,11 @@ export class DatabaseStorage implements IStorage {
       .from(rentScoreHistory)
       .where(eq(rentScoreHistory.userId, userId))
       .orderBy(asc(rentScoreHistory.recordedAt));
+  }
+
+  async getPropertyByVerificationToken(token: string): Promise<Property | undefined> {
+    const [property] = await db.select().from(properties).where(eq(properties.verificationToken, token));
+    return property;
   }
 
   // Maintenance request operations
@@ -1364,10 +1361,18 @@ export class DatabaseStorage implements IStorage {
   async updateManualPayment(id: number, updates: Partial<InsertManualPayment>): Promise<ManualPayment> {
     const [updatedPayment] = await db
       .update(manualPayments)
-      .set({ ...updates, updatedAt: new Date() })
+      .set(updates)
       .where(eq(manualPayments.id, id))
       .returning();
     return updatedPayment;
+  }
+
+  async getManualPaymentByToken(token: string): Promise<ManualPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(manualPayments)
+      .where(eq(manualPayments.verificationToken, token));
+    return payment;
   }
 
   async deleteManualPayment(id: number): Promise<void> {

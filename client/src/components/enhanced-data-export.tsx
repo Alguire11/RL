@@ -13,7 +13,7 @@ const dataTypes = [
   { id: 'properties', label: 'Properties', icon: Home, description: 'Rental property details' },
   { id: 'payments', label: 'Payment History', icon: CreditCard, description: 'All rent payments and manual entries' },
   { id: 'achievements', label: 'Achievements & Badges', icon: Award, description: 'Earned badges and streaks' },
-  { id: 'reports', label: 'Credit Reports', icon: FileText, description: 'Generated reports and shares' },
+  { id: 'reports', label: 'Rent Reports', icon: FileText, description: 'Generated reports and shares' },
 ];
 
 const exportFormats = [
@@ -66,12 +66,12 @@ export function EnhancedDataExport() {
     if (typeId === 'all') {
       setSelectedTypes(['all']);
     } else {
-      const newTypes = selectedTypes.includes('all') 
+      const newTypes = selectedTypes.includes('all')
         ? [typeId]
         : selectedTypes.includes(typeId)
           ? selectedTypes.filter(t => t !== typeId)
           : [...selectedTypes.filter(t => t !== 'all'), typeId];
-      
+
       setSelectedTypes(newTypes.length === 0 ? ['all'] : newTypes);
     }
   };
@@ -109,7 +109,7 @@ export function EnhancedDataExport() {
                 Export All Data
               </label>
             </div>
-            
+
             {dataTypes.map((type) => {
               const IconComponent = type.icon;
               return (
@@ -165,8 +165,8 @@ export function EnhancedDataExport() {
         </div>
 
         {/* Export Button */}
-        <Button 
-          onClick={handleExport} 
+        <Button
+          onClick={handleExport}
           disabled={exportMutation.isPending || selectedTypes.length === 0}
           className="w-full"
         >

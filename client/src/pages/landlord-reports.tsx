@@ -125,7 +125,7 @@ export default function LandlordReports() {
                         <CardContent>
                             <div className="text-2xl font-bold">£{netIncome.toLocaleString()}</div>
                             <p className="text-xs text-muted-foreground mt-1">
-                                <span className={netIncome >= 0 ? "text-green-600" : "text-red-600"} className="flex items-center">
+                                <span className={`flex items-center ${netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
                                     {netIncome >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
                                     {((netIncome / totalRevenue) * 100).toFixed(1)}% profit margin
                                 </span>

@@ -72,6 +72,8 @@ export const properties = pgTable("properties", {
   isActive: boolean("is_active").default(true),
   rentUpdateCount: integer("rent_update_count").default(0),
   lastRentUpdateMonth: varchar("last_rent_update_month"), // Format: YYYY-MM
+  isVerified: boolean("is_verified").default(false),
+  verificationToken: varchar("verification_token"),
   rentInfo: jsonb("rent_info"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -397,6 +399,7 @@ export const manualPayments = pgTable("manual_payments", {
   receiptUrl: varchar("receipt_url"), // For uploaded receipt images
   landlordEmail: varchar("landlord_email"), // Landlord email for verification
   landlordPhone: varchar("landlord_phone"), // Landlord phone for verification
+  verificationToken: varchar("verification_token"), // Token for email verification
   needsVerification: boolean("needs_verification").default(true),
   verifiedAt: timestamp("verified_at"),
   verifiedBy: varchar("verified_by"), // landlord email or admin

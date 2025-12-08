@@ -4,14 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { 
-  X, 
-  ChevronRight, 
-  ChevronLeft, 
-  Home, 
-  CreditCard, 
-  FileText, 
-  Settings, 
+import {
+  X,
+  ChevronRight,
+  ChevronLeft,
+  Home,
+  CreditCard,
+  FileText,
+  Settings,
   Bell,
   Building2,
   TrendingUp,
@@ -44,8 +44,8 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'welcome',
     title: 'Welcome to Enoíkio!',
-    description: 'Your journey to building credit through rent payments starts here',
-    content: 'Enoíkio helps you track rent payments and build a credit history that landlords and lenders can trust. Let\'s take a quick tour of your new dashboard.',
+    description: 'Your journey to building your Rent Score through rent payments starts here',
+    content: 'Enoíkio helps you track rent payments and build a Rent Score history that landlords and lenders can trust. Let\'s take a quick tour of your new dashboard.',
     icon: Home,
     position: 'center'
   },
@@ -53,7 +53,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'dashboard-overview',
     title: 'Dashboard Overview',
     description: 'Your financial health at a glance',
-    content: 'This is your main dashboard where you can see your payment history, credit score trends, and upcoming rent payments. Everything you need is organized clearly here.',
+    content: 'This is your main dashboard where you can see your payment history, Rent Score trends, and upcoming rent payments. Everything you need is organized clearly here.',
     target: '.dashboard-stats',
     icon: TrendingUp,
     position: 'bottom'
@@ -62,17 +62,17 @@ const TOUR_STEPS: TourStep[] = [
     id: 'payment-tracking',
     title: 'Payment Tracking',
     description: 'Monitor your rent payment history',
-    content: 'Track all your rent payments in one place. Each on-time payment helps build your credit profile. You can see payment status, due dates, and your payment streak.',
+    content: 'Track all your rent payments in one place. Each on-time payment helps build your Rent Score profile. You can see payment status, due dates, and your payment streak.',
     target: '.payment-history',
     icon: CreditCard,
     position: 'top'
   },
   {
-    id: 'credit-reports',
-    title: 'Credit Reports',
-    description: 'Generate and share your rental credit history',
-    content: 'Create professional credit reports to share with landlords, letting agencies, or lenders. Your payment history becomes a powerful tool for securing better rental opportunities.',
-    target: '.credit-reports',
+    id: 'rent-reports',
+    title: 'Rent Reports',
+    description: 'Generate and share your rental history',
+    content: 'Create professional Rent Reports to share with landlords, letting agencies, or lenders. Your payment history becomes a powerful tool for securing better rental opportunities.',
+    target: '.rent-reports',
     icon: FileText,
     position: 'left'
   },
@@ -88,14 +88,14 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'rent-tracking',
     title: 'Track Your Rent Payments',
-    description: 'Build credit through rent',
-    content: 'Log your rent payments to build your credit history. You can upload receipts manually or connect your bank for automatic tracking. Each verified payment strengthens your financial profile.',
+    description: 'Build your Rent Score through rent',
+    content: 'Log your rent payments to build your Rent Score history. You can upload receipts manually or connect your bank for automatic tracking. Each verified payment strengthens your financial profile.',
     target: '.payment-history',
     icon: CreditCard,
     position: 'top',
     action: {
       label: 'Log My Rent',
-      onClick: () => window.location.href = '/credit-builder'
+      onClick: () => window.location.href = '/rent-score-builder'
     }
   },
   {
@@ -120,7 +120,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'get-started',
     title: 'Ready to Get Started?',
     description: 'Complete your setup in just a few steps',
-    content: 'Now that you know your way around, let\'s complete your profile setup. Add your property details and connect your bank to start building your credit history.',
+    content: 'Now that you know your way around, let\'s complete your profile setup. Add your property details and connect your bank to start building your Rent Score history.',
     icon: Zap,
     position: 'center',
     action: {
@@ -141,7 +141,7 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
     if (isOpen) {
       // Add tour overlay class to body
       document.body.classList.add('tour-active');
-      
+
       // Highlight target element if it exists
       if (currentTourStep.target) {
         const element = document.querySelector(currentTourStep.target);
@@ -208,7 +208,7 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
     <>
       {/* Tour Overlay */}
       <div className="fixed inset-0 bg-black/50 z-40 tour-overlay" />
-      
+
       {/* Tour Dialog */}
       <Dialog open={isOpen} onOpenChange={handleSkip}>
         <DialogContent className="sm:max-w-lg z-50">
@@ -254,7 +254,7 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
                 <p className="text-gray-700 leading-relaxed">
                   {currentTourStep.content}
                 </p>
-                
+
                 {currentStep === 0 && (
                   <div className="mt-4 grid grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
@@ -296,13 +296,12 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
                 {TOUR_STEPS.map((_, index) => (
                   <div
                     key={index}
-                    className={`h-2 w-2 rounded-full transition-all duration-200 ${
-                      index === currentStep
-                        ? 'bg-blue-600 w-6'
-                        : index < currentStep
+                    className={`h-2 w-2 rounded-full transition-all duration-200 ${index === currentStep
+                      ? 'bg-blue-600 w-6'
+                      : index < currentStep
                         ? 'bg-blue-300'
                         : 'bg-gray-200'
-                    }`}
+                      }`}
                   />
                 ))}
               </div>
@@ -318,7 +317,7 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
                     Back
                   </Button>
                 )}
-                
+
                 {currentTourStep.action ? (
                   <Button
                     onClick={currentTourStep.action.onClick}
@@ -409,7 +408,7 @@ export function useDashboardTour() {
 
   const startTour = () => setShowTour(true);
   const closeTour = () => setShowTour(false);
-  
+
   const completeTour = () => {
     localStorage.setItem('enoikio_tour_completed', 'true');
     setShowTour(false);

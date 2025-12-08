@@ -33,9 +33,10 @@ import LandlordVerifications from "@/pages/landlord-verifications";
 import LandlordAnalytics from "@/pages/landlord-analytics";
 import LandlordVerification from "@/pages/landlord-verification";
 import LandlordVerify from "@/pages/landlord-verify";
+import LandlordVerifyPayment from "@/pages/landlord-verify-payment";
 import OnboardingPage from "@/pages/onboarding";
 import RentTracker from "@/pages/rent-tracker";
-import CreditBuilder from "@/pages/credit-builder";
+import RentScoreBuilder from "@/pages/rent-score-builder";
 import ManualVerify from "@/pages/manual-verify";
 import Trust from "@/pages/trust";
 import ReportGenerator from "@/pages/report-generator";
@@ -82,6 +83,7 @@ function Router() {
 
       {/* Public landlord verification route */}
       <Route path="/landlord/verify/:token" component={LandlordVerify} />
+      <Route path="/landlord/verify-payment/:token" component={LandlordVerifyPayment} />
 
       {/* Public routes - available when not authenticated */}
       <Route path="/auth" component={AuthPage} />
@@ -154,7 +156,7 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/rent-tracker" component={RentTracker} />
-      <Route path="/credit-builder" component={CreditBuilder} />
+      <Route path="/rent-score-builder" component={RentScoreBuilder} />
       <Route path="/manual-verify" component={ManualVerify} />
       <Route path="/trust" component={Trust} />
       <Route path="/report-generator" component={ReportGenerator} />

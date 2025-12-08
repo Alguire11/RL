@@ -109,7 +109,7 @@ export default function ManualVerify() {
         try {
           if (mode === "existing") {
             // Update existing payment with receipt
-            const response = await apiRequest("PATCH", `/api/payments/${selectedPaymentId}`, {
+            const response = await apiRequest("PATCH", `/api/manual-payments/${selectedPaymentId}`, {
               receiptUrl: base64File,
               landlordEmail: formData.landlordEmail,
               landlordPhone: formData.landlordPhone,
@@ -162,7 +162,7 @@ export default function ManualVerify() {
 
           // Redirect to credit builder after a short delay
           setTimeout(() => {
-            setLocation("/credit-builder");
+            setLocation("/rent-score-builder");
           }, 1500);
         } catch (error) {
           throw error;
@@ -204,15 +204,15 @@ export default function ManualVerify() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setLocation('/credit-builder')}
+            onClick={() => setLocation('/rent-score-builder')}
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Credit Builder
+            Back to Rent Score Builder
           </Button>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🧾 Upload Rent Proof</h1>
           <p className="text-gray-600">
-            Upload your rent receipt or proof of payment to verify your rent history and boost your credit score.
+            Upload your rent receipt or proof of payment to verify your rent history and boost your Rent score.
           </p>
         </div>
 

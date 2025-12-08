@@ -8,7 +8,7 @@ export interface DashboardStats {
   awaitingVerificationCount: number;
   onTimePercentage: number;
   nextPaymentDue: string | null;
-  creditScore: number;
+  rentScore: number;
   onTimeScore: number;
   verificationScore: number;
   rentToIncomeScore: number;
@@ -16,5 +16,5 @@ export interface DashboardStats {
   verificationStatus: VerificationStatus;
   verified: number;
   pendingVerificationCount: number;
-  creditGrowth: number;
+  rentScoreGrowth: number;
 }

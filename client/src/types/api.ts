@@ -47,6 +47,9 @@ export interface ManualPayment {
   description?: string | null;
   receiptUrl?: string | null;
   needsVerification?: boolean;
+  landlordEmail?: string | null;
+  landlordPhone?: string | null;
+  verifiedAt?: string | null;
 }
 
 export interface NotificationSettings {

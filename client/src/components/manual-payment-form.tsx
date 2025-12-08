@@ -348,23 +348,40 @@ export function ManualPaymentList() {
     retry: false,
   });
 
+  const [verifyingId, setVerifyingId] = useState<number | null>(null);
+
   const verifyMutation = useMutation({
     mutationFn: async (paymentId: number) => {
-      const response = await apiRequest("POST", `/api/payments/${paymentId}/request-verification`);
-      if (!response.ok) throw new Error("Failed to send verification request");
-      return response.json();
+      setVerifyingId(paymentId);
+      try {
+        const response = await apiRequest("POST", `/api/manual-payments/${paymentId}/reverify`);
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.indexOf("application/json") !== -1) {
+            const error = await response.json();
+            throw new Error(error.message || "Failed to send verification request");
+          } else {
+            const text = await response.text();
+            console.error("Non-JSON response:", text);
+            throw new Error("Server returned an invalid response. Please try again later.");
+          }
+        }
+        return response.json();
+      } finally {
+        setVerifyingId(null);
+      }
     },
     onSuccess: () => {
       toast({
-        title: "Verification Requested",
-        description: "An email has been sent to your landlord for verification.",
+        title: "Verification Email Sent",
+        description: "A verification request has been sent to your landlord.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/manual-payments"] });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: "Failed to send verification request. Please try again.",
+        title: "Cannot Send Verification",
+        description: error.message || "Failed to send verification request. Please try again.",
         variant: "destructive",
       });
     },
@@ -428,10 +445,21 @@ export function ManualPaymentList() {
                               size="sm"
                               variant="outline"
                               className="h-6 text-xs"
-                              onClick={() => verifyMutation.mutate(payment.id)}
-                              disabled={verifyMutation.isPending}
+                              onClick={() => {
+                                if (!payment.landlordEmail) {
+                                  toast({
+                                    title: "Landlord Email Required",
+                                    description: "Please add landlord contact information to send verification.",
+                                  });
+                                  // Redirect to manual-verify page to add landlord email
+                                  window.location.href = '/manual-verify';
+                                } else {
+                                  verifyMutation.mutate(payment.id);
+                                }
+                              }}
+                              disabled={verifyingId === payment.id}
                             >
-                              {verifyMutation.isPending ? "Sending..." : "Verify"}
+                              {verifyingId === payment.id ? "Sending..." : "Verify"}
                             </Button>
                           </>
                         ) : (

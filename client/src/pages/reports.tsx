@@ -72,13 +72,28 @@ export default function Reports() {
       }
       toast({
         title: "Error",
-        description: "Failed to generate report. Please try again.",
+        description: error.message || "Failed to generate report. Please try again.",
         variant: "destructive",
       });
     },
   });
 
+  const { plan } = useSubscription();
+
   const handleGenerateReport = (propertyId: number) => {
+    if (plan.id === 'free') {
+      toast({
+        title: "Premium Feature",
+        description: "Upgrade to Standard or Premium to generate professional rent reports.",
+        variant: "default",
+        action: (
+          <Button variant="outline" size="sm" onClick={() => window.location.href = '/subscribe'}>
+            Upgrade
+          </Button>
+        ),
+      });
+      return;
+    }
     generateReportMutation.mutate(propertyId);
   };
 
@@ -146,8 +161,8 @@ export default function Reports() {
       <Navigation />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Credit Reports</h1>
-          <p className="text-gray-600">Generate and share professional rental credit reports</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Rent Reports</h1>
+          <p className="text-gray-600">Generate and share professional rental ledger</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -171,7 +186,7 @@ export default function Reports() {
                         disabled={generateReportMutation.isPending}
                         className="gradient-primary text-white"
                       >
-                        {generateReportMutation.isPending ? 'Generating...' : 'Generate New Report'}
+                        {generateReportMutation.isPending ? 'Generating...' : plan.id === 'free' ? 'Unlock Reports' : 'Generate New Report'}
                       </Button>
                     )}
                   </div>
@@ -190,7 +205,7 @@ export default function Reports() {
                         disabled={generateReportMutation.isPending}
                         className="gradient-primary text-white"
                       >
-                        {generateReportMutation.isPending ? 'Generating...' : 'Generate New Report'}
+                        {generateReportMutation.isPending ? 'Generating...' : plan.id === 'free' ? 'Unlock Reports' : 'Generate New Report'}
                       </Button>
                     )}
                   </div>
@@ -201,44 +216,50 @@ export default function Reports() {
 
           {/* Report Actions */}
           <div className="space-y-6">
-            {/* Generate New Report */}
+            {/* Quick Actions */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Generate Report</CardTitle>
+                <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
               </CardHeader>
-              <CardContent>
-                {properties.length > 0 ? (
-                  <div className="space-y-3">
-                    {properties.map((property) => (
-                      <Button
-                        key={property.id}
-                        onClick={() => handleGenerateReport(property.id)}
-                        disabled={generateReportMutation.isPending}
-                        className="w-full justify-start text-left h-auto p-4"
-                        variant="outline"
-                      >
-                        <div>
-                          <p className="font-medium">{property.address}</p>
-                          <p className="text-sm text-gray-600">{property.city}, {property.postcode}</p>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-gray-600 mb-4">No properties found</p>
-                    <Button variant="outline" size="sm">
-                      Add Property
-                    </Button>
-                  </div>
-                )}
+              <CardContent className="space-y-4">
+                <Button
+                  variant="outline"
+                  className="w-full h-12 border-primary text-primary hover:bg-primary/5"
+                  onClick={() => window.location.href = '/manual-verify'}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Payment Record
+                </Button>
+
+                {properties.map((property) => (
+                  <Button
+                    key={property.id}
+                    onClick={() => handleGenerateReport(property.id)}
+                    disabled={generateReportMutation.isPending}
+                    className="w-full h-12 border-primary text-primary hover:bg-primary/5 relative"
+                    variant="outline"
+                  >
+                    {plan.id === 'free' && <Lock className="w-3 h-3 absolute top-1 right-1 text-gray-400" />}
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate Rent Report
+                  </Button>
+                ))}
+
+                <Button
+                  onClick={() => window.location.href = '/portfolio'}
+                  className="w-full h-12 border-primary text-primary hover:bg-primary/5"
+                  variant="outline"
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share Portfolio
+                </Button>
               </CardContent>
             </Card>
 
             {/* Report History */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">Report History</CardTitle>
+                <CardTitle className="text-lg font-semibold">My Ledger History</CardTitle>
               </CardHeader>
               <CardContent>
                 {reports.length > 0 ? (
@@ -246,11 +267,10 @@ export default function Reports() {
                     {reports.map((report) => (
                       <div
                         key={report.id}
-                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                          selectedReport?.id === report.id 
-                            ? 'border-primary bg-primary/5' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${selectedReport?.id === report.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                          }`}
                         onClick={() => setSelectedReport(report)}
                       >
                         <div className="flex justify-between items-start mb-2">

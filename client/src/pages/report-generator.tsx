@@ -88,7 +88,7 @@ export default function ReportGenerator() {
       setGeneratedReport(data);
       toast({
         title: "Report Generated",
-        description: "Your report has been generated successfully and is ready for download.",
+        description: "Your Rent report has been generated successfully and is ready for download.",
       });
     },
     onError: (error: any) => {
@@ -105,7 +105,7 @@ export default function ReportGenerator() {
       }
       toast({
         title: "Error",
-        description: error.message || "Failed to generate report",
+        description: error.message || "Failed to generate Rent report",
         variant: "destructive",
       });
     },
@@ -127,7 +127,7 @@ export default function ReportGenerator() {
 
       toast({
         title: "Download Started",
-        description: "Your report is being downloaded as a JSON file.",
+        description: "Your Rent report is being downloaded.",
       });
     }
   };
@@ -180,7 +180,7 @@ export default function ReportGenerator() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Generate Report</h1>
           <p className="text-gray-600">
-            Generate comprehensive reports of your payment history and rental achievements to share with landlords, lenders, or agencies.
+            Generate your comprehensive Rent report of your payment history and rental achievements to share with landlords, lenders, or agencies.
           </p>
         </div>
 
@@ -189,7 +189,7 @@ export default function ReportGenerator() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <FileText className="w-5 h-5 mr-2" />
-                Report Configuration
+                Rent Report Configuration
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -204,7 +204,7 @@ export default function ReportGenerator() {
                         Credit Building Report
                       </Label>
                       <p className="text-sm text-gray-500 mt-1">
-                        Comprehensive report showing payment history, reliability metrics, and credit-building potential.
+                        Comprehensive rent report showing payment history, reliability metrics, and credit-building potential.
                       </p>
                     </div>
                   </div>
