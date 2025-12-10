@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,11 @@ export default function AdminLogin() {
 
       const user = await response.json();
 
+      // Invalidate query to ensure fresh auth state
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // Also potentially set the data directly for immediate UI update
+      queryClient.setQueryData(["/api/user"], user);
+
       toast({
         title: "Login Successful",
         description: `Welcome back, ${user.firstName || 'Administrator'}!`,
@@ -47,9 +53,8 @@ export default function AdminLogin() {
 
       if (user.role === 'admin') {
         setLocation('/admin');
-      } else if (user.role === 'landlord') {
-        setLocation('/landlord-dashboard');
       } else {
+        // Fallback, though backend should prevent this
         setLocation('/dashboard');
       }
     } catch (err: any) {

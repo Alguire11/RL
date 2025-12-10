@@ -28,15 +28,32 @@ export default function VerifyEmail() {
                 if (response.ok) {
                     setStatus("success");
                     setMessage(data.message || "Email verified successfully!");
-                    // Redirect based on role
+
+                    // Force refresh of user data to ensure emailVerified is true in frontend cache
+                    // This prevents redirect loops or stale UI
+                    await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+
+                    // Redirect based on role and auth status
                     setTimeout(() => {
-                        if (data.user?.role === 'landlord') {
-                            setLocation("/landlord-dashboard");
-                        } else if (data.user?.role === 'admin') {
-                            setLocation("/admin");
-                        } else {
-                            setLocation("/dashboard");
-                        }
+                        // Check if we have a user session by attempting to fetch the user
+                        // If not logged in, go to login. If logged in, go to dashboard.
+                        queryClient.fetchQuery({ queryKey: ["/api/user"] }).then((user: any) => {
+                            if (!user) {
+                                setLocation("/auth");
+                                return;
+                            }
+
+                            if (user.role === 'landlord') {
+                                setLocation("/landlord-dashboard");
+                            } else if (user.role === 'admin') {
+                                setLocation("/admin");
+                            } else {
+                                setLocation("/dashboard");
+                            }
+                        }).catch(() => {
+                            // If fetch fails (401), redirect to login
+                            setLocation("/auth");
+                        });
                     }, 2000);
                 } else {
                     setStatus("error");

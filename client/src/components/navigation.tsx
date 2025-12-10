@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle, TrendingUp, Upload } from "lucide-react";
+import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle, TrendingUp, Upload, CreditCard } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -23,24 +23,30 @@ export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Check if user is admin
-  const { data: adminUser } = useQuery({
-    queryKey: ["/api/admin/stats"],
-    retry: false,
-    enabled: !!user && user.role === "admin",
-  });
-
-  const isAdmin = user?.role === "admin" && !!adminUser;
+  const isAdmin = user?.role === "admin";
 
   // Don't show Dashboard when already on dashboard
   const isOnDashboard = location === "/" || location === "/dashboard";
+  const isOnAdminDashboard = location === "/admin";
 
-  const navItems = [
-    ...(isOnDashboard ? [] : [{ path: "/dashboard", label: "Dashboard", icon: BarChart3 }]),
-    { path: "/rent-score-builder", label: "Rent Score Builder", icon: TrendingUp },
-    { path: "/manual-verify", label: "Manual Verification", icon: Upload },
-    { path: "/settings", label: "Settings", icon: Settings },
-    ...(isAdmin ? [{ path: "/admin", label: "Admin", icon: Shield }] : []),
-  ];
+  let navItems;
+
+  if (isAdmin) {
+    navItems = [
+      { path: "/admin", label: "Overview", icon: BarChart3 },
+      { path: "/admin/users", label: "Users", icon: Users },
+      { path: "/admin/properties", label: "Properties", icon: Building },
+      { path: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard }, // Using CreditCard as icon isn't imported, but Shield or similar is available. Let's use FileText for now or keep existing import
+      { path: "/admin/settings", label: "Settings", icon: Settings },
+    ];
+  } else {
+    navItems = [
+      ...(isOnDashboard ? [] : [{ path: "/dashboard", label: "Dashboard", icon: BarChart3 }]),
+      { path: "/rent-score-builder", label: "Rent Score Builder", icon: TrendingUp },
+      { path: "/manual-verify", label: "Manual Verification", icon: Upload },
+      { path: "/settings", label: "Settings", icon: Settings },
+    ];
+  }
 
   const isActive = (path: string) => {
     if (path === "/" && location === "/") return true;

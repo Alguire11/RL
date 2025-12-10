@@ -46,6 +46,7 @@ import Subscribe from "@/pages/subscribe";
 import SupportRequest from "@/pages/support-request";
 import MaintenancePage from "@/pages/maintenance";
 import VerifyEmail from "@/pages/verify-email";
+import VerifyEmailEnforced from "@/pages/verify-email-enforced";
 
 // Lazy load admin pages
 const AdminUsers = lazy(() => import("@/pages/admin-users"));
@@ -55,6 +56,7 @@ const AdminRevenue = lazy(() => import("@/pages/admin-revenue"));
 const AdminModeration = lazy(() => import("@/pages/admin-moderation"));
 const AdminProperties = lazy(() => import("@/pages/admin-properties"));
 const AdminAuditLogs = lazy(() => import("@/pages/admin-audit-logs"));
+const AdminUserDetails = lazy(() => import("@/pages/admin-user-details"));
 const Disputes = lazy(() => import("@/pages/disputes"));
 
 function Router() {
@@ -80,6 +82,7 @@ function Router() {
 
       {/* Email verification route */}
       <Route path="/verify-email/:token" component={VerifyEmail} />
+      <Route path="/verify-email-enforced" component={VerifyEmailEnforced} />
 
       {/* Public landlord verification route */}
       <Route path="/landlord/verify/:token" component={LandlordVerify} />
@@ -114,6 +117,11 @@ function Router() {
       <Route path="/admin/users" component={() => (
         <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
           <AdminUsers />
+        </Suspense>
+      )} />
+      <Route path="/admin/users/:id" component={() => (
+        <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+          <AdminUserDetails />
         </Suspense>
       )} />
       <Route path="/admin/settings" component={() => (

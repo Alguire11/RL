@@ -25,7 +25,7 @@ export default function AdminAuditLogs() {
     endDate: "",
   });
 
-  const { data: logs, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["/api/admin/audit-logs", filters],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -39,6 +39,8 @@ export default function AdminAuditLogs() {
       return res.json();
     },
   });
+
+  const logs = data?.logs || [];
 
   const handleExport = () => {
     // Implementation for export functionality
@@ -150,7 +152,7 @@ export default function AdminAuditLogs() {
               {logs?.map((log: any) => (
                 <TableRow key={log.id}>
                   <TableCell>
-                    {format(new Date(log.timestamp), "MMM d, yyyy HH:mm:ss")}
+                    {format(new Date(log.createdAt || log.timestamp || new Date()), "MMM d, yyyy HH:mm:ss")}
                   </TableCell>
                   <TableCell className="font-medium">{log.userEmail || log.userId}</TableCell>
                   <TableCell>

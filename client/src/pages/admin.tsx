@@ -590,7 +590,8 @@ export default function AdminDashboard() {
                                   onClick={() => handleEditUser(user)}
                                   data-testid={`button-edit-user-${user.id}`}
                                 >
-                                  <Edit className="h-4 w-4" />
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
                                 </Button>
                                 <Button
                                   size="sm"
@@ -599,7 +600,8 @@ export default function AdminDashboard() {
                                   onClick={() => handleResetPassword(user)}
                                   data-testid={`button-reset-password-${user.id}`}
                                 >
-                                  <Key className="h-4 w-4" />
+                                  <Key className="h-4 w-4 mr-1" />
+                                  Reset
                                 </Button>
                               </div>
                             </TableCell>

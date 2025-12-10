@@ -1,206 +1,316 @@
-import PDFDocument from "pdfkit";
-import { format } from "date-fns";
+import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
 
-interface PDFReportData {
-  user: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-  };
-  property: {
-    address: string;
-    city: string;
-    postcode: string;
-    monthlyRent: number;
-  };
-  payments: {
-    id: number;
-    amount: number;
-    dueDate: string;
-    paidDate?: string;
-    status: string;
-    method?: string;
-  }[];
+// Define types for better type safety
+interface ReportData {
+  reportType?: 'credit' | 'rental' | 'landlord';
   reportId: string;
-  generatedAt: string;
-  verificationStatus: 'verified' | 'pending' | 'unverified';
-  landlordInfo?: {
-    name: string;
-    email: string;
-    verifiedAt?: string;
-  };
+  generatedDate?: string;
+  generatedAt?: string;
+  user?: { firstName?: string; lastName?: string; email?: string; phone?: string; name?: string };
+  userInfo?: { name: string; email: string; phone?: string; rlid?: string };
+  property?: { address: string; city: string; postcode: string; monthlyRent: number | string };
+  currentAddress?: { fullAddress: string; city: string; postcode: string; moveInDate?: string };
+  currentProperty?: { fullAddress: string; city: string; postcode: string; moveInDate?: string; monthlyRent: number };
+  tenantInfo?: { name: string; email: string };
+  propertyDetails?: { fullAddress: string; monthlyRent: number };
+  landlordInfo?: { name: string; email: string; verificationStatus: string; verifiedAt?: string };
+  payments?: any[];
+  paymentHistory?: any[];
+  paymentRecords?: any[];
   rentScore?: number;
-  tenancyStartDate?: string;
-  tenancyEndDate?: string;
+  onTimeRate?: number;
+  totalPaid?: number;
+  paymentSummary?: { totalPaid: number; onTimeRate: number; totalPayments: number };
+  reliabilityMetrics?: { rentScore: number; onTimeRate: number; totalPaid: number };
+  badges?: any[];
+  earnedBadges?: any[];
 }
 
-export async function generatePDFReport(data: PDFReportData): Promise<Buffer> {
+export const sampleData = {
+  user: {
+    firstName: 'Alex',
+    lastName: 'Johnson',
+    email: 'alex.johnson@example.com',
+    phone: '07700 900000'
+  },
+  property: {
+    address: '42 Park Road',
+    city: 'London',
+    postcode: 'SW19 2HZ',
+    monthlyRent: 1200
+  },
+  payments: [
+    { id: 1, amount: 1200, dueDate: '2023-07-01', paidDate: '2023-07-01', status: 'paid', method: 'Direct Debit', isVerified: true },
+    { id: 2, amount: 1200, dueDate: '2023-06-01', paidDate: '2023-06-01', status: 'paid', method: 'Direct Debit', isVerified: true },
+    { id: 3, amount: 1200, dueDate: '2023-05-01', paidDate: '2023-05-01', status: 'paid', method: 'Direct Debit', isVerified: true },
+    { id: 4, amount: 1200, dueDate: '2023-04-01', paidDate: '2023-04-01', status: 'paid', method: 'Direct Debit', isVerified: true },
+    { id: 5, amount: 1200, dueDate: '2023-03-01', paidDate: '2023-03-01', status: 'paid', method: 'Direct Debit', isVerified: true },
+    { id: 6, amount: 1200, dueDate: '2023-02-01', paidDate: '2023-02-01', status: 'paid', method: 'Direct Debit', isVerified: true },
+    { id: 7, amount: 1200, dueDate: '2023-01-01', paidDate: '2023-01-01', status: 'paid', method: 'Direct Debit', isVerified: true },
+  ],
+  reportId: 'SAMPLE-001',
+  generatedAt: new Date().toISOString(),
+  verificationStatus: 'verified',
+  rentScore: 950,
+  onTimeRate: 100,
+  totalPaid: 8400,
+  landlordInfo: {
+    name: 'Citywide Estates',
+    email: 'agents@citywide.co.uk',
+    verificationStatus: 'verified'
+  }
+};
+
+export async function generateCreditReportPDF(data: ReportData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
-    const buffers: Buffer[] = [];
+    try {
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const buffers: Buffer[] = [];
 
-    doc.on('data', buffers.push.bind(buffers));
-    doc.on('end', () => resolve(Buffer.concat(buffers)));
-    doc.on('error', reject);
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-    const { user, property, payments, reportId, generatedAt, landlordInfo, rentScore, tenancyStartDate, tenancyEndDate } = data;
+      // --- Helper Functions ---
+      const formatDate = (dateStr?: string | Date | null) => {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+      };
 
-    // --- Header ---
-    // Logo Icon (CSS-based 'R' recreated in vector)
-    doc.save();
-    const grad = doc.linearGradient(50, 45, 110, 105);
-    grad.stop(0, "#3b82f6")
-        .stop(1, "#4f46e5");
-    
-    doc.roundedRect(50, 45, 60, 60, 12)
-       .fillAndStroke(grad, "#3b82f6");
+      const formatCurrency = (amount: number | string) => {
+        return `£${Number(amount).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
 
-    doc.fillColor('white')
-      .fontSize(36)
-      .font('Helvetica-Bold')
-      .text('R', 68, 58);
-    doc.restore();
+      // --- Data Normalization ---
+      const reportType = data.reportType || 'credit';
+      const reportId = data.reportId;
+      const generatedDate = data.generatedDate || data.generatedAt || new Date().toISOString();
+      const user = data.user || data.userInfo || data.tenantInfo || { name: 'Unknown', email: 'N/A' };
+      const userName = (user as any).firstName ? `${(user as any).firstName} ${(user as any).lastName}` : ((user as any).name || 'Unknown');
 
-    // Logo Text
-    doc.fillColor('#0f172a')
-      .fontSize(28) // Reduced from 42 to fit better
-      .font('Helvetica-Bold')
-      .text('Rent Ledger', 125, 60);
+      const property = data.property || data.currentAddress || data.currentProperty || data.propertyDetails || { fullAddress: 'N/A', city: '', postcode: '' };
+      const propertyAddress = (property as any).fullAddress ||
+        ((property as any).address ? `${(property as any).address}, ${(property as any).city || ''}, ${(property as any).postcode || ''}` : 'N/A');
 
-    doc.moveDown(2);
+      const payments = data.payments || data.paymentHistory || data.paymentRecords || [];
 
-    // --- Info Grid ---
-    const startY = 130;
-    let currentY = startY;
+      const landlord = data.landlordInfo || { name: 'N/A', email: 'N/A' };
 
-    // Tenant Info
-    doc.fontSize(10).fillColor('#64748b').font('Helvetica-Bold').text('TENANT NAME', 50, currentY);
-    doc.fontSize(14).fillColor('#0f172a').font('Helvetica').text(`${user.firstName} ${user.lastName}`, 50, currentY + 15);
-    doc.fontSize(12).fillColor('#334155').text(`${property.address}, ${property.city}, ${property.postcode}`, 50, currentY + 35);
+      // --- Watermark ---
+      doc.save();
+      doc.translate(300, 400); // Center of A4 roughly
+      doc.rotate(-45);
+      doc.fontSize(80);
+      doc.fillColor('#f3f4f6'); // Very light gray
+      doc.opacity(0.4);
+      doc.text('RentLedger', -200, 0, { align: 'center', width: 400 });
+      doc.restore();
 
-    currentY += 70;
+      // --- Header ---
+      // Header - Logo
+      const logoPath = path.resolve(process.cwd(), 'client/public/logo.png');
+      try {
+        if (fs.existsSync(logoPath)) {
+          // Draw rounded rectangle for logo background
+          doc.roundedRect(490, 40, 60, 60, 10).fill('#3b82f6'); // Blue-500
+          // Place logo inside
+          doc.image(logoPath, 500, 50, { width: 40, height: 40 });
+        } else {
+          throw new Error('Logo file not found');
+        }
+      } catch (err) {
+        // Fallback if logo file missing or error loading
+        console.warn('Could not load logo for PDF:', err);
+        doc.roundedRect(490, 40, 60, 60, 10).fill('#3b82f6');
+        doc.fontSize(30).fillColor('white').text('R', 510, 55);
+      }
 
-    // Landlord Info
-    doc.fontSize(10).fillColor('#64748b').font('Helvetica-Bold').text('LANDLORD / AGENT', 50, currentY);
-    doc.fontSize(14).fillColor('#0f172a').font('Helvetica').text(landlordInfo?.name || 'Property Management', 50, currentY + 15);
+      // Title
+      const titleGradient = doc.linearGradient(50, 60, 250, 60);
+      titleGradient.stop(0, '#3b82f6').stop(1, '#8b5cf6');
 
-    currentY += 50;
+      doc.fontSize(28)
+        .font('Helvetica-Bold')
+        .fill(titleGradient)
+        .text('RentLedger', 50, 60, { align: 'left' });
 
-    // Tenancy Period
-    const startPeriod = tenancyStartDate ? format(new Date(tenancyStartDate), 'MMMM yyyy') : 'January 2023';
-    const endPeriod = tenancyEndDate ? format(new Date(tenancyEndDate), 'MMMM yyyy') : 'Present';
-    const tenancyPeriod = `${startPeriod} – ${endPeriod}`;
+      // Subtitle / Report Type
+      let reportTitle = 'Tenant Credit Report';
+      if (reportType === 'rental') reportTitle = 'Rental History Report';
+      if (reportType === 'landlord') reportTitle = 'Tenant Verification Report';
 
-    doc.fontSize(10).fillColor('#64748b').font('Helvetica-Bold').text('TENANCY PERIOD', 50, currentY);
-    doc.fontSize(14).fillColor('#0f172a').font('Helvetica').text(tenancyPeriod, 50, currentY + 15);
+      doc.fontSize(10).font('Helvetica').fillColor('#6b7280').text(reportTitle, 50, 95);
 
-    currentY += 50;
+      doc.moveDown(4);
 
-    // Stats Row (Rent Score & On-Time Payments)
-    if (rentScore) {
-      doc.moveTo(50, currentY).lineTo(545, currentY).strokeColor('#f1f5f9').stroke();
-      currentY += 20;
+      // --- Info Section (Grid Layout) ---
+      const leftColX = 50;
+      let currentY = 160;
 
-      // Rent Score
-      doc.fontSize(10).fillColor('#64748b').font('Helvetica-Bold').text('RENT SCORE', 50, currentY);
-      doc.fontSize(24).fillColor('#4f46e5').font('Helvetica-Bold').text(rentScore.toString(), 50, currentY + 15);
+      // Tenant Detail
+      doc.fontSize(10).fillColor('#6b7280').text('Tenant Name', leftColX, currentY);
+      doc.fontSize(12).fillColor('#111827').text(userName, leftColX, currentY + 15);
 
-      // On-Time Payments
-      doc.fontSize(10).fillColor('#64748b').font('Helvetica-Bold').text('ON-TIME PAYMENTS', 200, currentY);
-      const onTimeCount = payments.filter(p => p.status === 'paid').length;
-      doc.fontSize(24).fillColor('#10b981').font('Helvetica-Bold').text(onTimeCount.toString(), 200, currentY + 15);
+      doc.fontSize(10).fillColor('#6b7280').text('Address', leftColX, currentY + 40);
+      doc.fontSize(12).fillColor('#111827').text(propertyAddress, leftColX, currentY + 55, { width: 250 });
 
-      currentY += 60;
+      // Landlord Detail
+      doc.fontSize(10).fillColor('#6b7280').text('Landlord / Agent', leftColX, currentY + 95);
+      doc.fontSize(12).fillColor('#111827').text(landlord.name || 'N/A', leftColX, currentY + 110);
+
+      // Tenancy Period
+      const startDate = (property as any).moveInDate || (property as any).tenancyStart || (property as any).tenancyStartDate;
+      const tenancyPeriod = startDate ? `${formatDate(startDate)} – Present` : 'Active Tenancy';
+      doc.fontSize(10).fillColor('#6b7280').text('Tenancy Period', leftColX, currentY + 140);
+      doc.fontSize(12).fillColor('#111827').text(tenancyPeriod, leftColX, currentY + 155);
+
+      // Stats Column (Right aligned, kind of) - Only for Credit reports
+      if (reportType === 'credit') {
+        const rightColX = 350;
+        const statsY = 160;
+
+        // Stats container
+        doc.roundedRect(rightColX, statsY, 150, 80, 5).fill('#f9fafb');
+
+        // Rent Score
+        const score = data.rentScore || data.reliabilityMetrics?.rentScore || 0;
+        doc.fillColor('#2563eb').fontSize(24).text(score.toString(), rightColX + 20, statsY + 20);
+        doc.fillColor('#6b7280').fontSize(9).text('Rent Score', rightColX + 20, statsY + 50);
+
+        // On Time Rate
+        const rate = data.onTimeRate || data.paymentSummary?.onTimeRate || data.reliabilityMetrics?.onTimeRate || 0;
+        doc.fillColor('#059669').fontSize(24).text(`${rate}%`, rightColX + 90, statsY + 20);
+        doc.fillColor('#6b7280').fontSize(9).text('On-Time', rightColX + 90, statsY + 50);
+      }
+
+      doc.moveDown(2);
+      currentY = 360; // Table starts here (Increased spacing from top section)
+
+      // --- Payment History Table ---
+
+      // Table Header Background
+      doc.rect(50, currentY, 500, 30).fill('#f3f4f6');
+
+      // Table Header Text
+      doc.fontSize(9).fillColor('#111827').font('Helvetica-Bold');
+      doc.text('DATE', 70, currentY + 11);
+      doc.text('AMOUNT', 180, currentY + 11);
+      doc.text('STATUS', 280, currentY + 11);
+      doc.text('METHOD', 380, currentY + 11);
+      doc.text('VERIFIED', 480, currentY + 11);
+
+      currentY += 30; // Row start
+
+      // Rows
+      doc.font('Helvetica');
+      doc.fontSize(10);
+
+      // Border lines
+      // We will draw lines between rows
+
+      payments.slice(0, 15).forEach((p: any, i: number) => {
+        // Alternate row bg? Maybe unnecessary clean look is better
+
+        const date = formatDate(p.paidDate || p.dueDate);
+        const amount = formatCurrency(p.amount);
+        const status = (p.status || 'paid').charAt(0).toUpperCase() + (p.status || 'paid').slice(1);
+        const method = p.method || p.paymentMethod || 'Direct Debit';
+        const isVerified = p.isVerified || p.status === 'verified';
+
+        // Row Content
+        doc.fillColor('#374151');
+        doc.text(date, 70, currentY + 12);
+        doc.text(amount, 180, currentY + 12);
+        doc.text(status, 280, currentY + 12);
+        doc.text(method, 380, currentY + 12);
+
+        // Verified Icon (Circle Check)
+        if (isVerified) {
+          doc.circle(500, currentY + 16, 8).fill('#10b981'); // Green circle
+          // Checkmark (white lines)
+          doc.lineWidth(1.5).strokeColor('white');
+          doc.moveTo(496, currentY + 16).lineTo(499, currentY + 19).lineTo(504, currentY + 13).stroke();
+        }
+
+        // Horizontal Line
+        doc.rect(50, currentY + 35, 500, 1).fill('#e5e7eb');
+
+        currentY += 35;
+      });
+
+      // --- Achievement Badges Section ---
+      const badges = data.badges || data.earnedBadges || [];
+      if (badges.length > 0) {
+        // Check if we have enough space for the header + one row of badges (approx 100px)
+        // A4 height is ~841px. Footer is at 750. Safe limit around 650-700.
+        if (currentY + 120 > 750) {
+          doc.addPage();
+          currentY = 50; // Reset to top margin
+        } else {
+          currentY += 40;
+        }
+
+        // Section Header
+        doc.fontSize(14).fillColor('#111827').font('Helvetica-Bold');
+        doc.text('Achievement Portfolio', 50, currentY);
+        currentY += 25;
+
+        // Badge Grid
+        let badgeX = 50;
+        const colWidth = 160;
+
+        doc.font('Helvetica');
+        doc.fontSize(10);
+
+        badges.forEach((badge: any, index: number) => {
+          // Wrap to new row if needed
+          if (index > 0 && index % 3 === 0) {
+            currentY += 60;
+            badgeX = 50;
+
+            // Check if this new row will hit the footer area
+            if (currentY + 60 > 750) {
+              doc.addPage();
+              currentY = 50;
+            }
+          }
+
+          // Badge Box
+          doc.roundedRect(badgeX, currentY, 150, 50, 5).stroke('#e5e7eb');
+
+          // Icon placeholder (simple circle)
+          doc.circle(badgeX + 25, currentY + 25, 12).fill('#8b5cf6'); // Violet-500
+          doc.fillColor('white').fontSize(14).text('★', badgeX + 19, currentY + 20); // Star icon
+
+          // Text
+          doc.fillColor('#111827').fontSize(10).font('Helvetica-Bold');
+          // Format badge type title
+          const title = (badge.badgeType || 'Achievement')
+            .split('_')
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+
+          doc.text(title, badgeX + 45, currentY + 15, { width: 100 });
+
+          doc.fillColor('#6b7280').fontSize(8).font('Helvetica');
+          const levelText = badge.level ? `Level ${badge.level}` : 'Earned';
+          doc.text(levelText, badgeX + 45, currentY + 30);
+
+          badgeX += colWidth;
+        });
+      }
+
+      // Footer Meta
+      doc.fontSize(8).fillColor('#9ca3af');
+      const footerY = 750;
+      doc.text(`Generated by RentLedger on: ${new Date(generatedDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, 50, footerY);
+      doc.text(`Ledger ID: ${reportId.split('-').pop() || '003589'}`, 400, footerY, { align: 'right' });
+
+      doc.end();
+    } catch (error) {
+      console.error('PDF Generation Error:', error);
+      reject(error);
     }
-
-    doc.moveDown(2);
-
-    // --- Payment Table ---
-    const tableTop = currentY + 20;
-    const itemHeight = 40;
-    const colX = [50, 150, 250, 380, 480]; // Column X positions
-
-    // Table Header
-    doc.rect(50, tableTop, 495, 30).fill('#f8fafc');
-    doc.fillColor('#0f172a').fontSize(9).font('Helvetica-Bold');
-    doc.text('DATE', colX[0] + 10, tableTop + 10);
-    doc.text('AMOUNT', colX[1] + 10, tableTop + 10);
-    doc.text('STATUS', colX[2] + 10, tableTop + 10);
-    doc.text('METHOD', colX[3] + 10, tableTop + 10);
-    doc.text('VERIFIED', colX[4] + 10, tableTop + 10, { align: 'center', width: 40 });
-
-    let y = tableTop + 30;
-
-    // Sort payments
-    const sortedPayments = [...payments].sort((a, b) =>
-      new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
-    );
-
-    doc.font('Helvetica').fontSize(10);
-
-    sortedPayments.forEach((payment, i) => {
-      // Row background for even rows
-      if (i % 2 === 0) {
-        doc.rect(50, y, 495, itemHeight).fill('white');
-      } else {
-        doc.rect(50, y, 495, itemHeight).fill('#f8fafc'); // Alternating row color? Or just white/border
-      }
-
-      // Bottom border
-      doc.moveTo(50, y + itemHeight).lineTo(545, y + itemHeight).strokeColor('#e2e8f0').stroke();
-
-      doc.fillColor('#334155');
-
-      // Date
-      doc.text(format(new Date(payment.dueDate), 'MMM yyyy'), colX[0] + 10, y + 14);
-
-      // Amount
-      doc.text(`£${payment.amount.toLocaleString()}`, colX[1] + 10, y + 14);
-
-      // Status
-      const statusColor = payment.status === 'paid' ? '#0f172a' : '#ef4444';
-      doc.fillColor(statusColor).text(payment.status.charAt(0).toUpperCase() + payment.status.slice(1), colX[2] + 10, y + 14);
-
-      // Method
-      doc.fillColor('#334155').text(payment.method || 'Direct Debit', colX[3] + 10, y + 14);
-
-      // Verified Icon
-      if (payment.status === 'paid') {
-        // Draw a green checkmark circle
-        const iconX = colX[4] + 30;
-        const iconY = y + 20;
-        doc.circle(iconX, iconY, 10).fill('#10b981');
-
-        // Checkmark
-        doc.strokeColor('white').lineWidth(2)
-          .moveTo(iconX - 4, iconY)
-          .lineTo(iconX - 1, iconY + 3)
-          .lineTo(iconX + 4, iconY - 3)
-          .stroke();
-      } else {
-        doc.fillColor('#cbd5e1').text('-', colX[4] + 10, y + 14, { align: 'center', width: 40 });
-      }
-
-      y += itemHeight;
-
-      // New page if needed
-      if (y > 750) {
-        doc.addPage();
-        y = 50;
-      }
-    });
-
-    // --- Footer ---
-    const footerY = 780;
-    doc.moveTo(50, footerY).lineTo(545, footerY).strokeColor('#e2e8f0').stroke();
-    doc.fontSize(8).fillColor('#64748b').text(`Generated by RentLedger on: ${format(new Date(generatedAt), 'dd MMMM yyyy')}`, 50, footerY + 10);
-    doc.text(`Ledger ID: ${reportId.split('-')[0]}`, 400, footerY + 10, { align: 'right' });
-
-    doc.end();
   });
 }
-
-// Alias for compatibility
-export const generateCreditReportPDF = generatePDFReport;

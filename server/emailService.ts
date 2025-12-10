@@ -1,5 +1,8 @@
 import { Resend } from 'resend';
 
+import fs from 'fs';
+import path from 'path';
+
 // Use Resend API Key from environment
 const API_KEY = process.env.RESEND_API_KEY;
 
@@ -18,6 +21,7 @@ interface SendEmailParams {
   fromName?: string;
   toName?: string;
   replyTo?: string;
+  attachments?: any[];
 }
 
 export async function sendEmail(params: SendEmailParams): Promise<{ success: boolean; error?: string }> {
@@ -33,6 +37,7 @@ export async function sendEmail(params: SendEmailParams): Promise<{ success: boo
       from: `${params.fromName || FROM_NAME} <${params.from}>`,
       to: [params.to],
       subject: params.subject,
+      attachments: params.attachments,
     };
 
     // Add reply-to if provided
@@ -74,6 +79,174 @@ export function isEmailServiceEnabled(): boolean {
 }
 
 // --- TEMPLATES ---
+
+const appUrl = process.env.APP_URL || 'http://localhost:5000';
+
+// Helper to get logo attachment
+function getLogoAttachment() {
+  try {
+    // robust path resolution relative to this file (server/emailService.ts) -> up one level -> client/public
+    const logoPath = path.resolve(__dirname, '..', '..', 'client', 'public', 'logo-email.png');
+    const logoContent = fs.readFileSync(logoPath);
+    return {
+      filename: 'logo.png',
+      content: logoContent,
+      content_id: 'rl_logo', // standard cid without brackets for Resend usually works, but keeping simple
+      disposition: 'inline',
+    };
+  } catch (error) {
+    console.warn("Could not load logo-email.png for attachment", error);
+    try {
+      // Fallback to process.cwd() just in case
+      const fallbackPath = path.join(process.cwd(), 'client', 'public', 'logo-email.png');
+      const logoContent = fs.readFileSync(fallbackPath);
+      return {
+        filename: 'logo.png',
+        content: logoContent,
+        content_id: 'rl_logo',
+        disposition: 'inline',
+      };
+    } catch (e) {
+      console.error("Fallback logo load failed:", e);
+      return undefined;
+    }
+  }
+}
+
+function getStroopwafelEmailTemplate(title: string, content: string, ctaText?: string, ctaUrl?: string) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          background-color: #f1f5f9;
+          margin: 0;
+          padding: 0;
+          color: #1e293b;
+          line-height: 1.6;
+        }
+        .container {
+          max-width: 600px;
+          margin: 40px auto;
+          background-color: #ffffff;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .header {
+          padding: 32px;
+          text-align: center;
+          border-bottom: 1px solid #e2e8f0;
+          background-color: #ffffff;
+        }
+        .logo-img {
+          width: 48px;
+          height: 48px;
+          object-fit: contain;
+          margin-bottom: 16px;
+          background-color: transparent;
+        }
+        .brand-name {
+          display: block;
+          font-size: 20px;
+          font-weight: 700;
+          color: #0f172a;
+          letter-spacing: -0.02em;
+        }
+        .content {
+          padding: 40px 32px;
+        }
+        h1 {
+          font-size: 24px;
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0 0 24px 0;
+          letter-spacing: -0.02em;
+          text-align: center;
+        }
+        p {
+          font-size: 16px;
+          color: #475569;
+          margin: 0 0 24px 0;
+        }
+        .btn-container {
+          text-align: center;
+          margin-top: 32px;
+          margin-bottom: 32px;
+        }
+        .btn {
+          display: inline-block;
+          background: linear-gradient(135deg, #3b82f6 0%, #4f46e5 100%);
+          color: #ffffff !important;
+          font-weight: 600;
+          font-size: 16px;
+          padding: 14px 32px;
+          border-radius: 8px;
+          text-decoration: none;
+          box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+          transition: all 0.2s ease;
+        }
+        .btn:hover {
+          opacity: 0.9;
+          transform: translateY(-1px);
+        }
+        .footer {
+          background-color: #f8fafc;
+          padding: 32px;
+          text-align: center;
+          font-size: 13px;
+          color: #94a3b8;
+          border-top: 1px solid #e2e8f0;
+        }
+        .footer-brand {
+          font-weight: 600;
+          color: #64748b;
+          margin-bottom: 8px;
+          display: block;
+        }
+        .footer a {
+          color: #64748b;
+          text-decoration: underline;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <img src="cid:rl_logo" alt="RentLedger Logo" class="logo-img" />
+          <div class="brand-name">RentLedger</div>
+        </div>
+
+        <div class="content">
+          <h1>${title}</h1>
+
+          ${content}
+
+          ${ctaUrl && ctaText ? `
+            <div class="btn-container">
+              <a href="${ctaUrl}" class="btn">${ctaText}</a>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="footer">
+          <span class="footer-brand">RentLedger</span>
+          <p style="margin: 0;">© ${new Date().getFullYear()} RentLedger. All rights reserved.</p>
+          <div style="margin-top: 12px;">
+            <a href="#">Unsubscribe</a>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
 
 // 1. Tenant Invite
 export function createTenantInviteEmail(
@@ -225,202 +398,48 @@ export function createLandlordPaymentVerificationEmail(params: LandlordVerificat
     ? `${process.env.APP_URL || 'https://rentledger.co.uk'}/landlord/verify-payment/${params.verificationToken}`
     : `${process.env.APP_URL || 'https://rentledger.co.uk'}/landlord/verify-payment`;
 
-  const logoUrl = `${process.env.APP_URL || 'https://rentledger.co.uk'}/logo-email.png`;
+  const content = `
+    <p>Hello ${params.landlordName || 'Landlord'},</p>
+    <p>Your tenant <strong>${params.tenantName}</strong> has logged a new rent payment and uploaded a receipt. Please review and verify the payment details below:</p>
+    
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: left;">
+      <h3 style="margin: 0 0 16px 0; color: #0f172a; font-size: 16px; font-weight: 600;">Payment Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Property</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.propertyAddress}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Amount</td>
+          <td style="padding: 8px 0; color: #059669; font-weight: 600; text-align: right; font-size: 16px;">£${params.amount.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Payment Date</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.paymentDate}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Method</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.paymentMethod}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Receipt</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.receiptUrl ? '✅ Attached' : 'Not provided'}</td>
+        </tr>
+      </table>
+    </div>
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        body { 
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          line-height: 1.6; 
-          color: #1f2937; 
-          background-color: #f8fafc; 
-          margin: 0; 
-          padding: 0; 
-        }
-        .container { 
-          max-width: 600px; 
-          margin: 0 auto; 
-          background-color: #ffffff;
-        }
-        .header { 
-          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); /* RentLedger Blue Palette */
-          color: white; 
-          padding: 40px 20px; 
-          text-align: center; 
-        }
-        .logo-box {
-          background-color: white;
-          width: 50px;
-          height: 50px;
-          border-radius: 12px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 20px;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-          overflow: hidden;
-        }
-        .logo-box img {
-          width: 80%;
-          height: 80%;
-          object-fit: contain;
-        }
-        .header-title {
-          font-size: 24px;
-          font-weight: 700;
-          margin: 0;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        }
-        /* ... existing styles ... */
-        .content { 
-          padding: 40px 30px; 
-        }
-        .greeting {
-          font-size: 18px;
-          font-weight: 700;
-          color: #111827;
-          margin-bottom: 15px;
-        }
-        .intro-text {
-          color: #4b5563;
-          font-size: 16px;
-          margin-bottom: 30px;
-        }
-        .card { 
-          background: #f8fafc; 
-          border: 1px solid #e2e8f0; 
-          border-radius: 12px; 
-          padding: 25px; 
-          margin-bottom: 30px;
-        }
-        .detail-row { 
-          display: flex; 
-          justify-content: space-between; 
-          align-items: center;
-          padding: 12px 0; 
-          border-bottom: 1px solid #cbd5e1;
-        }
-        .detail-row:last-child { 
-          border-bottom: none; 
-        }
-        .label { 
-          font-weight: 700; 
-          color: #64748b; 
-          font-size: 14px;
-          width: 40%;
-        }
-        .value { 
-          font-weight: 600; 
-          color: #1e293b; 
-          font-size: 15px;
-          width: 60%;
-          text-align: left;
-        }
-        .amount-value {
-          color: #059669; /* Green for money */
-          font-size: 18px;
-        }
-        .receipt-link {
-          color: #2563eb;
-          text-decoration: none;
-          display: inline-flex;
-          align-items: center;
-          font-weight: 600;
-        }
-        .button-container { 
-          text-align: center; 
-          margin: 40px 0; 
-        }
-        .button { 
-          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); 
-          color: white !important; 
-          padding: 16px 36px; 
-          border-radius: 8px; 
-          text-decoration: none; 
-          font-weight: bold; 
-          font-size: 16px; 
-          display: inline-block;
-          box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4); 
-        }
-        .footer-text {
-          font-size: 14px;
-          color: #6b7280;
-          text-align: center;
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 1px solid #e5e7eb;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="logo-box">
-             <img src="${logoUrl}" alt="RL">
-          </div>
-          <h1 class="header-title">Rent Payment Verification Request</h1>
-        </div>
-        
-        <div class="content">
-          <div class="greeting">Hello ${params.landlordName || 'Landlord'},</div>
-          
-          <div class="intro-text">
-            Your tenant, <strong>${params.tenantName}</strong> has logged a new rent payment and uploaded a receipt. Please review and verify the payment details below:
-          </div>
-          
-          <div class="card">
-            <div class="detail-row">
-              <span class="label">Property</span>
-              <span class="value"><strong>${params.propertyAddress}</strong></span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Amount</span>
-              <span class="value amount-value"><strong>£${params.amount.toFixed(2)}</strong></span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Payment Date</span>
-              <span class="value"><strong>${params.paymentDate}</strong></span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Payment Method</span>
-              <span class="value"><strong>${params.paymentMethod}</strong></span>
-            </div>
-            <div class="detail-row">
-              <span class="label">Receipt</span>
-              <span class="value">
-                ${params.receiptUrl ? `✅ <strong>Attached</strong>` : `<span style="color: #94a3b8;">Not provided</span>`}
-              </span>
-            </div>
-          </div>
-          
-          <div class="test-align: center; color: #4b5563; font-size: 14px; margin-bottom: 20px;">
-             Verifying this payment helps <strong>${params.tenantName}</strong> build their credit history and demonstrates your cooperation as a landlord.
-          </div>
-          
-          <div class="button-container">
-            <a href="${verificationLink}" class="button">Verify Payment Now</a>
-          </div>
-          
-          <div class="footer-text">
-             <p>© ${new Date().getFullYear()} RentLedger. All rights reserved.</p>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
+    <p>Verifying this payment helps <strong>${params.tenantName}</strong> build their credit history and demonstrates your cooperation as a landlord.</p>
   `;
+
+  const html = getStroopwafelEmailTemplate("Rent Payment Verification", content, "Verify Payment Now", verificationLink);
 
   return {
     to: params.landlordEmail,
     from: FROM_EMAIL,
     fromName: 'RentLedger',
     subject,
-    html
+    html,
+    attachments: [getLogoAttachment()].filter(Boolean)
   };
 }
 
@@ -690,7 +709,7 @@ export const emailService = {
       text: `Hello, ${landlordName} has invited you to join RentLedger for ${propertyAddress}. Accept here: ${inviteUrl}`
     };
 
-    return sendEmail(emailParams);
+    return sendEmail({ ...emailParams, attachments: [getLogoAttachment()].filter(Boolean) });
   },
 
 
@@ -751,47 +770,19 @@ export const emailService = {
 
 // 10. Password Reset
 export function createPasswordResetEmail(to: string, resetUrl: string): SendEmailParams {
+  const content = `
+    <p>We received a request to reset your password for your RentLedger account.</p>
+    <p>Please click the button below to reset your password. This link is valid for 1 hour.</p>
+    <p>If you didn't request a password reset, you can safely ignore this email.</p>
+  `;
+
   return {
     to,
     from: FROM_EMAIL,
     fromName: 'RentLedger Security',
-    subject: 'Reset Your Password - RentLedger',
-    html: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .header { background: #dc2626; color: white; padding: 30px; text-align: center; }
-        .content { padding: 40px 30px; }
-        .button { display: inline-block; background: #dc2626; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-        .footer { background: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Password Reset Request</h1>
-        </div>
-        <div class="content">
-          <h2>Hello,</h2>
-          <p>We received a request to reset your password for your RentLedger account.</p>
-          <p>If you didn't make this request, you can safely ignore this email.</p>
-          
-          <div style="text-align: center;">
-            <a href="${resetUrl}" class="button">Reset Password</a>
-          </div>
-          
-          <p style="font-size: 14px; color: #64748b;">This link will expire in 1 hour.</p>
-        </div>
-        <div class="footer">
-          <p>© ${new Date().getFullYear()} RentLedger. All rights reserved.</p>
-        </div>
-      </div>
-    </body>
-    </html>
-    `
+    subject: 'Reset your password',
+    html: getStroopwafelEmailTemplate('Reset your password', content, 'Reset Password', resetUrl),
+    attachments: [getLogoAttachment()].filter(Boolean)
   };
 }
 
@@ -866,7 +857,8 @@ export function createRentPaymentNotificationEmail(
     from: FROM_EMAIL,
     fromName: 'RentLedger',
     subject,
-    html
+    html,
+    attachments: [getLogoAttachment()].filter(Boolean)
   };
 }
 
@@ -947,74 +939,33 @@ export function createWelcomeEmail(
   userName: string,
   userRole: string
 ): SendEmailParams {
-  const subject = `Welcome to RentLedger! 🎉`;
   const isLandlord = userRole === 'landlord';
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 40px 20px; text-align: center; }
-        .content { padding: 40px 30px; }
-        .button { display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-        .feature-list { background: #f8fafc; border-left: 4px solid #4f46e5; padding: 20px; margin: 20px 0; border-radius: 4px; }
-        .footer { background: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
-        h1 { margin: 0; font-size: 28px; }
-        h2 { color: #1e293b; margin-top: 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Welcome to RentLedger!</h1>
-        </div>
-        <div class="content">
-          <h2>Hi ${userName},</h2>
-          <p>Thank you for joining RentLedger! We're excited to help you ${isLandlord ? 'manage your properties and tenants' : 'build your credit history through rent payments'}.</p>
-          
-          <div class="feature-list">
-            <h3 style="margin-top: 0;">What you can do now:</h3>
-            <ul style="margin: 0; padding-left: 20px;">
-              ${isLandlord ? `
-                <li>Add your properties</li>
-                <li>Invite tenants to track their rent</li>
-                <li>Monitor payment history</li>
-                <li>Verify tenant payments</li>
-              ` : `
-                <li>Log your rent payments</li>
-                <li>Build your payment history</li>
-                <li>Earn credit-building badges</li>
-                <li>Generate shareable credit reports</li>
-              `}
-            </ul>
-          </div>
-          
-          <div style="text-align: center;">
-            <a href="${process.env.APP_URL || 'http://localhost:5000'}/dashboard" class="button">Go to Dashboard</a>
-          </div>
-          
-          <p style="margin-top: 30px; font-size: 14px; color: #64748b;">
-            Need help getting started? Check out our <a href="${process.env.APP_URL || 'http://localhost:5000'}/help" style="color: #4f46e5;">Help Center</a> or reply to this email.
-          </p>
-        </div>
-        <div class="footer">
-          <p>© ${new Date().getFullYear()} RentLedger. All rights reserved.</p>
-          <p>Questions? Contact us at support@rentledger.co.uk</p>
-        </div>
-      </div>
-    </body>
-    </html>
-    `;
+  const content = `
+    <p>Hi ${userName},</p>
+    <p>Thank you for joining RentLedger! We're excited to help you ${isLandlord ? 'manage your properties and tenants' : 'build your credit history through rent payments'}.</p>
+    <p><strong>What you can do now:</strong></p>
+    <ul>
+      ${isLandlord ? `
+        <li>Add your properties</li>
+        <li>Invite tenants to track their rent</li>
+        <li>Monitor payment history</li>
+        <li>Verify tenant payments</li>
+      ` : `
+        <li>Log your rent payments</li>
+        <li>Build your payment history</li>
+        <li>Earn credit-building badges</li>
+        <li>Generate shareable credit reports</li>
+      `}
+    </ul>
+  `;
 
   return {
     to: userEmail,
     from: FROM_EMAIL,
     fromName: 'RentLedger',
-    subject,
-    html
+    subject: 'Welcome to RentLedger!',
+    html: getStroopwafelEmailTemplate('Welcome to RentLedger!', content, 'Go to Dashboard', `${process.env.APP_URL || 'http://localhost:5000'}/dashboard`),
+    attachments: [getLogoAttachment()].filter(Boolean)
   };
 }
 
@@ -1024,68 +975,16 @@ export function createEmailVerificationEmail(
   userName: string,
   verificationUrl: string
 ): SendEmailParams {
-  const subject = `Verify Your Email - RentLedger`;
-
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 40px 20px; text-align: center; }
-        .content { padding: 40px 30px; }
-        .button { display: inline-block; background: #4f46e5; color: white; padding: 16px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; font-size: 16px; }
-        .footer { background: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
-        .info-box { background: #f8fafc; border-left: 4px solid #4f46e5; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        h1 { margin: 0; font-size: 28px; }
-        h2 { color: #1e293b; margin-top: 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>✉️ Verify Your Email</h1>
-        </div>
-        <div class="content">
-          <h2>Hi ${userName},</h2>
-          <p>Thanks for signing up for RentLedger! To complete your registration and access your account, please verify your email address.</p>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${verificationUrl}" class="button">Verify Email Address</a>
-          </div>
-          
-          <div class="info-box">
-            <p style="margin: 0; font-size: 14px;">
-              <strong>Why verify?</strong><br>
-              Email verification helps us ensure your account security and allows us to send you important notifications about your rent payments and account activity.
-            </p>
-          </div>
-          
-          <p style="font-size: 14px; color: #64748b; margin-top: 30px;">
-            This verification link will expire in <strong>24 hours</strong>.<br>
-            If you didn't create an account with RentLedger, you can safely ignore this email.
-          </p>
-          
-          <p style="font-size: 12px; color: #94a3b8; margin-top: 20px;">
-            If the button doesn't work, copy and paste this link into your browser:<br>
-            <a href="${verificationUrl}" style="color: #4f46e5; word-break: break-all;">${verificationUrl}</a>
-          </p>
-        </div>
-        <div class="footer">
-          <p>© ${new Date().getFullYear()} RentLedger. All rights reserved.</p>
-          <p>Questions? Contact us at support@rentledger.co.uk</p>
-        </div>
-      </div>
-    </body>
-    </html>
-    `;
+  const content = `
+    <p>Please click the button below to confirm your email address and finish setting up your account. This link is valid for 48 hours.</p>
+  `;
 
   return {
     to: userEmail,
     from: FROM_EMAIL,
     fromName: 'RentLedger',
-    subject,
-    html
+    subject: 'Confirm your account',
+    html: getStroopwafelEmailTemplate('Confirm your account', content, 'Confirm', verificationUrl),
+    attachments: [getLogoAttachment()].filter(Boolean)
   };
 }

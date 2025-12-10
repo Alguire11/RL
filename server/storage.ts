@@ -106,7 +106,7 @@ import {
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
 import { db, pool } from "./db";
-import { and, eq, desc, or, isNull, gte, lt, sql, asc, lte } from "drizzle-orm";
+import { and, eq, desc, or, isNull, gte, lt, sql, asc, lte, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -117,6 +117,7 @@ export interface IStorage {
   updateUser(id: string, user: Partial<UpsertUser>): Promise<User>;
   createUserWithRLID(user: UpsertUser, rolePrefix: 'TRLID-' | 'LRLID-'): Promise<User>;
   getUsersWithPreferences(): Promise<User[]>;
+  getUsersBySubscriptionStatus(statuses: string[]): Promise<User[]>;
 
   // Property operations
   createProperty(property: InsertProperty): Promise<Property>;
@@ -168,7 +169,8 @@ export interface IStorage {
 
   // Landlord operations
   getPropertyById(id: number): Promise<Property | undefined>;
-  getUserById(id: string): Promise<User | undefined>;
+  getUser(id: string): Promise<User | undefined>;
+  updateUser(id: string, user: Partial<User>): Promise<User>;
   getLandlordTenants(landlordId: string): Promise<Array<{ tenant: User; property: Property; payments: RentPayment[] }>>;
   getLandlordVerifications(landlordId: string): Promise<RentPayment[]>;
   getLandlordPendingRequests(landlordId: string): Promise<Array<{ type: string; id: number; tenant: User; property: Property; data: any }>>;
@@ -358,6 +360,15 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async updateUser(id: string, user: Partial<User>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ ...user, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
@@ -383,17 +394,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: string, userData: Partial<UpsertUser>): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({
-        ...userData,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, id))
-      .returning();
-    return user;
-  }
+
 
   async createUserWithRLID(userData: UpsertUser, rolePrefix: 'TRLID-' | 'LRLID-'): Promise<User> {
     let retries = 3;
@@ -710,9 +711,7 @@ export class DatabaseStorage implements IStorage {
     return property;
   }
 
-  async getUserById(id: string): Promise<User | undefined> {
-    return this.getUser(id);
-  }
+
 
   async getLandlordTenants(landlordId: string): Promise<Array<{ tenant: User; property: Property; payments: RentPayment[] }>> {
     const landlordProperties = await db.select().from(properties).where(eq(properties.userId, landlordId));
@@ -999,6 +998,13 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .orderBy(desc(users.createdAt));
+  }
+
+  async getUsersBySubscriptionStatus(statuses: string[]): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(inArray(users.subscriptionStatus, statuses));
   }
 
   // Get all properties (admin only)

@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { Download, Share2, FileText, Calendar, Clock, CheckCircle } from "lucide-react";
+import { Download, Share2, FileText, Calendar, Clock, CheckCircle, Lock, Plus } from "lucide-react";
 import { format } from "date-fns";
 import type { CreditReport, Property } from "@shared/schema";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export default function Reports() {
   const { toast } = useToast();
@@ -48,14 +49,19 @@ export default function Reports() {
 
   const generateReportMutation = useMutation({
     mutationFn: async (propertyId: number) => {
-      const response = await apiRequest("POST", "/api/reports/generate", { propertyId });
-      return response.json();
+      // Use the unified endpoint that includes manual payments
+      const response = await apiRequest("POST", "/api/generate-report", {
+        includePortfolio: true,
+        reportType: 'credit'
+      });
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Report Generated",
         description: "Your credit report has been generated successfully",
       });
+      setSelectedReport(data.report); // Update selected report with response
       queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
     },
     onError: (error) => {
@@ -72,7 +78,7 @@ export default function Reports() {
       }
       toast({
         title: "Error",
-        description: error.message || "Failed to generate report. Please try again.",
+        description: error.message || "Failed to generate rent report",
         variant: "destructive",
       });
     },
@@ -223,8 +229,7 @@ export default function Reports() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button
-                  variant="outline"
-                  className="w-full h-12 border-primary text-primary hover:bg-primary/5"
+                  className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                   onClick={() => window.location.href = '/manual-verify'}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -236,10 +241,9 @@ export default function Reports() {
                     key={property.id}
                     onClick={() => handleGenerateReport(property.id)}
                     disabled={generateReportMutation.isPending}
-                    className="w-full h-12 border-primary text-primary hover:bg-primary/5 relative"
-                    variant="outline"
+                    className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm relative"
                   >
-                    {plan.id === 'free' && <Lock className="w-3 h-3 absolute top-1 right-1 text-gray-400" />}
+                    {plan.id === 'free' && <Lock className="w-3 h-3 absolute top-1 right-1" />}
                     <FileText className="w-4 h-4 mr-2" />
                     Generate Rent Report
                   </Button>
@@ -247,8 +251,7 @@ export default function Reports() {
 
                 <Button
                   onClick={() => window.location.href = '/portfolio'}
-                  className="w-full h-12 border-primary text-primary hover:bg-primary/5"
-                  variant="outline"
+                  className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                 >
                   <Share2 className="w-4 h-4 mr-2" />
                   Share Portfolio

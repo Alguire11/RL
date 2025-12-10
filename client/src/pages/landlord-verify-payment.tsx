@@ -7,8 +7,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Building, User, MapPin, PoundSterling, Shield, Calendar, CreditCard, FileText } from "lucide-react";
+import { CheckCircle, Building, User, MapPin, PoundSterling, Shield, Calendar, CreditCard, FileText, Eye, ExternalLink } from "lucide-react";
 import { Logo } from "@/components/logo";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface VerificationData {
     payment: {
@@ -180,18 +188,46 @@ export default function LandlordVerifyPayment() {
                             </div>
                             {verificationData.payment.receiptUrl && (
                                 <div>
-                                    <label className="text-sm font-medium text-gray-500">Receipt</label>
-                                    <div className="mt-2">
-                                        <a
-                                            href={verificationData.payment.receiptUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center text-sm text-primary hover:underline"
-                                        >
-                                            <FileText className="h-4 w-4 mr-1" />
-                                            View Receipt
-                                        </a>
-                                    </div>
+                                    <label className="text-sm font-medium text-gray-500 block mb-2">Receipt</label>
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" className="w-full sm:w-auto">
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                View Receipt
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-3xl">
+                                            <DialogHeader>
+                                                <DialogTitle>Payment Receipt</DialogTitle>
+                                                <DialogDescription>
+                                                    Attached receipt for payment of {formatCurrency(verificationData.payment.amount)}
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="mt-4">
+                                                <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-slate-100 border flex items-center justify-center">
+                                                    {verificationData.payment.receiptUrl.toLowerCase().endsWith('.pdf') ? (
+                                                        <iframe
+                                                            src={verificationData.payment.receiptUrl}
+                                                            className="w-full h-full"
+                                                            title="Receipt PDF"
+                                                        />
+                                                    ) : (
+                                                        <img
+                                                            src={verificationData.payment.receiptUrl}
+                                                            alt="Receipt"
+                                                            className="object-contain max-h-[60vh] w-full"
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div className="mt-4 flex justify-end">
+                                                    <Button variant="secondary" onClick={() => window.open(verificationData.payment.receiptUrl, '_blank')}>
+                                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                                        Open in New Tab
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
                             )}
                         </CardContent>

@@ -40,6 +40,7 @@ export default function AdminUsers() {
   const [filterPlan, setFilterPlan] = useState("all");
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editFormData, setEditFormData] = useState<Partial<AdminUser>>({});
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -48,6 +49,23 @@ export default function AdminUsers() {
       setLocation('/admin-login');
     }
   }, [authLoading, isAuthenticated, user, setLocation]);
+
+  useEffect(() => {
+    if (selectedUser) {
+      setEditFormData({
+        firstName: selectedUser.firstName,
+        lastName: selectedUser.lastName,
+        email: selectedUser.email,
+        businessName: selectedUser.businessName,
+        subscriptionPlan: selectedUser.subscriptionPlan,
+        role: selectedUser.role
+      });
+    }
+  }, [selectedUser]);
+
+  const handleInputChange = (field: keyof AdminUser, value: string) => {
+    setEditFormData(prev => ({ ...prev, [field]: value }));
+  };
 
   const adminQuery = (url: string) => {
     return fetch(url, {
@@ -335,7 +353,8 @@ export default function AdminUsers() {
                               setShowEditDialog(true);
                             }}
                           >
-                            <UserCheck className="w-3 h-3" />
+                            <UserCheck className="w-3 h-3 mr-1" />
+                            Edit
                           </Button>
                           {user.role === 'landlord' && !user.isOnboarded && (
                             <Button
@@ -365,7 +384,8 @@ export default function AdminUsers() {
                               }}
                               disabled={suspendUserMutation.isPending}
                             >
-                              <UserX className="w-3 h-3" />
+                              <UserX className="w-3 h-3 mr-1" />
+                              Suspend
                             </Button>
                           )}
                         </div>
@@ -393,14 +413,16 @@ export default function AdminUsers() {
                     <Label htmlFor="firstName">First Name</Label>
                     <Input
                       id="firstName"
-                      defaultValue={selectedUser.firstName || ''}
+                      value={editFormData.firstName || ''}
+                      onChange={(e) => handleInputChange('firstName', e.target.value)}
                     />
                   </div>
                   <div>
                     <Label htmlFor="lastName">Last Name</Label>
                     <Input
                       id="lastName"
-                      defaultValue={selectedUser.lastName || ''}
+                      value={editFormData.lastName || ''}
+                      onChange={(e) => handleInputChange('lastName', e.target.value)}
                     />
                   </div>
                 </div>
@@ -408,8 +430,9 @@ export default function AdminUsers() {
                   <Label htmlFor="businessName">Business Name (Landlords)</Label>
                   <Input
                     id="businessName"
-                    defaultValue={selectedUser.businessName || ''}
+                    value={editFormData.businessName || ''}
                     placeholder="e.g. Smith Properties Ltd"
+                    onChange={(e) => handleInputChange('businessName', e.target.value)}
                   />
                 </div>
                 <div>
@@ -417,13 +440,17 @@ export default function AdminUsers() {
                   <Input
                     id="email"
                     type="email"
-                    defaultValue={selectedUser.email || ''}
+                    value={editFormData.email || ''}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="plan">Subscription Plan</Label>
-                    <Select defaultValue={selectedUser.subscriptionPlan} data-plan-select>
+                    <Select
+                      value={editFormData.subscriptionPlan}
+                      onValueChange={(value) => handleInputChange('subscriptionPlan', value)}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -436,7 +463,10 @@ export default function AdminUsers() {
                   </div>
                   <div>
                     <Label htmlFor="role">Role</Label>
-                    <Select defaultValue={selectedUser.role} data-role-select>
+                    <Select
+                      value={editFormData.role}
+                      onValueChange={(value) => handleInputChange('role', value)}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -454,18 +484,9 @@ export default function AdminUsers() {
                   </Button>
                   <Button
                     onClick={() => {
-                      const formData = {
-                        firstName: (document.getElementById('firstName') as HTMLInputElement)?.value || selectedUser.firstName,
-                        lastName: (document.getElementById('lastName') as HTMLInputElement)?.value || selectedUser.lastName,
-                        email: (document.getElementById('email') as HTMLInputElement)?.value || selectedUser.email,
-                        subscriptionPlan: (document.querySelector('[data-plan-select]') as HTMLSelectElement)?.value || selectedUser.subscriptionPlan,
-                        role: (document.querySelector('[data-role-select]') as HTMLSelectElement)?.value || selectedUser.role,
-                        businessName: (document.getElementById('businessName') as HTMLInputElement)?.value || selectedUser.businessName,
-                      };
-
                       updateUserMutation.mutate({
                         userId: selectedUser.id,
-                        updates: formData,
+                        updates: editFormData,
                       });
                     }}
                   >

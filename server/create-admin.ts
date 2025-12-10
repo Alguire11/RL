@@ -21,7 +21,7 @@ export async function createAdminAccount(
     const existingUser = await storage.getUserByUsername(username);
     if (existingUser) {
       console.log(`⚠️  User ${username} already exists. Updating to admin...`);
-      
+
       // Update existing user to admin role
       const updatedUser = await storage.upsertUser({
         id: existingUser.id,
@@ -116,7 +116,10 @@ export async function createAdminAccount(
 }
 
 // If run directly (for testing)
-if (require.main === module) {
+// ESM compatible check for main module
+import { fileURLToPath } from 'url';
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const username = process.argv[2] || "Ismail";
   const password = process.argv[3] || "Jahbless101";
   const email = process.argv[4];

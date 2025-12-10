@@ -75,8 +75,13 @@ export default function AuthPage() {
       const response = await apiRequest("POST", "/api/login", data);
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (user) => {
+      // Fix race condition: Update auth state synchronously before navigating
+      queryClient.setQueryData(["/api/user"], user);
+
+      // Also invalidate to ensure freshness
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+
       toast({
         title: "Welcome back!",
         description: "You've successfully logged in.",
@@ -84,6 +89,14 @@ export default function AuthPage() {
       navigate("/dashboard");
     },
     onError: (error: any) => {
+      // Check for email verification error
+      if (error.message && error.message.toLowerCase().includes("email not verified")) {
+        // Extract email to prepopulate the verification page
+        const email = loginForm.getValues().email;
+        navigate(`/verify-email-enforced?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
       toast({
         title: "Login failed",
         description: error.message || "Please check your credentials and try again.",

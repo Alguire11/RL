@@ -107,7 +107,7 @@ export default function AdminRevenue() {
             <div>
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-8 w-8 text-blue-600" />
-                <h1 className="text-3xl font-bold text-gray-900">Revenue Analytics</h1>
+                <h1 className="text-3xl font-bold text-gray-900">CustomerRevenue Analytics</h1>
               </div>
               <p className="text-gray-600">Monitor financial performance and growth metrics</p>
             </div>
@@ -205,14 +205,14 @@ export default function AdminRevenue() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <PieChart className="h-5 w-5" />
-                <span>Revenue Breakdown</span>
+                <span>Customer Rent Payment Breakdown</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               {topMetrics ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between py-3 border-b">
-                    <span className="font-medium">Gross Revenue</span>
+                    <span className="font-medium">Gross Customer Rent Payment</span>
                     <span className="text-lg font-bold text-green-600">
                       {formatCurrency(topMetrics.grossRevenue)}
                     </span>
@@ -224,7 +224,7 @@ export default function AdminRevenue() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between py-3 border-b border-gray-400">
-                    <span className="font-medium">Net Revenue</span>
+                    <span className="font-medium">Net Customer Rent Payment</span>
                     <span className="text-xl font-bold text-blue-600">
                       {formatCurrency(topMetrics.netRevenue)}
                     </span>
@@ -372,7 +372,7 @@ export default function AdminRevenue() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <DollarSign className="h-5 w-5" />
-                <span>Total Revenue</span>
+                <span>Total Rent Revenue</span>
               </CardTitle>
             </CardHeader>
             <CardContent>

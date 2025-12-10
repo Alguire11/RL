@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { FileText, Download, Calendar, Award, DollarSign, CheckCircle, ArrowLeft, AlertCircle } from "lucide-react";
 import { useEffect } from "react";
@@ -79,55 +79,59 @@ export default function ReportGenerator() {
         throw new Error(getReportLimitMessage() || "Report limit reached");
       }
 
-      return apiRequest("POST", "/api/generate-report", {
+      const res = await apiRequest("POST", "/api/generate-report", {
         reportType,
         includePortfolio,
       });
+      return await res.json();
     },
     onSuccess: (data: any) => {
-      setGeneratedReport(data);
-      toast({
-        title: "Report Generated",
-        description: "Your Rent report has been generated successfully and is ready for download.",
-      });
-    },
-    onError: (error: any) => {
-      if (isUnauthorizedError(error)) {
+      console.log("Raw API response for report generation:", data);
+
+      if (!data || Object.keys(data).length === 0) {
+        console.error("Received empty data from report generation API");
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
+          title: "Error",
+          description: "Received empty response from server. Please check logs.",
+          variant: "destructive"
         });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
         return;
       }
+
+      setGeneratedReport(data);
+      toast({
+        title: "Report Generated Successfully",
+        description: "Your report has been generated and is ready for download.",
+      });
+
+      // Invalidate queries to refresh report history
+      queryClient.invalidateQueries({ queryKey: ["/api/reports"] });
+    },
+    onError: (error: any) => {
+      console.error("Error generating report:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to generate Rent report",
+        description: "Failed to generate report. Please try again.",
         variant: "destructive",
       });
     },
   });
 
   const downloadReport = () => {
-    if (generatedReport) {
-      // In a real app, this would trigger a PDF download
-      // For demo purposes, we'll show the report data
-      const dataStr = JSON.stringify(generatedReport.report, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      
-      const exportFileDefaultName = `rentledger-report-${generatedReport.reportId}.json`;
-      
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
+    if (generatedReport && generatedReport.report && generatedReport.report.id) {
+      // Trigger PDF download from server
+      window.location.href = `/api/downloads/report/${generatedReport.report.id}`;
 
       toast({
         title: "Download Started",
-        description: "Your Rent report is being downloaded.",
+        description: "Your report is downloading...",
+      });
+    } else {
+      console.error("Report data is missing or incomplete:", generatedReport);
+      toast({
+        title: "Error",
+        description: "Report data is incomplete. Please regenerate.",
+        variant: "destructive"
       });
     }
   };
@@ -152,7 +156,7 @@ export default function ReportGenerator() {
       <div className="min-h-screen bg-gray-50">
         <Navigation />
         <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" aria-label="Loading"/>
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" aria-label="Loading" />
         </div>
       </div>
     );
@@ -168,9 +172,9 @@ export default function ReportGenerator() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="flex items-center mb-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setLocation('/dashboard')}
               className="mr-4"
             >
@@ -240,6 +244,7 @@ export default function ReportGenerator() {
                     id="portfolio"
                     checked={includePortfolio}
                     onCheckedChange={(checked) => setIncludePortfolio(checked === true)}
+                    className="data-[state=checked]:bg-blue-600 data-[state=checked]:text-white data-[state=checked]:border-blue-600"
                   />
                   <div className="flex-1">
                     <Label htmlFor="portfolio" className="font-medium cursor-pointer">
@@ -342,8 +347,8 @@ export default function ReportGenerator() {
                   <div>
                     <Label className="text-sm font-medium text-gray-500">Type</Label>
                     <Badge variant="outline" className="ml-2">
-                      {reportType === 'credit' ? 'Credit Building' : 
-                       reportType === 'rental' ? 'Rental History' : 'Tenant Verification'}
+                      {reportType === 'credit' ? 'Credit Building' :
+                        reportType === 'rental' ? 'Rental History' : 'Tenant Verification'}
                     </Badge>
                   </div>
                   <div>
@@ -392,8 +397,8 @@ export default function ReportGenerator() {
 
             {/* Generate Another */}
             <div className="text-center">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setGeneratedReport(null)}
               >
                 Generate Another Report

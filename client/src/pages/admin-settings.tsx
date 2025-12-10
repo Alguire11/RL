@@ -65,8 +65,18 @@ export default function AdminSettings() {
     enabled: isAuthenticated && user?.role === 'admin',
   });
 
+  // Update local state when data is fetched
+  useEffect(() => {
+    if (currentSettings) {
+      setSettings(prev => ({
+        ...prev,
+        ...currentSettings
+      }));
+    }
+  }, [currentSettings]);
+
   const updateSettingsMutation = useMutation({
-    mutationFn: (newSettings: SystemSettings) => 
+    mutationFn: (newSettings: SystemSettings) =>
       fetch('/api/admin/settings', {
         method: 'POST',
         credentials: 'include',
@@ -95,7 +105,7 @@ export default function AdminSettings() {
   });
 
   const testEmailMutation = useMutation({
-    mutationFn: () => 
+    mutationFn: () =>
       fetch('/api/admin/test-email', {
         method: 'POST',
         credentials: 'include',
@@ -152,7 +162,7 @@ export default function AdminSettings() {
               <p className="text-gray-600">Configure platform settings and preferences</p>
             </div>
           </div>
-          <Button 
+          <Button
             onClick={handleSaveSettings}
             disabled={updateSettingsMutation.isPending}
             className="bg-blue-600 hover:bg-blue-700"
@@ -222,7 +232,7 @@ export default function AdminSettings() {
                   onCheckedChange={(checked) => handleSettingChange('allowNewRegistrations', checked)}
                 />
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="requireVerification">Require Email Verification</Label>
@@ -238,7 +248,7 @@ export default function AdminSettings() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="defaultPlan">Default Subscription Plan</Label>
-                  <Select 
+                  <Select
                     value={settings.defaultSubscriptionPlan}
                     onValueChange={(value) => handleSettingChange('defaultSubscriptionPlan', value)}
                   >
@@ -293,7 +303,7 @@ export default function AdminSettings() {
                   </Button>
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <div>
                   <Label htmlFor="emailNotifications">Email Notifications</Label>
@@ -377,7 +387,7 @@ export default function AdminSettings() {
         </div>
 
         <div className="mt-8 text-center">
-          <Button 
+          <Button
             onClick={handleSaveSettings}
             disabled={updateSettingsMutation.isPending}
             className="bg-blue-600 hover:bg-blue-700 px-8 py-2"

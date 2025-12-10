@@ -33,7 +33,7 @@ const CheckoutForm = ({ selectedPlan, userRole }: { selectedPlan: 'standard' | '
     setIsProcessing(true);
 
     // Determine return URL based on user role
-    const returnUrl = userRole === 'landlord' 
+    const returnUrl = userRole === 'landlord'
       ? window.location.origin + "/landlord-dashboard"
       : window.location.origin + "/dashboard";
 
@@ -65,13 +65,13 @@ const CheckoutForm = ({ selectedPlan, userRole }: { selectedPlan: 'standard' | '
           title: "Payment Successful",
           description: "Welcome to " + (selectedPlan === 'premium' ? 'Premium' : 'Standard') + "! Your subscription is now active.",
         });
-        
+
         // Invalidate queries to refresh subscription status
         const { queryClient } = await import("@/lib/queryClient");
         queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
         queryClient.invalidateQueries({ queryKey: ["/api/landlord/gold-status"] });
-        
+
         // Navigate to appropriate dashboard after a short delay
         setTimeout(() => {
           setLocation(userRole === 'landlord' ? '/landlord-dashboard' : '/dashboard');
@@ -214,11 +214,11 @@ export default function Subscribe() {
       description: 'Build your credit score',
       features: [
         'All Free features',
-        'Credit bureau reporting(Batch reporting)',
+        'Credit bureau reporting (Batch)',
+        'Legal document templates',
         'Rent reminders',
         'Verified Tenant badge',
-        'Contact to landlord to verify payment',
-        'Standard support'
+        'Priority support'
       ],
       color: 'from-blue-500 to-blue-600',
       icon: Shield,
@@ -231,12 +231,11 @@ export default function Subscribe() {
       description: 'Maximum benefits',
       features: [
         'All Standard features',
-        'Auto rent collection',
-        'Legal document templates',
-        'Priority support',
-        'Partner discounts',
+        'Auto rent collection (coming soon)',
         'Advanced spending analytics',
-        'Unlimited rental history report and sharing'
+        'Unlimited rental history report and sharing',
+        'Partner discounts',
+        'Priority 24/7 support'
       ],
       color: 'from-purple-500 to-pink-600',
       icon: Crown,

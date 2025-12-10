@@ -627,7 +627,7 @@ export default function Landing() {
                 <p className="text-gray-600 mb-4">
                   Find answers to common questions and detailed guides
                 </p>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => setLocation('/help')}>
                   Visit Help Center
                 </Button>
               </CardContent>
@@ -641,7 +641,7 @@ export default function Landing() {
                 <p className="text-gray-600 mb-4">
                   Get direct help from our support team
                 </p>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => setLocation('/contact')}>
                   Contact Us
                 </Button>
               </CardContent>
@@ -655,7 +655,7 @@ export default function Landing() {
                 <p className="text-gray-600 mb-4">
                   Check the current status of our services
                 </p>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => setLocation('/status')}>
                   View Status
                 </Button>
               </CardContent>

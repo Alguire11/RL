@@ -56,9 +56,38 @@ export default function PublicPortfolio() {
         );
     }
 
-    const badges = portfolio.badges ? JSON.parse(portfolio.badges) : [];
-    const paymentHistory = portfolio.paymentHistory ? JSON.parse(portfolio.paymentHistory) : {};
+    let badges = [];
+    try {
+        if (typeof portfolio.badges === 'string') {
+            badges = JSON.parse(portfolio.badges);
+        } else {
+            badges = portfolio.badges || [];
+        }
+    } catch (e) {
+        console.error("Failed to parse badges:", e);
+    }
 
+    let paymentHistory: { totalPayments?: number; onTimePayments?: number; averageAmount?: number } = {};
+    try {
+        if (typeof portfolio.paymentHistory === 'string') {
+            paymentHistory = JSON.parse(portfolio.paymentHistory);
+        } else {
+            paymentHistory = portfolio.paymentHistory || {};
+        }
+    } catch (e) {
+        console.error("Failed to parse paymentHistory:", e);
+    }
+
+    // Testimonials will still be strings from the DB blob unless we updated them too. The API merge only overwrote badges/history.
+    // So testimonials logic remains as string parsing, which is safe due to previous fix.
+    let testimonials = [];
+    try {
+        testimonials = portfolio.landlordTestimonials ? JSON.parse(portfolio.landlordTestimonials) : [];
+    } catch (e) {
+        console.error("Failed to parse landlordTestimonials:", e);
+    }
+
+    // Add Rent Score Display
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
             <div className="max-w-4xl mx-auto space-y-6">
@@ -77,6 +106,24 @@ export default function PublicPortfolio() {
                         <span>Expires: {formatDate(portfolio.expiresAt)}</span>
                     </div>
                 </div>
+
+                {/* Rent Score Benefit */}
+                {portfolio.rentScore !== undefined && (
+                    <Card className="bg-white shadow-lg border-t-4 border-t-indigo-600">
+                        <CardContent className="pt-6">
+                            <div className="text-center">
+                                <p className="text-sm font-medium text-gray-500 uppercase tracking-widest mb-1">Rent Score</p>
+                                <div className="text-5xl font-extrabold text-indigo-600 mb-2">
+                                    {portfolio.rentScore}
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2.5 max-w-xs mx-auto mb-2">
+                                    <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${(portfolio.rentScore / 1000) * 100}%` }}></div>
+                                </div>
+                                <p className="text-sm text-gray-600">Excellent reliability rating based on real-time data.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Payment Performance Summary */}
                 <Card className="bg-white shadow-lg">
@@ -165,14 +212,15 @@ export default function PublicPortfolio() {
                 )}
 
                 {/* Landlord Testimonials */}
-                {portfolio.landlordTestimonials && JSON.parse(portfolio.landlordTestimonials).length > 0 && (
+                {/* Landlord Testimonials */}
+                {testimonials.length > 0 && (
                     <Card className="bg-white shadow-lg">
                         <CardHeader>
                             <CardTitle>Landlord Testimonials</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {JSON.parse(portfolio.landlordTestimonials).map((testimonial: any, index: number) => (
+                                {testimonials.map((testimonial: any, index: number) => (
                                     <div key={index} className="p-4 bg-gray-50 rounded-lg">
                                         <p className="text-gray-700 italic mb-2">"{testimonial.text}"</p>
                                         <p className="text-sm text-gray-600">— {testimonial.landlordName}</p>

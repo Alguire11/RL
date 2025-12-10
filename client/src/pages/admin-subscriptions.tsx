@@ -65,15 +65,20 @@ export default function AdminSubscriptions() {
     enabled: isAuthenticated && user?.role === 'admin',
   });
 
-  const { data: subscriptions = [], isLoading: subscriptionsLoading } = useQuery<SubscriptionData[]>({
+  const { data: subscriptions = [], isLoading: subscriptionsLoading, error, isError } = useQuery<SubscriptionData[]>({
     queryKey: ["/api/admin/subscriptions"],
     queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
     enabled: isAuthenticated && user?.role === 'admin',
   });
 
+  useEffect(() => {
+    console.log('Subscriptions data:', subscriptions);
+    if (error) console.error('Subscriptions error:', error);
+  }, [subscriptions, error]);
+
   const updateSubscriptionMutation = useMutation({
-    mutationFn: (data: { subscriptionId: string; updates: any }) => 
+    mutationFn: (data: { subscriptionId: string; updates: any }) =>
       fetch(`/api/admin/subscriptions/${data.subscriptionId}`, {
         method: 'PATCH',
         credentials: 'include',
@@ -102,13 +107,13 @@ export default function AdminSubscriptions() {
   });
 
   const filteredSubscriptions = subscriptions.filter(sub => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       sub.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       sub.userEmail.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = filterStatus === "all" || sub.status === filterStatus;
     const matchesPlan = filterPlan === "all" || sub.plan === filterPlan;
-    
+
     return matchesSearch && matchesStatus && matchesPlan;
   });
 
@@ -193,7 +198,7 @@ export default function AdminSubscriptions() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -207,7 +212,7 @@ export default function AdminSubscriptions() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -221,7 +226,7 @@ export default function AdminSubscriptions() {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center">
@@ -249,8 +254,8 @@ export default function AdminSubscriptions() {
                   <div className="text-3xl font-bold text-gray-600">{stats.freeUsers}</div>
                   <div className="text-sm text-gray-500">Free Users</div>
                   <div className="text-xs text-gray-400">
-                    {stats.totalSubscriptions > 0 ? 
-                      `${((stats.freeUsers / (stats.freeUsers + stats.standardUsers + stats.premiumUsers)) * 100).toFixed(1)}%` 
+                    {stats.totalSubscriptions > 0 ?
+                      `${((stats.freeUsers / (stats.freeUsers + stats.standardUsers + stats.premiumUsers)) * 100).toFixed(1)}%`
                       : '0%'}
                   </div>
                 </div>
@@ -258,8 +263,8 @@ export default function AdminSubscriptions() {
                   <div className="text-3xl font-bold text-blue-600">{stats.standardUsers}</div>
                   <div className="text-sm text-gray-500">Standard Users</div>
                   <div className="text-xs text-gray-400">
-                    {stats.totalSubscriptions > 0 ? 
-                      `${((stats.standardUsers / (stats.freeUsers + stats.standardUsers + stats.premiumUsers)) * 100).toFixed(1)}%` 
+                    {stats.totalSubscriptions > 0 ?
+                      `${((stats.standardUsers / (stats.freeUsers + stats.standardUsers + stats.premiumUsers)) * 100).toFixed(1)}%`
                       : '0%'}
                   </div>
                 </div>
@@ -267,8 +272,8 @@ export default function AdminSubscriptions() {
                   <div className="text-3xl font-bold text-purple-600">{stats.premiumUsers}</div>
                   <div className="text-sm text-gray-500">Premium Users</div>
                   <div className="text-xs text-gray-400">
-                    {stats.totalSubscriptions > 0 ? 
-                      `${((stats.premiumUsers / (stats.freeUsers + stats.standardUsers + stats.premiumUsers)) * 100).toFixed(1)}%` 
+                    {stats.totalSubscriptions > 0 ?
+                      `${((stats.premiumUsers / (stats.freeUsers + stats.standardUsers + stats.premiumUsers)) * 100).toFixed(1)}%`
                       : '0%'}
                   </div>
                 </div>
@@ -335,7 +340,12 @@ export default function AdminSubscriptions() {
             <CardTitle>All Subscriptions ({filteredSubscriptions.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            {subscriptionsLoading ? (
+            {isError ? (
+              <div className="text-center py-8 text-red-500">
+                Failed to load subscriptions. Please try refreshing the page. <br />
+                {error instanceof Error ? error.message : String(error)}
+              </div>
+            ) : subscriptionsLoading ? (
               <div className="text-center py-8">Loading subscriptions...</div>
             ) : (
               <Table>

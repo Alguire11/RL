@@ -57,6 +57,9 @@ export function setupAuth(app: Express) {
           if (!user || !(await verifyPassword(password, user.password))) {
             return done(null, false, { message: "Invalid email or password" });
           }
+          if (!user.emailVerified) {
+            return done(null, false, { message: "Email not verified" });
+          }
           return done(null, user);
         } catch (error) {
           return done(error);
@@ -178,9 +181,24 @@ export function setupAuth(app: Express) {
   });
 
   // Standard email/password login endpoint
-  app.post("/api/login", passport.authenticate("local-email"), (req, res) => {
-    const user = req.user as SelectUser;
-    res.json({ ...user, password: undefined });
+  app.post("/api/login", (req, res, next) => {
+    passport.authenticate("local-email", (err: any, user: SelectUser | false, info: any) => {
+      if (err) {
+        return next(err);
+      }
+      if (!user) {
+        // Return 401 with specific message if available, otherwise generic
+        // This ensures "Email not verified" is sent to client
+        return res.status(401).json({ message: info?.message || "Invalid email or password" });
+      }
+
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return next(loginErr);
+        }
+        return res.json({ ...user, password: undefined });
+      });
+    })(req, res, next);
   });
 
   // Admin/Landlord username login endpoint
@@ -193,9 +211,9 @@ export function setupAuth(app: Express) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
-      // Check if user is admin or landlord
-      if (user.role !== "admin" && user.role !== "landlord") {
-        return res.status(403).json({ message: "Admin or landlord access required" });
+      // Check if user is admin
+      if (user.role !== "admin") {
+        return res.status(403).json({ message: "Admin access required" });
       }
 
       // For admins, check if they have admin record
