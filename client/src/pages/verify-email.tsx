@@ -3,6 +3,7 @@ import { useLocation, useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, XCircle, Mail } from "lucide-react";
+import { queryClient } from "@/lib/queryClient";
 
 export default function VerifyEmail() {
     const [, params] = useRoute("/verify-email/:token");

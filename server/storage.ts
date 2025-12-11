@@ -106,7 +106,8 @@ import {
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
 import { db, pool } from "./db";
-import { and, eq, desc, or, isNull, gte, lt, sql, asc, lte, inArray } from "drizzle-orm";
+import { and, eq, desc, or, isNull, isNotNull, gte, lt, sql, asc, lte, inArray } from "drizzle-orm";
+
 
 export interface IStorage {
   // User operations
@@ -134,6 +135,7 @@ export interface IStorage {
   getPropertyRentPayments(propertyId: number): Promise<RentPayment[]>;
   updateRentPayment(id: number, payment: Partial<InsertRentPayment>): Promise<RentPayment>;
   deleteRentPayment(id: number): Promise<void>;
+  getAllManualPayments(): Promise<ManualPayment[]>;
 
   // Bank connection operations
   createBankConnection(connection: InsertBankConnection): Promise<BankConnection>;
@@ -144,6 +146,7 @@ export interface IStorage {
   // Credit report operations
   createCreditReport(report: InsertCreditReport): Promise<CreditReport>;
   getUserCreditReports(userId: string): Promise<CreditReport[]>;
+  getAllCreditReports(): Promise<CreditReport[]>;
   getUserCreditReportsByMonth(userId: string, month: string): Promise<CreditReport[]>;
   getCreditReportByReportId(reportId: string): Promise<CreditReport | undefined>;
   updateCreditReport(id: number, report: Partial<InsertCreditReport>): Promise<CreditReport>;
@@ -569,8 +572,15 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(creditReports)
-      .where(and(eq(creditReports.userId, userId), eq(creditReports.isActive, true)))
-      .orderBy(desc(creditReports.createdAt));
+      .where(eq(creditReports.userId, userId))
+      .orderBy(desc(creditReports.generatedAt));
+  }
+
+  async getAllCreditReports(): Promise<CreditReport[]> {
+    return await db
+      .select()
+      .from(creditReports)
+      .orderBy(desc(creditReports.generatedAt));
   }
 
   async getUserCreditReportsByMonth(userId: string, month: string): Promise<CreditReport[]> {
@@ -941,7 +951,12 @@ export class DatabaseStorage implements IStorage {
 
     const [paymentStats] = await db
       .select({ count: sql<number>`count(*)` })
-      .from(rentPayments);
+      .from(rentPayments)
+      .where(isNotNull(rentPayments.paymentMethod));
+
+    const [manualPaymentStats] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(manualPayments);
 
     const [reportStats] = await db
       .select({ count: sql<number>`count(*)` })
@@ -981,7 +996,7 @@ export class DatabaseStorage implements IStorage {
     return {
       totalUsers: userStats?.count || 0,
       activeUsers: activeUserStats?.count || 0,
-      totalPayments: paymentStats?.count || 0,
+      totalPayments: Number(paymentStats?.count || 0) + Number(manualPaymentStats?.count || 0),
       totalReports: reportStats?.count || 0,
       freeUsers: freeUserStats?.count || 0,
       standardUsers,
@@ -1017,10 +1032,36 @@ export class DatabaseStorage implements IStorage {
 
   // Get all payments (admin only)
   async getAllPayments(): Promise<RentPayment[]> {
-    return await db
+    const rentPaymentsData = await db
       .select()
       .from(rentPayments)
       .orderBy(desc(rentPayments.createdAt));
+
+    const manualPaymentsData = await db
+      .select()
+      .from(manualPayments)
+      .where(isNotNull(manualPayments.verifiedBy))
+      .orderBy(desc(manualPayments.createdAt));
+
+    // Map manual payments to RentPayment structure
+    const mappedManualPayments: RentPayment[] = manualPaymentsData.map(mp => ({
+      id: mp.id + 100000, // Offset ID to avoid collision (hacky but works for display)
+      userId: mp.userId,
+      propertyId: mp.propertyId,
+      amount: mp.amount,
+      dueDate: new Date(mp.paymentDate).toISOString(), // Map paymentDate to dueDate
+      paidDate: new Date(mp.paymentDate).toISOString(),
+      status: 'paid',
+      paymentMethod: mp.paymentMethod || 'manual',
+      transactionId: null,
+      isVerified: true,
+      createdAt: mp.createdAt,
+      updatedAt: mp.updatedAt
+    }));
+
+    return [...rentPaymentsData, ...mappedManualPayments].sort((a, b) => {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
   }
 
   // Get security logs with filtering (admin only)
@@ -1362,6 +1403,18 @@ export class DatabaseStorage implements IStorage {
       .from(manualPayments)
       .where(eq(manualPayments.userId, userId))
       .orderBy(desc(manualPayments.paymentDate));
+  }
+
+  async getAllManualPayments(): Promise<ManualPayment[]> {
+    return await db
+      .select({
+        ...manualPayments,
+        tenantName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+        tenantEmail: users.email
+      })
+      .from(manualPayments)
+      .leftJoin(users, eq(manualPayments.userId, users.id))
+      .orderBy(desc(manualPayments.createdAt));
   }
 
   async updateManualPayment(id: number, updates: Partial<InsertManualPayment>): Promise<ManualPayment> {

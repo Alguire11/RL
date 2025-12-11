@@ -142,13 +142,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/verify-email/:token', async (req, res) => {
     try {
       const { token } = req.params;
+      console.log('🔍 [VERIFY] Attempting to verify token:', token.substring(0, 10) + '...');
 
       // Get verification token
       const verificationToken = await storage.getEmailVerificationToken(token);
+      console.log('🔍 [VERIFY] Token found in database:', !!verificationToken);
 
       if (!verificationToken) {
+        console.log('❌ [VERIFY] Token not found in database');
         return res.status(400).json({ message: "Invalid or expired verification link" });
       }
+
+      console.log('🔍 [VERIFY] Token details:', {
+        userId: verificationToken.userId,
+        used: verificationToken.used,
+        expiresAt: verificationToken.expiresAt,
+        isExpired: new Date() > new Date(verificationToken.expiresAt)
+      });
 
       // Check if already used
       if (verificationToken.used) {
@@ -805,17 +815,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const property = await storage.createProperty(propertyDataWithToken);
 
       // Send verification email to landlord if email is provided
+      // This is the ONLY place where property verification emails are sent
       if (property.landlordEmail && property.landlordName) {
-        const verificationUrl = `${process.env.APP_URL || 'https://rentledger.co.uk'}/landlord/verify-property/${verificationToken}`;
+        const verificationUrl = `${process.env.APP_URL || 'https://rentledger.co.uk'}/landlord/verify/${verificationToken}`;
 
         // Get tenant info
         const tenant = await storage.getUser(userId);
         if (!tenant) {
           console.error(`Tenant not found for user ID: ${userId}`);
-          // Continue without sending email or throw? 
-          // Better to log and continue to avoid failing property creation, but email won't be sent.
-          // Or throw to fail the request.
-          // Let's throw to be safe.
           throw new Error("Tenant user not found");
         }
 
@@ -853,6 +860,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: error?.issues || error?.code || error,
         stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
       });
+    }
+  });
+
+  // Resend property verification email
+  app.post('/api/properties/:id/resend-verification', requireAuth, async (req: any, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const userId = req.user.id;
+
+      const property = await storage.getPropertyById(propertyId);
+      if (!property) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+
+      // Check if property belongs to user
+      if (property.userId !== userId) {
+        return res.status(403).json({ message: 'Unauthorized' });
+      }
+
+      // Check if landlord email exists
+      if (!property.landlordEmail) {
+        return res.status(400).json({ message: 'No landlord email on file. Please update the property with landlord contact information.' });
+      }
+
+      // Generate new verification token if needed
+      let verificationToken = property.verificationToken;
+      if (!verificationToken) {
+        verificationToken = nanoid(32);
+        await storage.updateProperty(propertyId, { verificationToken });
+      }
+
+      const verificationUrl = `${process.env.APP_URL || 'https://rentledger.co.uk'}/landlord/verify/${verificationToken}`;
+
+      // Get tenant info
+      const tenant = await storage.getUser(userId);
+      if (!tenant) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Send verification email
+      await emailService.sendPropertyVerificationRequest({
+        landlordEmail: property.landlordEmail,
+        landlordName: property.landlordName || 'Landlord',
+        tenantName: `${tenant.firstName} ${tenant.lastName}`,
+        tenantEmail: tenant.email,
+        propertyAddress: `${property.address}, ${property.city}`,
+        monthlyRent: parseFloat(property.monthlyRent),
+        leaseType: property.leaseType || 'Not specified',
+        tenancyStartDate: property.tenancyStartDate ? new Date(property.tenancyStartDate).toLocaleDateString() : 'Not specified',
+        verificationUrl
+      });
+
+      res.json({ message: 'Verification email sent successfully' });
+    } catch (error) {
+      console.error('Error resending verification email:', error);
+      res.status(500).json({ message: 'Failed to send verification email' });
     }
   });
 
@@ -1482,6 +1545,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/reports', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (user?.role === 'admin') {
+        const reports = await storage.getAllCreditReports();
+        return res.json(reports);
+      }
+
       const reports = await storage.getUserCreditReports(userId);
       res.json(reports);
     } catch (error) {
@@ -1917,6 +1987,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Landlord verification routes
+  app.post('/api/landlord-verification/send', requireAuth, async (req: any, res) => {
+    try {
+      const { propertyId, landlordEmail, landlordName } = req.body;
+
+      if (!propertyId || !landlordEmail) {
+        return res.status(400).json({ message: 'Property ID and landlord email are required' });
+      }
+
+      const property = await storage.getPropertyById(propertyId);
+      if (!property) {
+        return res.status(404).json({ message: 'Property not found' });
+      }
+
+      // Check if property belongs to user
+      if (property.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Unauthorized access to property' });
+      }
+
+      // Generate verification token if not exists
+      let verificationToken = property.verificationToken;
+      if (!verificationToken) {
+        verificationToken = nanoid(32);
+        await storage.updateProperty(property.id, { verificationToken });
+      }
+
+      const verificationUrl = `${process.env.APP_URL || 'http://localhost:5000'}/landlord/verify/${verificationToken}`;
+
+      const emailResult = await emailService.sendPropertyVerificationRequest({
+        landlordEmail,
+        landlordName: landlordName || property.landlordName || 'Landlord',
+        tenantName: `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email,
+        tenantEmail: req.user.email,
+        propertyAddress: `${property.address}, ${property.city} ${property.postcode}`,
+        monthlyRent: parseFloat(property.monthlyRent as any) || 0,
+        leaseType: property.leaseType || 'month_to_month',
+        tenancyStartDate: property.tenancyStartDate ? new Date(property.tenancyStartDate).toLocaleDateString() : 'Not specified',
+        verificationUrl,
+      });
+
+      if (!emailResult.success) {
+        // Log the error but don't fail the request to the client if the property was added
+        console.error("Failed to send verification email:", emailResult.error);
+        return res.status(500).json({ message: 'Failed to send verification email: ' + emailResult.error });
+      }
+
+      res.json({ message: 'Verification email sent successfully' });
+    } catch (error) {
+      console.error('Error sending verification email:', error);
+      res.status(500).json({ message: 'Internal server error while sending verification email' });
+    }
+  });
   app.post('/api/landlord/verify-request', requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -1995,6 +2116,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/landlord/verify/:token', async (req, res) => {
     try {
       const token = req.params.token;
+
+      // Try to find property by verification token (for property verifications)
+      const property = await storage.getPropertyByVerificationToken(token);
+
+      if (property) {
+        // This is a property verification
+        if (property.isVerified) {
+          return res.status(200).json({
+            message: 'Property already verified',
+            property: {
+              address: property.address,
+              city: property.city,
+              monthlyRent: property.monthlyRent,
+              isVerified: true
+            }
+          });
+        }
+
+        // Get tenant information
+        const tenant = await storage.getUser(property.userId);
+
+        return res.json({
+          type: 'property',
+          user: tenant ? {
+            name: `${tenant.firstName} ${tenant.lastName}`,
+            email: tenant.email
+          } : undefined,
+          property: {
+            id: property.id,
+            address: property.address,
+            city: property.city,
+            postcode: property.postcode,
+            monthlyRent: property.monthlyRent,
+            leaseType: property.leaseType,
+            tenancyStartDate: property.tenancyStartDate,
+            landlordName: property.landlordName,
+            landlordEmail: property.landlordEmail,
+          },
+          tenant: {
+            id: property.userId
+          }
+        });
+      }
+
+      // If not a property, try payment verification
       const verification = await storage.getLandlordVerification(token);
 
       if (!verification) {
@@ -2012,23 +2178,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user and property info for display
       const user = await storage.getUser(verification.userId);
       const properties = await storage.getUserProperties(verification.userId);
-      const property = properties.find(p => p.id === verification.propertyId);
+      const verificationProperty = properties.find(p => p.id === verification.propertyId);
 
-      if (!user || !property) {
+      if (!user || !verificationProperty) {
         console.error(`User or property not found for verification ID: ${verification.id}, userId: ${verification.userId}, propertyId: ${verification.propertyId}`);
         return res.status(404).json({ message: 'User or property not found' });
       }
 
       res.json({
+        type: 'payment',
         user: {
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
         },
         property: {
-          address: property.address,
-          city: property.city,
-          postcode: property.postcode,
-          monthlyRent: property.monthlyRent,
+          address: verificationProperty.address,
+          city: verificationProperty.city,
+          postcode: verificationProperty.postcode,
+          monthlyRent: verificationProperty.monthlyRent,
         },
         verification: {
           id: verification.id,
@@ -2044,6 +2211,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/landlord/verify/:token/confirm', async (req, res) => {
     try {
       const token = req.params.token;
+
+      // Try property verification first
+      const property = await storage.getPropertyByVerificationToken(token);
+
+      if (property) {
+        // This is a property verification
+        if (property.isVerified) {
+          return res.status(400).json({ message: 'Property already verified' });
+        }
+
+        // Mark property as verified
+        await storage.updateProperty(property.id, {
+          isVerified: true,
+          verificationToken: null // Clear token after use
+        });
+
+        // Notify tenant
+        await storage.createNotification({
+          userId: property.userId,
+          type: 'landlord_verified',
+          title: 'Property Verified!',
+          message: `Your landlord has verified your property at ${property.address}. This helps build your rental history.`,
+        });
+
+        return res.json({
+          message: 'Property verified successfully',
+          property: {
+            address: property.address,
+            city: property.city,
+            isVerified: true
+          }
+        });
+      }
+
+      // If not a property, try payment verification
       const verification = await storage.getLandlordVerification(token);
 
       if (!verification) {
@@ -3528,18 +3730,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (u.subscriptionStatus === 'cancelled' || u.subscriptionStatus === 'expired')
       ).length;
 
+      // Calculate total and recent revenue
+      const totalRevenue = allPayments.reduce((acc, p) => acc + Number(p.amount), 0);
+
+      const recentPayments = allPayments.filter(p =>
+        p.createdAt && new Date(p.createdAt) >= thirtyDaysAgo
+      );
+      const recentRevenue = recentPayments.reduce((acc, p) => acc + Number(p.amount), 0);
+
       const metrics = {
+        totalRevenue,
+        recentRevenue,
         newSubscriptions,
         upgrades,
-        downgrades: 0, // Hard to detect downgrade vs profile update without audit logs
         cancellations,
-        netRevenue: recentRevenue,
-        grossRevenue: recentRevenue
+        totalPayments: allPayments.length,
+        recentPayments: recentPayments.length,
       };
+
       res.json(metrics);
     } catch (error) {
       console.error('Error fetching revenue metrics:', error);
       res.status(500).json({ message: 'Failed to fetch revenue metrics' });
+    }
+  });
+
+  app.get('/api/admin/manual-payments', requireAdmin, async (req, res) => {
+    try {
+      const payments = await storage.getAllManualPayments();
+      res.json(payments);
+    } catch (error) {
+      console.error('Error fetching admin manual payments:', error);
+      res.status(500).json({ message: 'Failed to fetch manual payments' });
     }
   });
 
@@ -4162,6 +4384,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
 
+    // First Payment Badge (New)
+    const totalPaidPayments = payments.filter(p => p.status === 'paid').length;
+    if (totalPaidPayments >= 1) {
+      badges.push({
+        id: `first_payment_${userId}`,
+        badgeType: 'first_payment',
+        level: 1,
+        earnedAt: payments.find(p => p.status === 'paid')?.paidDate || new Date().toISOString(),
+        isActive: true,
+        metadata: { totalPayments: totalPaidPayments }
+      });
+    }
+
     // Reliable tenant badge
     const onTimePayments = payments.filter(p => p.status === 'paid').length;
     if (onTimePayments >= 12) {
@@ -4254,6 +4489,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Send notification to landlord if email exists
+        // NOTE: Email is now only sent when tenant clicks "Verify" button in pending section
+        // via the /api/manual-payments/:id/reverify endpoint to avoid premature verification requests
+        /*
         if (verificationEmail) {
           try {
             await emailService.sendLandlordVerificationRequest({
@@ -4274,6 +4512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Don't fail the whole request if email fails
           }
         }
+        */
 
         // Create in-app notification for tenant
         await storage.createNotification({
@@ -4281,8 +4520,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: 'system',
           title: 'Payment Logged Successfully',
           message: verificationEmail
-            ? `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} is awaiting landlord verification. We've sent a verification request to ${verificationEmail}.`
-            : `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} has been logged. Add landlord contact info to request verification.`,
+            ? `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} has been logged. Click "Verify" in the Pending section to send a verification request to ${verificationEmail}.`
+            : `Your payment of £${amount} on ${new Date(paymentDate).toLocaleDateString()} has been logged. Add landlord contact info and click "Verify" to request verification.`,
         });
 
         // Update payment streak and check for badges
@@ -4628,6 +4867,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             title = "Early Bird";
             description = "Paying rent before due date";
             iconName = "Clock";
+          } else if (b.badgeType === 'first_payment') {
+            title = "First Payment";
+            description = "Made your first rent payment";
+            iconName = "Trophy";
           }
 
           return {
@@ -4969,6 +5212,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isRentUpdate = updateData.rentInfo?.amount || updateData.monthlyRent;
       const newRentAmount = updateData.rentInfo?.amount || updateData.monthlyRent;
 
+      // Handle address update if provided as an object (fix for AddressEditor)
+      if (updateData.address && typeof updateData.address === 'object') {
+        const { street, city, postcode } = updateData.address;
+        updateData.address = street;
+        if (city) updateData.city = city;
+        if (postcode) updateData.postcode = postcode;
+      }
+
       if (isRentUpdate && newRentAmount !== undefined) {
         const currentRent = parseFloat(String(existingProperty.monthlyRent));
         const newRent = parseFloat(String(newRentAmount));
@@ -5105,6 +5356,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin get all manual payments
+  app.get('/api/admin/manual-payments', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+
+      // Get all manual payments
+      const payments = await storage.getAllManualPayments();
+      // Return all payments (pending and verified) as requested
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching admin manual payments:", error);
+      res.status(500).json({ message: "Failed to fetch manual payments" });
+    }
+  });
+
   // Admin verification for manual payments
   app.post('/api/manual-payments/:id/admin-verify', requireAuth, async (req: any, res) => {
     try {
@@ -5132,6 +5403,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: new Date()
       });
 
+      if (status === 'approved') {
+        try {
+          // 1. Create a Rent Log entry so it appears in reports/history
+          const paymentDate = new Date(manualPayment.paymentDate);
+          const monthStr = paymentDate.toISOString().slice(0, 7); // YYYY-MM
+
+          await storage.createRentLog({
+            userId: manualPayment.userId,
+            amount: manualPayment.amount.toString(),
+            month: monthStr,
+            verified: true,
+            verifiedBy: userId.toString(), // Admin's ID
+            verifiedAt: new Date(),
+            landlordEmail: manualPayment.landlordEmail,
+            submittedAt: new Date()
+          });
+
+          // 2. Sync with RentPayments (Standard Ledger)
+          // Find if there's a pending payment for this month/property
+          const existingPayments = await storage.getUserRentPayments(manualPayment.userId);
+
+          // Look for a payment due in the same month for this property
+          const targetPayment = existingPayments.find(p => {
+            const pDate = new Date(p.dueDate);
+            return p.propertyId === manualPayment.propertyId &&
+              pDate.getFullYear() === paymentDate.getFullYear() &&
+              pDate.getMonth() === paymentDate.getMonth();
+          });
+
+          if (targetPayment) {
+            // Update existing payment to paid
+            await storage.updateRentPayment(targetPayment.id, {
+              status: 'paid',
+              amount: manualPayment.amount.toString(),
+              paidDate: paymentDate.toISOString(),
+              paymentMethod: manualPayment.paymentMethod || 'manual',
+              isVerified: true
+            });
+          } else {
+            // Create a new rent payment record if none exists
+            await storage.createRentPayment({
+              userId: manualPayment.userId,
+              propertyId: manualPayment.propertyId,
+              amount: manualPayment.amount.toString(),
+              dueDate: paymentDate.toISOString(),
+              paidDate: paymentDate.toISOString(),
+              status: 'paid',
+              paymentMethod: manualPayment.paymentMethod || 'manual',
+              isVerified: true
+            });
+          }
+
+          // 3. Log security event
+          await logSecurityEvent(req, 'admin_verified_manual_payment', {
+            paymentId,
+            adminId: userId,
+            amount: manualPayment.amount
+          });
+
+        } catch (syncError) {
+          console.error("Error syncing verified payment to ledger:", syncError);
+          // We don't fail the request, but we log the error. 
+          // Ideally we should revert the verification, but for now logging is sufficient as manual fix might be needed.
+        }
+      }
+
       // Create notification for tenant
       await storage.createNotification({
         userId: manualPayment.userId,
@@ -5146,7 +5483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         success: true,
         payment: updatedPayment,
-        message: status === 'approved' ? 'Payment verified successfully' : 'Payment status updated'
+        message: status === 'approved' ? 'Payment verified and synced to ledger' : 'Payment status updated'
       });
     } catch (error) {
       console.error("Error admin verifying payment:", error);

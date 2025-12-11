@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { CreditCard, ArrowLeft, TrendingUp, Users, DollarSign, Calendar, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
@@ -49,6 +50,10 @@ export default function AdminSubscriptions() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPlan, setFilterPlan] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingSubscription, setEditingSubscription] = useState<SubscriptionData | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ plan: "", status: "" });
+
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -96,6 +101,8 @@ export default function AdminSubscriptions() {
         description: "Subscription has been updated successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/subscriptions"] });
+      setIsEditDialogOpen(false);
+      setEditingSubscription(null);
     },
     onError: () => {
       toast({
@@ -384,10 +391,12 @@ export default function AdminSubscriptions() {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              updateSubscriptionMutation.mutate({
-                                subscriptionId: subscription.id,
-                                updates: { /* subscription updates */ }
+                              setEditingSubscription(subscription);
+                              setEditForm({
+                                plan: subscription.plan,
+                                status: subscription.status
                               });
+                              setIsEditDialogOpen(true);
                             }}
                             disabled={updateSubscriptionMutation.isPending}
                           >
@@ -417,6 +426,77 @@ export default function AdminSubscriptions() {
           </CardContent>
         </Card>
       </div>
-    </div>
+
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Subscription</DialogTitle>
+            <DialogDescription>
+              Update subscription details for {editingSubscription?.userName}
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingSubscription && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-plan">Plan</Label>
+                <Select
+                  value={editForm.plan}
+                  onValueChange={(val) => setEditForm(prev => ({ ...prev, plan: val }))}
+                >
+                  <SelectTrigger id="edit-plan">
+                    <SelectValue placeholder="Select plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="free">Free</SelectItem>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(val) => setEditForm(prev => ({ ...prev, status: val }))}
+                >
+                  <SelectTrigger id="edit-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="past_due">Past Due</SelectItem>
+                    <SelectItem value="trialing">Trialing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!editingSubscription) return;
+                updateSubscriptionMutation.mutate({
+                  subscriptionId: editingSubscription.id,
+                  updates: {
+                    subscriptionPlan: editForm.plan,
+                    subscriptionStatus: editForm.status
+                  }
+                });
+              }}
+              disabled={updateSubscriptionMutation.isPending}
+            >
+              {updateSubscriptionMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div >
   );
 }

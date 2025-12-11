@@ -458,76 +458,48 @@ interface PropertyVerificationRequestParams {
 
 export function createPropertyVerificationRequestEmail(params: PropertyVerificationRequestParams): SendEmailParams {
   const subject = `Verify Property: ${params.propertyAddress} - Tenant: ${params.tenantName}`;
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .header { background: #4f46e5; color: white; padding: 30px; text-align: center; }
-        .content { padding: 40px 30px; }
-        .details-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0; }
-        .row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
-        .row:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-        .label { font-weight: 600; color: #64748b; }
-        .value { font-weight: 600; color: #0f172a; }
-        .button { display: inline-block; background: #4f46e5; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-        .footer { background: #f1f5f9; padding: 20px; text-align: center; font-size: 12px; color: #64748b; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Property Verification Request</h1>
-        </div>
-        <div class="content">
-          <h2>Hello ${params.landlordName},</h2>
-          <p><strong>${params.tenantName}</strong> has added your property to RentLedger and requested verification. Verifying this property allows your tenant to build credit with their rent payments.</p>
-          
-          <div class="details-box">
-            <div class="row">
-              <span class="label">Property Address</span>
-              <span class="value">${params.propertyAddress}</span>
-            </div>
-            <div class="row">
-              <span class="label">Tenant</span>
-              <span class="value">${params.tenantName}</span>
-            </div>
-            <div class="row">
-              <span class="label">Monthly Rent</span>
-              <span class="value">£${params.monthlyRent.toFixed(2)}</span>
-            </div>
-            <div class="row">
-              <span class="label">Lease Type</span>
-              <span class="value">${params.leaseType}</span>
-            </div>
-            <div class="row">
-              <span class="label">Start Date</span>
-              <span class="value">${params.tenancyStartDate}</span>
-            </div>
-          </div>
-          
-          <p>Please confirm these details are correct to verify the tenancy.</p>
-          
-          <div style="text-align: center;">
-            <a href="${params.verificationUrl}" class="button">Verify Property</a>
-          </div>
-        </div>
-        <div class="footer">
-          <p>© ${new Date().getFullYear()} RentLedger. All rights reserved.</p>
-        </div>
-      </div>
-    </body>
-    </html>
+  const content = `
+    <p>Hello ${params.landlordName},</p>
+    <p><strong>${params.tenantName}</strong> has added your property to RentLedger and requested verification. Verifying this property allows your tenant to build credit with their rent payments.</p>
+    
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: left;">
+      <h3 style="margin: 0 0 16px 0; color: #0f172a; font-size: 16px; font-weight: 600;">Property Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Property Address</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.propertyAddress}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Tenant</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.tenantName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Monthly Rent</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">£${params.monthlyRent.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Lease Type</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.leaseType}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Start Date</td>
+          <td style="padding: 8px 0; color: #0f172a; font-weight: 500; text-align: right;">${params.tenancyStartDate}</td>
+        </tr>
+      </table>
+    </div>
+    
+    <p>Please confirm these details are correct to verify the tenancy.</p>
   `;
+
+  const html = getStroopwafelEmailTemplate("Property Verification Request", content, "Verify Property", params.verificationUrl);
 
   return {
     to: params.landlordEmail,
     from: FROM_EMAIL,
     fromName: 'RentLedger',
     subject,
-    html
+    html,
+    attachments: [getLogoAttachment()].filter(Boolean)
   };
 }
 

@@ -11,17 +11,22 @@ import { CheckCircle, Building, User, MapPin, PoundSterling, Shield } from "luci
 import { Logo } from "@/components/logo";
 
 interface VerificationData {
-  user: {
+  type?: 'property' | 'payment';
+  user?: {
     name: string;
     email: string;
   };
-  property: {
+  property?: {
     address: string;
     city: string;
     postcode: string;
     monthlyRent: string;
+    landlordEmail?: string;
+    landlordName?: string;
+    leaseType?: string;
+    tenancyStartDate?: string;
   };
-  verification: {
+  verification?: {
     id: number;
     token: string;
   };
@@ -85,7 +90,7 @@ export default function LandlordVerify() {
             <Logo className="mx-auto h-12 w-12 mb-4" />
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Landlord Verification</h1>
           </div>
-          
+
           <Alert variant="destructive">
             <AlertDescription>
               {error?.message || "Verification link not found or has expired. Please contact the tenant for a new verification link."}
@@ -104,7 +109,7 @@ export default function LandlordVerify() {
             <Logo className="mx-auto h-12 w-12 mb-4" />
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Verification Complete</h1>
           </div>
-          
+
           <Card>
             <CardContent className="pt-6">
               <div className="text-center">
@@ -115,7 +120,7 @@ export default function LandlordVerify() {
                   Thank You!
                 </h2>
                 <p className="text-gray-600 mb-4">
-                  You have successfully verified {verificationData.user.name}'s rental history.
+                  You have successfully verified {verificationData.user?.name}'s as your tenant and this helps towards creating a rental history.
                 </p>
                 <Badge variant="default" className="bg-green-100 text-green-800">
                   Verification Confirmed
@@ -150,11 +155,11 @@ export default function LandlordVerify() {
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-700">Full Name</label>
-                <p className="text-gray-900">{verificationData.user.name}</p>
+                <p className="text-gray-900">{verificationData.user?.name || 'N/A'}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Email</label>
-                <p className="text-gray-900">{verificationData.user.email}</p>
+                <p className="text-gray-900">{verificationData.user?.email || 'N/A'}</p>
               </div>
             </div>
           </CardContent>
@@ -205,9 +210,10 @@ export default function LandlordVerify() {
                 Confirm Tenant Verification
               </h2>
               <p className="text-gray-600 mb-6">
-                Please confirm that {verificationData.user.name} is your tenant at the above property and that their rental payment history is accurate.
+                Please confirm that {verificationData.type === 'property' ? 'this property information' : verificationData.user?.name} is your tenant at{' '}
+                <strong>{verificationData.property?.address}</strong>.
               </p>
-              <Button 
+              <Button
                 onClick={() => confirmMutation.mutate()}
                 disabled={confirmMutation.isPending}
                 className="w-full"

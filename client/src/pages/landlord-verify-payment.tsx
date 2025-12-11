@@ -157,6 +157,13 @@ export default function LandlordVerifyPayment() {
                     </p>
                 </div>
 
+                <Alert className="mb-6 bg-blue-50 border-blue-200">
+                    <Shield className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                        This payment has been pre-verified by our admin team on behalf of the tenant. Please review the details below.
+                    </AlertDescription>
+                </Alert>
+
                 <div className="grid gap-6 md:grid-cols-2">
                     {/* Payment Details */}
                     <Card>
@@ -244,8 +251,8 @@ export default function LandlordVerifyPayment() {
                             </CardHeader>
                             <CardContent>
                                 <div>
-                                    <p className="font-medium text-gray-900">{verificationData.tenant.name}</p>
-                                    <p className="text-sm text-gray-500">{verificationData.tenant.email}</p>
+                                    <p className="font-medium text-gray-900">{verificationData.tenant?.name || 'Unknown Tenant'}</p>
+                                    <p className="text-sm text-gray-500">{verificationData.tenant?.email || 'No email provided'}</p>
                                 </div>
                             </CardContent>
                         </Card>
@@ -258,10 +265,11 @@ export default function LandlordVerifyPayment() {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex items-center space-x-2">
-                                    <MapPin className="h-4 w-4 text-gray-400" />
-                                    <p className="text-gray-900">
-                                        {verificationData.property.address}, {verificationData.property.city}
+                                <div>
+                                    <p className="font-medium text-gray-900">{verificationData.property?.address || 'Unknown Address'}</p>
+                                    <p className="text-sm text-gray-500">
+                                        {verificationData.property?.city ? `${verificationData.property.city}, ` : ''}
+                                        {verificationData.property?.postcode || ''}
                                     </p>
                                 </div>
                             </CardContent>

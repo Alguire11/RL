@@ -55,6 +55,7 @@ export default function AdminRevenue() {
     queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
     enabled: isAuthenticated && user?.role === 'admin',
+    refetchInterval: 5000,
   });
 
   const { data: chartData = [], isLoading: chartLoading } = useQuery<RevenueChart[]>({
@@ -62,6 +63,7 @@ export default function AdminRevenue() {
     queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
     enabled: isAuthenticated && user?.role === 'admin',
+    refetchInterval: 5000,
   });
 
   const { data: topMetrics, isLoading: metricsLoading } = useQuery<TopMetrics>({
@@ -69,6 +71,7 @@ export default function AdminRevenue() {
     queryFn: getQueryFn({ on401: "throw" }),
     retry: false,
     enabled: isAuthenticated && user?.role === 'admin',
+    refetchInterval: 5000,
   });
 
   const formatCurrency = (amount: number) => {
@@ -253,7 +256,7 @@ export default function AdminRevenue() {
                     </div>
                     <span className="font-bold text-green-600">+{topMetrics.newSubscriptions}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between py-3">
                     <div className="flex items-center space-x-2">
                       <Badge className="bg-blue-100 text-blue-800">Upgrade</Badge>
@@ -261,7 +264,7 @@ export default function AdminRevenue() {
                     </div>
                     <span className="font-bold text-blue-600">+{topMetrics.upgrades}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between py-3">
                     <div className="flex items-center space-x-2">
                       <Badge className="bg-yellow-100 text-yellow-800">Downgrade</Badge>
@@ -269,7 +272,7 @@ export default function AdminRevenue() {
                     </div>
                     <span className="font-bold text-yellow-600">-{topMetrics.downgrades}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between py-3 border-t">
                     <div className="flex items-center space-x-2">
                       <Badge className="bg-red-100 text-red-800">Cancelled</Badge>
@@ -300,10 +303,10 @@ export default function AdminRevenue() {
               <div className="h-64 flex items-end space-x-2">
                 {chartData.map((data, index) => (
                   <div key={index} className="flex-1 flex flex-col items-center">
-                    <div 
+                    <div
                       className="w-full bg-blue-200 hover:bg-blue-300 transition-colors rounded-t"
-                      style={{ 
-                        height: `${Math.max((data.revenue / Math.max(...chartData.map(d => d.revenue))) * 200, 4)}px` 
+                      style={{
+                        height: `${Math.max((data.revenue / Math.max(...chartData.map(d => d.revenue))) * 200, 4)}px`
                       }}
                       title={`${formatCurrency(data.revenue)} on ${format(new Date(data.date), 'dd MMM')}`}
                     />
@@ -337,8 +340,8 @@ export default function AdminRevenue() {
               </p>
               <div className={`mt-2 text-sm ${getGrowthColor(-(revenueData?.churnRate || 0))}`}>
                 {revenueData?.churnRate ? (
-                  revenueData.churnRate < 5 ? 'Excellent retention' : 
-                  revenueData.churnRate < 10 ? 'Good retention' : 'Needs improvement'
+                  revenueData.churnRate < 5 ? 'Excellent retention' :
+                    revenueData.churnRate < 10 ? 'Good retention' : 'Needs improvement'
                 ) : 'No data'}
               </div>
             </CardContent>
@@ -360,9 +363,9 @@ export default function AdminRevenue() {
               </p>
               <div className="mt-2 text-sm text-gray-500">
                 {revenueData?.growthRate ? (
-                  revenueData.growthRate > 20 ? 'Exceptional growth' : 
-                  revenueData.growthRate > 10 ? 'Strong growth' : 
-                  revenueData.growthRate > 0 ? 'Positive growth' : 'Declining'
+                  revenueData.growthRate > 20 ? 'Exceptional growth' :
+                    revenueData.growthRate > 10 ? 'Strong growth' :
+                      revenueData.growthRate > 0 ? 'Positive growth' : 'Declining'
                 ) : 'No data'}
               </div>
             </CardContent>
@@ -372,7 +375,7 @@ export default function AdminRevenue() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <DollarSign className="h-5 w-5" />
-                <span>Total Rent Revenue</span>
+                <span>Total Rent Revenue Collected</span>
               </CardTitle>
             </CardHeader>
             <CardContent>

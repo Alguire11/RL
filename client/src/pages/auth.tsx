@@ -133,6 +133,26 @@ export default function AuthPage() {
     },
   });
 
+  const resendVerificationMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("POST", "/api/resend-verification", { email });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Email Sent",
+        description: data.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send email",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onLogin = (data: LoginData) => {
     loginMutation.mutate(data);
   };
@@ -144,13 +164,13 @@ export default function AuthPage() {
   const watchPassword = registerForm.watch("password");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 relative overflow-hidden" >
       {/* Animated mesh background */}
-      <div className="absolute inset-0 opacity-30">
+      < div className="absolute inset-0 opacity-30" >
         <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl animate-blob" />
         <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000" />
         <div className="absolute -bottom-8 left-20 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000" />
-      </div>
+      </div >
 
       <div className="relative min-h-screen flex items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6 animate-fade-in">
@@ -214,7 +234,24 @@ export default function AuthPage() {
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
                 <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 text-center">
-                  <p>Didn't receive the email? Check your spam folder or try logging in to resend.</p>
+                  <p>Didn't receive the email? Check your spam folder or</p>
+                  <Button
+                    variant="link"
+                    className="p-0 h-auto font-normal text-blue-600 hover:text-blue-700"
+                    onClick={() => {
+                      const email = registerForm.getValues().email;
+                      if (email) {
+                        resendVerificationMutation.mutate(email);
+                      } else {
+                        // If email is lost from state (page refresh), guide to login
+                        setVerificationSent(false);
+                        navigate("/login");
+                      }
+                    }}
+                    disabled={resendVerificationMutation.isPending}
+                  >
+                    {resendVerificationMutation.isPending ? "sending..." : "click here to resend"}
+                  </Button>
                 </div>
                 <Button
                   className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white"
@@ -524,6 +561,6 @@ export default function AuthPage() {
           }
         }
       `}</style>
-    </div>
+    </div >
   );
 }

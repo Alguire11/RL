@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Edit3, Save, X } from "lucide-react";
+import { MapPin, Edit3, Save, X, CheckCircle, AlertCircle, Mail } from "lucide-react";
 
 const addressSchema = z.object({
   street: z.string().min(1, "Street address is required"),
@@ -47,6 +48,18 @@ export function AddressEditor({ currentAddress, onAddressUpdate, propertyId }: A
       country: currentAddress?.country || "United Kingdom",
     },
   });
+
+  // Update form values when currentAddress changes or dialog opens
+  useEffect(() => {
+    if (isOpen && currentAddress) {
+      form.reset({
+        street: currentAddress.street || "",
+        city: currentAddress.city || "",
+        postcode: currentAddress.postcode || "",
+        country: currentAddress.country || "United Kingdom",
+      });
+    }
+  }, [currentAddress, isOpen, form]);
 
   const updateAddressMutation = useMutation({
     mutationFn: async (data: AddressData) => {
@@ -86,7 +99,37 @@ export function AddressEditor({ currentAddress, onAddressUpdate, propertyId }: A
     updateAddressMutation.mutate(data);
   };
 
-  const displayAddress = currentAddress?.street 
+  // Fetch property details to get verification status
+  const { data: properties } = useQuery<any[]>({
+    queryKey: ["/api/properties"],
+    queryFn: getQueryFn<any[]>({ on401: "throw" }),
+    enabled: !!propertyId,
+  });
+
+  const currentProperty = properties?.find(p => p.id === propertyId);
+  const isVerified = currentProperty?.isVerified || false;
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: async () => {
+      if (!propertyId) throw new Error("No property ID");
+      return apiRequest("POST", `/api/properties/${propertyId}/resend-verification`, {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Verification email sent",
+        description: "We've sent a verification request to your landlord.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send email",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const displayAddress = currentAddress?.street
     ? `${currentAddress.street}, ${currentAddress.city}, ${currentAddress.postcode}`
     : "No address set";
 
@@ -99,19 +142,57 @@ export function AddressEditor({ currentAddress, onAddressUpdate, propertyId }: A
             <Edit3 className="h-4 w-4 text-gray-500" />
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-2">
-              <MapPin className="h-4 w-4 text-gray-500" />
-              <p className="text-sm text-gray-600">{displayAddress}</p>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                <p className="text-sm text-gray-600">{displayAddress}</p>
+              </div>
+
+              {propertyId && (
+                <>
+                  {/* Verification Status Badge */}
+                  <div className="flex items-center space-x-2">
+                    {isVerified ? (
+                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Verified
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Unverified
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Resend Verification Button */}
+                  {!isVerified && currentProperty?.landlordEmail && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        resendVerificationMutation.mutate();
+                      }}
+                      disabled={resendVerificationMutation.isPending}
+                    >
+                      <Mail className="h-3 w-3 mr-1" />
+                      {resendVerificationMutation.isPending ? "Sending..." : "Resend Verification Email"}
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Address</DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="street">Street Address</Label>

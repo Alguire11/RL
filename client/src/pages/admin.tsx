@@ -481,13 +481,13 @@ export default function AdminDashboard() {
             color="success"
           />
           <StatCard
-            title="Total Payments"
+            title="Rent Payments"
             value={stats?.totalPayments || 0}
             icon={CreditCard}
             color="secondary"
           />
           <StatCard
-            title="Total Reports"
+            title="Total Reports Created"
             value={stats?.totalReports || 0}
             icon={FileText}
             color="accent"
@@ -794,6 +794,15 @@ export default function AdminDashboard() {
               >
                 <Activity className="w-4 h-4 mr-2" />
                 System Check
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setLocation('/admin/verifications')}
+              >
+                <Check className="w-4 h-4 mr-2" />
+                Verifications
               </Button>
 
               <Button

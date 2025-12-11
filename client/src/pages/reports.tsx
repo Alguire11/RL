@@ -6,6 +6,7 @@ import { Navigation } from "@/components/navigation";
 import { ReportPreview } from "@/components/reports/report-preview";
 import { ShareDialog } from "@/components/reports/share-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,7 +19,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 
 export default function Reports() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [selectedReport, setSelectedReport] = useState<CreditReport | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
 
@@ -222,77 +223,120 @@ export default function Reports() {
 
           {/* Report Actions */}
           <div className="space-y-6">
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button
-                  className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                  onClick={() => window.location.href = '/manual-verify'}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Payment Record
-                </Button>
-
-                {properties.map((property) => (
+            {/* Quick Actions - Hide for admins */}
+            {user?.role !== 'admin' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <Button
-                    key={property.id}
-                    onClick={() => handleGenerateReport(property.id)}
-                    disabled={generateReportMutation.isPending}
-                    className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm relative"
+                    className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                    onClick={() => window.location.href = '/manual-verify'}
                   >
-                    {plan.id === 'free' && <Lock className="w-3 h-3 absolute top-1 right-1" />}
-                    <FileText className="w-4 h-4 mr-2" />
-                    Generate Rent Report
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Payment Record
                   </Button>
-                ))}
 
-                <Button
-                  onClick={() => window.location.href = '/portfolio'}
-                  className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share Portfolio
-                </Button>
-              </CardContent>
-            </Card>
+                  {properties.map((property) => (
+                    <Button
+                      key={property.id}
+                      onClick={() => handleGenerateReport(property.id)}
+                      disabled={generateReportMutation.isPending}
+                      className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm relative"
+                    >
+                      {plan.id === 'free' && <Lock className="w-3 h-3 absolute top-1 right-1" />}
+                      <FileText className="w-4 h-4 mr-2" />
+                      Generate Rent Report
+                    </Button>
+                  ))}
+
+                  <Button
+                    onClick={() => window.location.href = '/portfolio'}
+                    className="w-full h-12 bg-white border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share Portfolio
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Report History */}
-            <Card>
+            <Card className={user?.role === 'admin' ? "col-span-3 lg:col-span-3 lg:w-[150%] lg:-ml-[50%]" : ""}>
               <CardHeader>
-                <CardTitle className="text-lg font-semibold">My Ledger History</CardTitle>
+                <CardTitle className="text-lg font-semibold">
+                  {user?.role === 'admin' ? "All Downloaded Ledger History" : "My Ledger History"}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {reports.length > 0 ? (
-                  <div className="space-y-3">
-                    {reports.map((report) => (
-                      <div
-                        key={report.id}
-                        className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${selectedReport?.id === report.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        onClick={() => setSelectedReport(report)}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <p className="font-medium text-sm">
-                            {formatDate(report.generatedAt)}
+                  user?.role === 'admin' ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>User ID</TableHead>
+                          <TableHead>Report ID</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Shares</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reports.map((report) => (
+                          <TableRow
+                            key={report.id}
+                            className={`cursor-pointer ${selectedReport?.id === report.id ? 'bg-muted/50' : ''}`}
+                            onClick={() => setSelectedReport(report)}
+                          >
+                            <TableCell>{formatDate(report.generatedAt)}</TableCell>
+                            <TableCell className="font-mono text-xs">{report.userId}</TableCell>
+                            <TableCell className="font-mono text-xs">{report.verificationId}</TableCell>
+                            <TableCell>
+                              <Badge variant={getStatusColor(report.isActive ?? false, report.expiresAt)}>
+                                {getStatusText(report.isActive ?? false, report.expiresAt)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{report.shareCount}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedReport(report); }}>
+                                View
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="space-y-3">
+                      {reports.map((report) => (
+                        <div
+                          key={report.id}
+                          className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${selectedReport?.id === report.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                          onClick={() => setSelectedReport(report)}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <p className="font-medium text-sm">
+                              {formatDate(report.generatedAt)}
+                            </p>
+                            <Badge variant={getStatusColor(report.isActive ?? false, report.expiresAt)}>
+                              {getStatusText(report.isActive ?? false, report.expiresAt)}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-gray-600 mb-1">
+                            ID: {report.verificationId}
                           </p>
-                          <Badge variant={getStatusColor(report.isActive ?? false, report.expiresAt)}>
-                            {getStatusText(report.isActive ?? false, report.expiresAt)}
-                          </Badge>
+                          <p className="text-xs text-gray-600">
+                            Shares: {report.shareCount}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-600 mb-1">
-                          ID: {report.verificationId}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          Shares: {report.shareCount}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )
                 ) : (
                   <div className="text-center py-4">
                     <Calendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />

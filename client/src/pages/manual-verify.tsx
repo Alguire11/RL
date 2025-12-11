@@ -37,7 +37,7 @@ export default function ManualVerify() {
   const { data: unverifiedPayments = [] } = useQuery<any[]>({
     queryKey: ["/api/manual-payments"],
     retry: false,
-    select: (data) => data.filter(p => p.needsVerification && !p.receiptUrl),
+    select: (data) => data.filter(p => p.needsVerification),
   });
 
   // Get selected property

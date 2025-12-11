@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle, TrendingUp, Upload, CreditCard } from "lucide-react";
+import { Menu, BarChart3, FileText, Settings, LogOut, User, Shield, Building, Users, Scale, ChevronDown, History, PlusCircle, TrendingUp, Upload, CreditCard, CheckCircle } from "lucide-react";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -36,7 +36,8 @@ export function Navigation() {
       { path: "/admin", label: "Overview", icon: BarChart3 },
       { path: "/admin/users", label: "Users", icon: Users },
       { path: "/admin/properties", label: "Properties", icon: Building },
-      { path: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard }, // Using CreditCard as icon isn't imported, but Shield or similar is available. Let's use FileText for now or keep existing import
+      { path: "/admin/subscriptions", label: "Subscriptions", icon: CreditCard },
+      { path: "/admin/verifications", label: "Verifications", icon: CheckCircle },
       { path: "/admin/settings", label: "Settings", icon: Settings },
     ];
   } else {
