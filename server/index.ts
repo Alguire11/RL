@@ -53,6 +53,16 @@ app.use(rateLimit({
   message: "Too many requests from this IP, please try again later",
 }));
 
+// Stricter rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === "production" ? 5 : 100, // 5 attempts per 15 minutes in production
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many authentication attempts, please try again later",
+  skipSuccessfulRequests: true, // Don't count successful logins
+});
+
 import pino from "pino";
 
 // Structured Logging
@@ -84,6 +94,9 @@ app.use(pinoHttp({
 
 app.use(express.json({ limit: '10mb' })); // Reduced from 50mb
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Export authLimiter for use in auth routes
+export { authLimiter };
 
 (async () => {
   startScheduler();

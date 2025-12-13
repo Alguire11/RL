@@ -9,6 +9,7 @@ import { pool } from "./db";
 import { User as SelectUser } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { emailService } from "./emailService";
+import rateLimit from "express-rate-limit";
 
 // Helper function to generate unique RLID (RentLedger ID)
 
@@ -22,6 +23,16 @@ declare global {
 export function setupAuth(app: Express) {
   const PgSessionStore = connectPgSimple(session);
   const isProduction = process.env.NODE_ENV === "production";
+
+  // Stricter rate limiting for authentication endpoints
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: isProduction ? 5 : 100, // 5 attempts per 15 minutes in production
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: "Too many authentication attempts, please try again later",
+    skipSuccessfulRequests: true, // Don't count successful logins
+  });
 
   const sessionSettings: session.SessionOptions = {
     store: new PgSessionStore({
@@ -104,7 +115,7 @@ export function setupAuth(app: Express) {
   });
 
   // Register endpoint
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", authLimiter, async (req, res, next) => {
     try {
       const { email, password, firstName, lastName } = req.body;
 
@@ -181,7 +192,7 @@ export function setupAuth(app: Express) {
   });
 
   // Standard email/password login endpoint
-  app.post("/api/login", (req, res, next) => {
+  app.post("/api/login", authLimiter, (req, res, next) => {
     passport.authenticate("local-email", (err: any, user: SelectUser | false, info: any) => {
       if (err) {
         return next(err);
@@ -202,7 +213,7 @@ export function setupAuth(app: Express) {
   });
 
   // Admin/Landlord username login endpoint
-  app.post("/api/admin-login", async (req, res, next) => {
+  app.post("/api/admin-login", authLimiter, async (req, res, next) => {
     passport.authenticate("local-username", async (err: any, user: SelectUser | false, info: any) => {
       if (err) {
         return next(err);

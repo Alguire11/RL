@@ -42,6 +42,11 @@ export function validateEnvironment(): {
     if (process.env.SESSION_SECRET === 'dev-secret-key') {
       errors.push('SESSION_SECRET cannot be the default "dev-secret-key" in production');
     }
+
+    // Ensure minimum entropy for session secret
+    if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length < 32) {
+      errors.push('SESSION_SECRET must be at least 32 characters in production for adequate security');
+    }
   }
 
   return {

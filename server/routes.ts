@@ -1533,7 +1533,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/bank-connections/:id', requireAuth, async (req: any, res) => {
     try {
       const connectionId = parseInt(req.params.id);
+      const userId = req.user.id;
+
+      // Ownership check - SECURITY FIX
+      const connection = await storage.getBankConnection(connectionId);
+      if (!connection) {
+        return res.status(404).json({ message: "Bank connection not found" });
+      }
+
+      if (connection.userId !== userId) {
+        await logSecurityEvent(req, 'unauthorized_bank_connection_delete_attempt', { connectionId });
+        return res.status(403).json({ message: "You do not have permission to delete this connection" });
+      }
+
       await storage.deleteBankConnection(connectionId);
+
+      // Audit Log
+      await storage.createAuditLog({
+        userId: req.user.id,
+        action: "delete",
+        entityType: "bank_connection",
+        entityId: connectionId.toString(),
+        details: { connectionId },
+        ipAddress: req.ip || req.connection.remoteAddress,
+      });
+
       res.json({ message: "Bank connection deleted successfully" });
     } catch (error) {
       console.error("Error deleting bank connection:", error);

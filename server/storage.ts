@@ -139,6 +139,7 @@ export interface IStorage {
 
   // Bank connection operations
   createBankConnection(connection: InsertBankConnection): Promise<BankConnection>;
+  getBankConnection(id: number): Promise<BankConnection | undefined>;
   getUserBankConnections(userId: string): Promise<BankConnection[]>;
   updateBankConnection(id: number, connection: Partial<InsertBankConnection>): Promise<BankConnection>;
   deleteBankConnection(id: number): Promise<void>;
@@ -533,6 +534,14 @@ export class DatabaseStorage implements IStorage {
       .values(connection)
       .returning();
     return newConnection;
+  }
+
+  async getBankConnection(id: number): Promise<BankConnection | undefined> {
+    const [connection] = await db
+      .select()
+      .from(bankConnections)
+      .where(eq(bankConnections.id, id));
+    return connection;
   }
 
   async getUserBankConnections(userId: string): Promise<BankConnection[]> {
