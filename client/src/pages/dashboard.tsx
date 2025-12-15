@@ -539,7 +539,7 @@ export default function Dashboard() {
         {/* Main Content Grid */}
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Report Snapshot */}
-          <Card className="report-snapshot">
+          <Card className="report-snapshot rent-reports">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-xl font-semibold flex items-center">
                 <FileText className="h-5 w-5 mr-2 text-blue-600" />

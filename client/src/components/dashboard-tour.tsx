@@ -43,9 +43,9 @@ interface DashboardTourProps {
 const TOUR_STEPS: TourStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to Enoíkio!',
+    title: 'Welcome to RentLedger!',
     description: 'Your journey to building your Rent Score through rent payments starts here',
-    content: 'Enoíkio helps you track rent payments and build a Rent Score history that landlords and lenders can trust. Let\'s take a quick tour of your new dashboard.',
+    content: 'RentLedger helps you track rent payments and build a Rent Score history that landlords and lenders can trust. Let\'s take a quick tour of your new dashboard.',
     icon: Home,
     position: 'center'
   },
@@ -147,6 +147,7 @@ export function DashboardTour({ isOpen, onClose, onComplete }: DashboardTourProp
         const element = document.querySelector(currentTourStep.target);
         if (element) {
           element.classList.add('tour-highlight');
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     }
