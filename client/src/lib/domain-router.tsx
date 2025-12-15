@@ -18,7 +18,7 @@ export function DomainRouter({ children }: { children: ReactNode }) {
     // return different route sets entirely.
     //
     // Refactored approach: logic inside App.tsx using a helper to determine domain type.
-    return <>{ children } </>;
+    return <>{children} </>;
 }
 
 export function useDomainType(): DomainType {
@@ -37,7 +37,7 @@ export function useDomainType(): DomainType {
             return;
         }
 
-        if (hostname.includes('admin.') || hostname.includes('admin-')) {
+        if (hostname.includes('internal-ops.') || hostname.includes('admin.') || hostname.includes('admin-')) {
             setDomainType('admin');
         } else if (hostname.includes('myrentledger')) {
             setDomainType('tenant');
@@ -51,7 +51,7 @@ export function useDomainType(): DomainType {
 
 export const MAIN_DOMAIN = 'rentledger.co.uk';
 export const APP_DOMAIN = 'myrentledger.co.uk';
-export const ADMIN_SUBDOMAIN = 'admin.rentledger.co.uk';
+export const ADMIN_SUBDOMAIN = 'internal-ops.rentledger.co.uk';
 
 export function getAppUrl(path: string = '') {
     const protocol = window.location.protocol;
