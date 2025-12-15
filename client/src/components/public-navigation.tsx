@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { getAppUrl } from "@/lib/domain-router";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Menu, X, Building, Users, Scale, Shield, ChevronDown } from "lucide-react";
 
@@ -15,11 +16,11 @@ export function PublicNavigation() {
   const [, setLocation] = useLocation();
 
   const handleGetStarted = () => {
-    setLocation("/auth");
+    window.location.href = getAppUrl('/auth?tab=signup');
   };
 
   const handleSignIn = () => {
-    setLocation("/auth");
+    window.location.href = getAppUrl('/auth');
   };
 
   return (
@@ -36,7 +37,7 @@ export function PublicNavigation() {
             <Link href="/" className="text-gray-600 hover:text-primary px-3 py-2 rounded-md text-sm font-medium transition-colors">
               Home
             </Link>
-            
+
             {/* Company Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -75,14 +76,14 @@ export function PublicNavigation() {
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleSignIn}
               className="text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700"
             >
               Sign In
             </Button>
-            <Button 
+            <Button
               onClick={handleGetStarted}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
@@ -92,9 +93,9 @@ export function PublicNavigation() {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setIsMobileMenuOpen(true)}
             >
               <Menu className="h-6 w-6" />
@@ -108,60 +109,60 @@ export function PublicNavigation() {
         <div className="fixed inset-0 bg-white z-40 md:hidden">
           <div className="pt-16 pb-6 px-4">
             <div className="flex justify-end mb-4">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 <X className="h-6 w-6" />
               </Button>
             </div>
             <div className="space-y-4">
-              <Link 
-                href="/" 
+              <Link
+                href="/"
                 className="block text-gray-900 hover:text-primary px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Home
               </Link>
-              <Link 
-                href="/about" 
+              <Link
+                href="/about"
                 className="block text-gray-600 hover:text-primary px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 About
               </Link>
-              <Link 
-                href="/privacy" 
+              <Link
+                href="/privacy"
                 className="block text-gray-600 hover:text-primary px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Privacy Policy
               </Link>
-              <Link 
-                href="/terms" 
+              <Link
+                href="/terms"
                 className="block text-gray-600 hover:text-primary px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Terms of Service
               </Link>
-              <Link 
-                href="/contact" 
+              <Link
+                href="/contact"
                 className="block text-gray-600 hover:text-primary px-3 py-2 rounded-md text-base font-medium"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 Contact
               </Link>
               <hr className="my-4" />
-              <Button 
-                variant="outline" 
-                onClick={handleSignIn} 
+              <Button
+                variant="outline"
+                onClick={handleSignIn}
                 className="block w-full text-left text-blue-600 border-blue-600 hover:bg-blue-50 hover:text-blue-700 px-3 py-2 rounded-md text-base font-medium"
               >
                 Sign In
               </Button>
-              <Button 
-                onClick={handleGetStarted} 
+              <Button
+                onClick={handleGetStarted}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Get Started

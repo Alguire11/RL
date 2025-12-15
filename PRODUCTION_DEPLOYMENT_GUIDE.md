@@ -110,6 +110,30 @@ VITE_STRIPE_PUBLIC_KEY=your-stripe-public-key
 
 ---
 
+### Option 4: IONOS VPS (Custom Node.js Hosting)
+
+1.  **Provision VPS**: Ubuntu 22.04+ on IONOS.
+2.  **Install Dependencies**:
+    ```bash
+    apt install nodejs npm nginx git
+    npm install -g pm2
+    ```
+3.  **Deploy & Build**:
+    ```bash
+    git clone <repo>
+    npm install && npm run build
+    ```
+4.  **Run with PM2**:
+    ```bash
+    pm2 start npm --name "app" -- start
+    ```
+5.  **Configure Nginx**: Proxy port 80 to 5000.
+
+**Pros:** Full control, persistent filesystem, cost-effective  
+**Cons:** Requires server management (updates, security)
+
+---
+
 ## 🔒 Security Hardening
 
 ### SSL/HTTPS
