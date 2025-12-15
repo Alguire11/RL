@@ -705,7 +705,7 @@ export default function Landing() {
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link href="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link>
               <Link href="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link>
-              <Link href="/admin-login" className="text-gray-400 hover:text-white">Admin Access</Link>
+              {/* <Link href="/admin-login" className="text-gray-400 hover:text-white">Admin Access</Link> */}
             </div>
           </div>
         </div>
