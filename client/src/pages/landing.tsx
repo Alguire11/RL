@@ -106,23 +106,76 @@ export default function Landing() {
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-              Transform Your Rent Into{" "}
               <span className="bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
-                Credit History
-              </span>
+                Verified rent history
+              </span>{" "}
+              you can actually use.
             </h1>
             <p className="text-xl text-gray-100 mb-8 max-w-3xl mx-auto">
-              RentLedger manually/automatically tracks your on-time rent payments and builds a comprehensive credit portfolio.
-              Turn your rental history into a powerful financial asset.
+              RentLedger helps renters and landlords create a tamper-resistant rent payment record — useful for applications, disputes, and building trust.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleGetStarted} className="text-lg px-8 py-3 bg-white hover:bg-gray-100 text-blue-600 shadow-lg">
-                Get Started Free
-              </Button>
+
+            <div className="flex flex-col items-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-4">
+                <Button onClick={handleGetStarted} className="text-lg px-8 py-3 bg-white hover:bg-gray-100 text-blue-600 shadow-lg">
+                  Get Started Free
+                </Button>
+              </div>
+
+              <p className="text-sm text-gray-200 font-medium mb-3">
+                Privacy-first. Consent-based sharing. GDPR-ready.
+              </p>
+
+              <a
+                href="#how-it-works"
+                className="text-white hover:text-blue-200 underline underline-offset-4 text-sm font-medium transition-colors mb-6"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                How it works
+              </a>
+
+              <p className="text-xs text-gray-400 max-w-md">
+                Does not replace affordability checks — it adds verified payment evidence.
+              </p>
             </div>
           </div>
         </div>
       </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              How it works
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Simple steps to verify your rental history
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-4 gap-8">
+            {[
+              { title: "1. Log payments", desc: "Track your monthly rent payments manually or automatically." },
+              { title: "2. Verify", desc: "Invite your landlord to verify your payment history." },
+              { title: "3. Build Timeline", desc: "Create a verified timeline of on-time payments." },
+              { title: "4. Share", desc: "Download your PDF Rent Ledger and share it securely." }
+            ].map((step, idx) => (
+              <div key={idx} className="relative p-6 bg-white rounded-xl shadow-sm border border-gray-100 text-center hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-lg">
+                  {idx + 1}
+                </div>
+                <h3 className="font-bold text-lg text-gray-900 mb-2">{step.title}</h3>
+                <p className="text-gray-600">{step.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Product Section */}
       <section id="product" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
