@@ -175,8 +175,8 @@ export default function Terms() {
                   </a>
                 </p>
                 <p className="text-sm text-gray-600">
-                  Phone: <a href="tel:+442071234567" className="text-blue-600 hover:underline">
-                    +44 20 7123 4567
+                  Phone: <a href="tel:+447926528820" className="text-blue-600 hover:underline">
+                    +44 7926 528 820
                   </a>
                 </p>
               </div>
@@ -188,8 +188,8 @@ export default function Terms() {
                   </a>
                 </p>
                 <p className="text-sm text-gray-600">
-                  Phone: <a href="tel:+442071234568" className="text-blue-600 hover:underline">
-                    +44 20 7123 4568
+                  Phone: <a href="tel:+447926528820" className="text-blue-600 hover:underline">
+                    +44 7926 528 820
                   </a>
                 </p>
               </div>
@@ -212,14 +212,14 @@ export default function Terms() {
               <div>
                 <h3 className="font-semibold mb-2">Jurisdiction</h3>
                 <p className="text-gray-700">
-                  These terms are governed by the laws of England and Wales. Any disputes will be resolved 
+                  These terms are governed by the laws of England and Wales. Any disputes will be resolved
                   in the courts of England and Wales.
                 </p>
               </div>
               <div>
                 <h3 className="font-semibold mb-2">Dispute Resolution</h3>
                 <p className="text-gray-700">
-                  We encourage users to contact us directly to resolve any disputes. If necessary, 
+                  We encourage users to contact us directly to resolve any disputes. If necessary,
                   disputes may be resolved through binding arbitration.
                 </p>
               </div>

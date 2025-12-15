@@ -85,12 +85,12 @@ export default function Privacy() {
     {
       title: "Data Protection Officer",
       email: "dpo@rentledger.co.uk",
-      phone: "+44 20 7123 4567"
+      phone: "+44 7926 528 820"
     },
     {
       title: "General Privacy Inquiries",
       email: "privacy@rentledger.co.uk",
-      phone: "+44 20 7123 4568"
+      phone: "+44 7926 528 820"
     }
   ];
 
@@ -172,21 +172,21 @@ export default function Privacy() {
               <div>
                 <h3 className="font-semibold mb-2">Legal Basis for Processing</h3>
                 <p className="text-gray-700">
-                  We process your personal data based on legitimate interests, contractual necessity, 
+                  We process your personal data based on legitimate interests, contractual necessity,
                   legal obligations, and your consent where required.
                 </p>
               </div>
               <div>
                 <h3 className="font-semibold mb-2">Data Transfers</h3>
                 <p className="text-gray-700">
-                  When we transfer data outside the EU, we ensure appropriate safeguards are in place, 
+                  When we transfer data outside the EU, we ensure appropriate safeguards are in place,
                   including standard contractual clauses and adequacy decisions.
                 </p>
               </div>
               <div>
                 <h3 className="font-semibold mb-2">Data Protection Impact Assessments</h3>
                 <p className="text-gray-700">
-                  We conduct regular assessments to ensure our processing activities meet GDPR requirements 
+                  We conduct regular assessments to ensure our processing activities meet GDPR requirements
                   and protect your fundamental rights.
                 </p>
               </div>

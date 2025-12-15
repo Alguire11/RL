@@ -5,13 +5,13 @@ import { Navigation } from "@/components/navigation";
 import { PublicNavigation } from "@/components/public-navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "wouter";
-import { 
-  HelpCircle, 
-  MessageCircle, 
-  Phone, 
-  Mail, 
-  Activity, 
-  Book, 
+import {
+  HelpCircle,
+  MessageCircle,
+  Phone,
+  Mail,
+  Activity,
+  Book,
   ArrowRight,
   CheckCircle,
   AlertCircle,
@@ -38,7 +38,7 @@ export default function Support() {
       href: "/help",
       features: [
         "Step-by-step guides",
-        "Video tutorials", 
+        "Video tutorials",
         "Frequently asked questions",
         "Getting started guides"
       ]
@@ -130,8 +130,8 @@ export default function Support() {
           {quickActions.map((action, index) => {
             const Icon = action.icon;
             return (
-              <Card 
-                key={index} 
+              <Card
+                key={index}
                 className="cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={action.action}
               >
@@ -239,7 +239,7 @@ export default function Support() {
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">Phone Support</p>
-                    <p className="text-sm text-gray-600">+44 20 7123 4567</p>
+                    <p className="text-sm text-gray-600">+44 7926 528 820</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -280,8 +280,8 @@ export default function Support() {
               <div>
                 <h3 className="font-semibold text-red-900">Critical Issue?</h3>
                 <p className="text-red-700">
-                  For urgent issues affecting your account security or payment processing, 
-                  contact our emergency support line at <strong>+44 20 7123 4567</strong> or 
+                  For urgent issues affecting your account security or payment processing,
+                  contact our emergency support line at <strong>+44 7926 528 820</strong> or
                   use the priority contact form.
                 </p>
               </div>
@@ -292,8 +292,8 @@ export default function Support() {
 
       {/* Live Chat Components */}
       {!isChatMinimized && (
-        <LiveChat 
-          isOpen={isChatOpen} 
+        <LiveChat
+          isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
           onMinimize={() => {
             setIsChatMinimized(true);
@@ -301,9 +301,9 @@ export default function Support() {
           }}
         />
       )}
-      
+
       {(isChatMinimized || !isChatOpen) && (
-        <ChatToggle 
+        <ChatToggle
           onClick={() => {
             setIsChatOpen(true);
             setIsChatMinimized(false);

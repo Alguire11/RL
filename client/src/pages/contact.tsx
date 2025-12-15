@@ -32,7 +32,7 @@ export default function Contact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.email || !formData.subject || !formData.message || !formData.category) {
       toast({
         title: "Missing Information",
@@ -43,20 +43,20 @@ export default function Contact() {
     }
 
     setIsSubmitting(true);
-    
+
     try {
       const response = await apiRequest("POST", "/api/support/contact", formData);
-      
+
       toast({
         title: "Message Sent Successfully!",
         description: "We've received your support request and will respond within 24 hours. Check your email for confirmation.",
       });
-      
-      setFormData({ 
-        name: '', 
-        email: '', 
-        subject: '', 
-        category: '', 
+
+      setFormData({
+        name: '',
+        email: '',
+        subject: '',
+        category: '',
         message: '',
         priority: 'normal'
       });
@@ -89,7 +89,7 @@ export default function Contact() {
       title: "Phone Support",
       description: "Speak with our team",
       icon: Phone,
-      value: "+44 20 7123 4567",
+      value: "+44 7926 528 820",
       action: "Call Now"
     },
     {
@@ -121,7 +121,7 @@ export default function Contact() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <Button
-          variant="ghost"  
+          variant="ghost"
           onClick={() => setLocation(isAuthenticated ? "/" : "/")}
           className="mb-6 hover:bg-gray-100"
         >
@@ -156,7 +156,7 @@ export default function Contact() {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Enter your name"
                       required
                     />
@@ -167,16 +167,16 @@ export default function Contact() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="Enter your email"
                       required
                     />
                   </div>
                 </div>
-                
+
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
+                  <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
@@ -197,7 +197,7 @@ export default function Contact() {
                   <Input
                     id="subject"
                     value={formData.subject}
-                    onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                     placeholder="Brief description of your inquiry"
                     required
                   />
@@ -208,7 +208,7 @@ export default function Contact() {
                   <Textarea
                     id="message"
                     value={formData.message}
-                    onChange={(e) => setFormData({...formData, message: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                     placeholder="Please provide details about your inquiry..."
                     rows={6}
                     required
@@ -217,7 +217,7 @@ export default function Contact() {
 
                 <div>
                   <Label htmlFor="priority">Priority</Label>
-                  <Select value={formData.priority} onValueChange={(value) => setFormData({...formData, priority: value})}>
+                  <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
@@ -230,8 +230,8 @@ export default function Contact() {
                   </Select>
                 </div>
 
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   disabled={isSubmitting}
                 >
@@ -271,14 +271,14 @@ export default function Contact() {
                         <p className="text-gray-600 text-sm">{method.description}</p>
                         <p className="text-blue-600 text-sm font-medium">{method.value}</p>
                       </div>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         size="sm"
                         onClick={(method as any).onClick || (() => {
                           if (method.title === "Email Support") {
                             window.open("mailto:support@enoikio.com");
                           } else if (method.title === "Phone Support") {
-                            window.open("tel:+442071234567");
+                            window.open("tel:+447926528820");
                           } else if (method.title === "Office Address") {
                             window.open("https://maps.google.com/?q=123+Fintech+Street,+London+EC2A+4NE");
                           }
@@ -356,8 +356,8 @@ export default function Contact() {
 
       {/* Live Chat Components */}
       {!isChatMinimized && (
-        <LiveChat 
-          isOpen={isChatOpen} 
+        <LiveChat
+          isOpen={isChatOpen}
           onClose={() => setIsChatOpen(false)}
           onMinimize={() => {
             setIsChatMinimized(true);
@@ -365,9 +365,9 @@ export default function Contact() {
           }}
         />
       )}
-      
+
       {(isChatMinimized || !isChatOpen) && (
-        <ChatToggle 
+        <ChatToggle
           onClick={() => {
             setIsChatOpen(true);
             setIsChatMinimized(false);
