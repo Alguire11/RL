@@ -233,6 +233,14 @@ function Router() {
       {/* Root route - always show Landing Page as requested, even on app domain */}
       <Route path="/" component={Landing} />
 
+      {/* Public Pages shared with Main Domain (for Footer Links) */}
+      <Route path="/about" component={About} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/product" component={Product} />
+      <Route path="/status" component={Status} />
+
       {/* Landlord Routes */}
       <Route path="/landlord-login" component={LandlordLogin} />
       <Route path="/landlord-signup" component={LandlordSignup} />
