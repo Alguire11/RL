@@ -31,6 +31,36 @@ export default function Settings() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [, setLocation] = useLocation();
+
+  // Consent Logic
+  const { data: consent, isLoading: isLoadingConsent } = useQuery({
+    queryKey: ["/api/user/consents"],
+  });
+
+  const updateConsentMutation = useMutation({
+    mutationFn: async (checked: boolean) => {
+      const status = checked ? "consented" : "withdrawn";
+      const res = await apiRequest("PUT", "/api/user/consents", { status });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/consents"] });
+      toast({
+        title: data.status === "consented" ? "Opted In" : "Opted Out",
+        description: data.status === "consented"
+          ? "You have authorised rent reporting to partners."
+          : "You have withdrawn your authorization for rent reporting.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update consent settings.",
+        variant: "destructive",
+      });
+    }
+  });
+
   interface ProfileFormState {
     firstName: string;
     lastName: string;
@@ -457,8 +487,56 @@ export default function Settings() {
             </CardContent>
           </Card>
 
+
+          {/* Data Sharing & Privacy */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold flex items-center">
+                <Shield className="w-5 h-5 mr-2 text-blue-600" />
+                Data Sharing & Privacy
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex flex-col space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <p className="font-medium">Rent Reporting Authorization</p>
+                      <p className="text-sm text-gray-600 max-w-lg">
+                        I authorise RentLedger to generate and share my verified rent payment record with partners
+                        (e.g., credit reference agencies, lenders) to help build my credit history.
+                      </p>
+                      <div className="flex items-center mt-2">
+                        <Badge variant={consent?.status === 'consented' ? "default" : "outline"} className={consent?.status === 'consented' ? "bg-green-600" : ""}>
+                          {consent?.status === 'consented' ? "Active" : "Inactive"}
+                        </Badge>
+                        {consent?.capturedAt && (
+                          <span className="text-xs text-gray-400 ml-2">
+                            Last updated: {new Date(consent.capturedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Switch
+                      checked={consent?.status === 'consented'}
+                      onCheckedChange={(c) => updateConsentMutation.mutate(c)}
+                      disabled={updateConsentMutation.isPending || isLoadingConsent}
+                    />
+                  </div>
+                  {consent?.status === 'consented' && (
+                    <div className="bg-blue-50 p-3 rounded-md text-xs text-blue-700 flex items-start">
+                      <Shield className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                      Your data is securely hashed and only shared with authorized partners. You can withdraw this consent at any time.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Account Actions */}
           <Card>
+
             <CardHeader>
               <CardTitle className="text-xl font-semibold">Account Actions</CardTitle>
             </CardHeader>

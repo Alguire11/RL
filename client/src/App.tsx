@@ -58,6 +58,8 @@ const AdminProperties = lazy(() => import("@/pages/admin-properties"));
 const AdminAuditLogs = lazy(() => import("@/pages/admin-audit-logs"));
 const AdminUserDetails = lazy(() => import("@/pages/admin-user-details"));
 const AdminManualVerification = lazy(() => import("@/pages/admin-manual-verification"));
+const AdminApiKeys = lazy(() => import("@/pages/admin-api-keys"));
+const AdminReporting = lazy(() => import("@/pages/admin-reporting"));
 const Disputes = lazy(() => import("@/pages/disputes"));
 
 import { useDomainType, getAppUrl, getAdminUrl } from "./lib/domain-router";
@@ -146,11 +148,17 @@ function Router() {
             <AdminManualVerification />
           </Suspense>
         )} />
+        <Route path="/admin/reporting" component={() => (
+          <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+            <AdminReporting />
+          </Suspense>
+        )} />
         <Route path="/admin/properties" component={() => (
           <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
             <AdminProperties />
           </Suspense>
         )} />
+
         <Route path="/admin/audit-logs" component={() => (
           <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
             <AdminAuditLogs />

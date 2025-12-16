@@ -102,6 +102,15 @@ import {
   rentScoreHistory,
   type RentScoreHistory,
   type InsertRentScoreHistory,
+  consents,
+  type Consent,
+  type InsertConsent,
+  reportingBatches,
+  type ReportingBatch,
+  type InsertReportingBatch,
+  reportingRecords,
+  type ReportingRecord,
+  type InsertReportingRecord,
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
@@ -155,6 +164,7 @@ export interface IStorage {
   // Report share operations
   createReportShare(share: InsertReportShare): Promise<ReportShare>;
   getReportShares(reportId: number): Promise<ReportShare[]>;
+  getUserReportShares(userId: string): Promise<ReportShare[]>;
   getReportShareByUrl(url: string): Promise<ReportShare | undefined>;
   incrementShareAccess(shareId: number): Promise<void>;
 
@@ -355,6 +365,29 @@ export interface IStorage {
   createRentScoreSnapshot(userId: string, score: number, change: number): Promise<RentScoreHistory>;
   getRentScoreHistory(userId: string): Promise<RentScoreHistory[]>;
   getPropertyByVerificationToken(token: string): Promise<Property | undefined>;
+  getPropertyByVerificationToken(token: string): Promise<Property | undefined>;
+
+  // Consents & Reporting
+  createConsent(consent: InsertConsent): Promise<Consent>;
+  getConsent(tenantId: string, scope: string): Promise<Consent | undefined>;
+  getConsentByRef(tenantRef: string): Promise<Consent | undefined>;
+  updateConsent(tenantId: string, scope: string, status: string, tenantRef?: string): Promise<Consent>;
+
+  createReportingBatch(batch: InsertReportingBatch): Promise<ReportingBatch>;
+  getReportingBatch(id: string): Promise<ReportingBatch | undefined>;
+  getReportingBatches(): Promise<ReportingBatch[]>;
+  updateReportingBatch(id: string, updates: Partial<ReportingBatch>): Promise<ReportingBatch>;
+
+  createReportingRecords(records: InsertReportingRecord[]): Promise<void>;
+  getReportingRecords(batchId: string): Promise<ReportingRecord[]>;
+  getReportingRecordsByQuery(options: { month: string, verificationStatus?: string, limit?: number, offset?: number }): Promise<{ items: ReportingRecord[], total: number }>;
+
+  // Partners
+  getApiKey(key: string): Promise<ApiKey | undefined>;
+  createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
+  getAllApiKeys(): Promise<ApiKey[]>;
+  revokeApiKey(id: number): Promise<void>;
+  logApiKeyUsage(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -644,6 +677,29 @@ export class DatabaseStorage implements IStorage {
       .from(reportShares)
       .where(and(eq(reportShares.reportId, reportId), eq(reportShares.isActive, true)))
       .orderBy(desc(reportShares.createdAt));
+  }
+
+  async getUserReportShares(userId: string): Promise<ReportShare[]> {
+    // We need to join with creditReports to filter by userId
+    // Since reportShares doesn't have userId directly, we link via reportId -> creditReports -> userId
+    const shares = await db
+      .select({
+        id: reportShares.id,
+        reportId: reportShares.reportId,
+        recipientEmail: reportShares.recipientEmail,
+        recipientType: reportShares.recipientType,
+        shareUrl: reportShares.shareUrl,
+        expiresAt: reportShares.expiresAt,
+        accessCount: reportShares.accessCount,
+        isActive: reportShares.isActive,
+        createdAt: reportShares.createdAt
+      })
+      .from(reportShares)
+      .innerJoin(creditReports, eq(reportShares.reportId, creditReports.id))
+      .where(eq(creditReports.userId, userId))
+      .orderBy(desc(reportShares.createdAt));
+
+    return shares;
   }
 
   async getReportShareByUrl(url: string): Promise<ReportShare | undefined> {
@@ -1905,6 +1961,152 @@ export class DatabaseStorage implements IStorage {
       .values(event)
       .returning();
     return created;
+  }
+
+  // Consent operations
+  async createConsent(consent: InsertConsent): Promise<Consent> {
+    const [created] = await db.insert(consents).values(consent).returning();
+    return created;
+  }
+
+  async getConsent(tenantId: string, scope: string): Promise<Consent | undefined> {
+    const [consent] = await db
+      .select()
+      .from(consents)
+      .where(and(eq(consents.tenantId, tenantId), eq(consents.scope, scope)));
+    return consent;
+  }
+
+  async updateConsent(tenantId: string, scope: string, status: string, tenantRef?: string): Promise<Consent> {
+    const existing = await this.getConsent(tenantId, scope);
+
+    // If we have consent+tenantRef, update both
+    const updateData: any = {
+      status,
+      updatedAt: new Date(),
+      withdrawnAt: status === 'withdrawn' ? new Date() : null,
+    };
+    if (tenantRef) updateData.tenantRef = tenantRef;
+
+    if (existing) {
+      const [updated] = await db
+        .update(consents)
+        .set(updateData)
+        .where(eq(consents.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(consents)
+        .values({
+          tenantId,
+          scope,
+          status,
+          tenantRef: tenantRef || null,
+          capturedAt: new Date(),
+          withdrawnAt: status === 'withdrawn' ? new Date() : null,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async getConsentByRef(tenantRef: string): Promise<Consent | undefined> {
+    const [consent] = await db.select().from(consents).where(eq(consents.tenantRef, tenantRef));
+    return consent;
+  }
+
+  // Reporting Batch operations
+  async createReportingBatch(batch: InsertReportingBatch): Promise<ReportingBatch> {
+    const [created] = await db.insert(reportingBatches).values(batch).returning();
+    return created;
+  }
+
+  async getReportingBatch(id: string): Promise<ReportingBatch | undefined> {
+    const [batch] = await db.select().from(reportingBatches).where(eq(reportingBatches.id, id));
+    return batch;
+  }
+
+  async getReportingBatches(): Promise<ReportingBatch[]> {
+    return await db.select().from(reportingBatches).orderBy(desc(reportingBatches.createdAt));
+  }
+
+  async updateReportingBatch(id: string, updates: Partial<InsertReportingBatch>): Promise<ReportingBatch> {
+    const [updated] = await db
+      .update(reportingBatches)
+      .set({ ...updates, readyAt: updates.status === 'ready' ? new Date() : undefined })
+      .where(eq(reportingBatches.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Reporting Records operations
+  async createReportingRecords(records: InsertReportingRecord[]): Promise<void> {
+    if (records.length === 0) return;
+    // Batch insert
+    await db.insert(reportingRecords).values(records);
+  }
+
+  async getReportingRecords(batchId: string): Promise<ReportingRecord[]> {
+    return await db.select().from(reportingRecords).where(eq(reportingRecords.batchId, batchId));
+  }
+
+  async getReportingRecordsByQuery(options: {
+    month: string,
+    verificationStatus?: string,
+    limit?: number,
+    offset?: number
+  }): Promise<{ items: ReportingRecord[], total: number }> {
+    // 1. Find batches for the month
+    const batches = await db.select({ id: reportingBatches.id }).from(reportingBatches).where(eq(reportingBatches.month, options.month));
+    const batchIds = batches.map(b => b.id);
+
+    if (batchIds.length === 0) return { items: [], total: 0 };
+
+    // 2. Build query
+    let conditions = inArray(reportingRecords.batchId, batchIds);
+    if (options.verificationStatus) {
+      conditions = and(conditions, eq(reportingRecords.verificationStatus, options.verificationStatus));
+    }
+
+    const records = await db.select()
+      .from(reportingRecords)
+      .where(conditions)
+      .limit(options.limit || 50)
+      .offset(options.offset || 0);
+
+    // Count (approx)
+    // For V1, simple count
+    const [countRes] = await db.select({ count: sql<number>`count(*)` })
+      .from(reportingRecords)
+      .where(conditions);
+
+    return { items: records, total: Number(countRes?.count || 0) };
+  }
+
+  // Partners
+  async getApiKey(key: string): Promise<ApiKey | undefined> {
+    const [apiKey] = await db.select().from(apiKeys).where(and(eq(apiKeys.key, key), eq(apiKeys.isActive, true)));
+    return apiKey;
+  }
+
+  async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {
+    const [created] = await db.insert(apiKeys).values(apiKey).returning();
+    return created;
+  }
+
+  async getAllApiKeys(): Promise<ApiKey[]> {
+    return await db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
+  }
+
+  async revokeApiKey(id: number): Promise<void> {
+    await db.update(apiKeys).set({ isActive: false }).where(eq(apiKeys.id, id));
+  }
+
+  async logApiKeyUsage(id: number): Promise<void> {
+    await db.update(apiKeys)
+      .set({ lastUsedAt: new Date(), usageCount: sql`${apiKeys.usageCount} + 1` })
+      .where(eq(apiKeys.id, id));
   }
 }
 

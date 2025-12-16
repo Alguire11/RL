@@ -637,6 +637,37 @@ export function createSupportReplyEmail(
   };
 }
 
+// 11. Report Share Email
+export function createReportShareEmail(
+  to: string,
+  senderName: string,
+  recipientType: string,
+  shareUrl: string
+): SendEmailParams {
+  const recipientLabel = recipientType === 'landlord' ? 'Landlord' :
+    recipientType === 'lender' ? 'Lender' :
+      recipientType === 'agency' ? 'Agent' : 'User';
+
+  const content = `
+    <p>Hello,</p>
+    <p><strong>${senderName}</strong> has shared their RentLedger Rent History with you.</p>
+    <p>RentLedger allows tenants to build a verified track record of their rent payments. You can view their full payment history, badges, and verification status by clicking the link below.</p>
+    
+    <div style="background-color: #f0f9ff; border-left: 4px solid #0ea5e9; padding: 15px; margin: 20px 0;">
+      <p style="margin: 0; color: #0284c7;"><strong>Note:</strong> This link allows temporary read-only access to the user's report.</p>
+    </div>
+  `;
+
+  return {
+    to,
+    from: FROM_EMAIL,
+    fromName: 'RentLedger',
+    subject: `${senderName} has shared their Rent History with you`,
+    html: getStroopwafelEmailTemplate("Rent History Shared", content, "View Rent Report", shareUrl),
+    attachments: [getLogoAttachment()].filter(Boolean)
+  };
+}
+
 export const emailService = {
   async sendLandlordVerificationRequest(params: LandlordVerificationRequestParams): Promise<{ success: boolean; error?: string }> {
     const emailParams = createLandlordPaymentVerificationEmail(params);
@@ -732,6 +763,11 @@ export const emailService = {
 
   async sendEmailVerification(userEmail: string, userName: string, verificationUrl: string): Promise<{ success: boolean; error?: string }> {
     const emailParams = createEmailVerificationEmail(userEmail, userName, verificationUrl);
+    return sendEmail(emailParams);
+  },
+
+  async sendReportShareEmail(to: string, senderName: string, recipientType: string, shareUrl: string): Promise<{ success: boolean; error?: string }> {
+    const emailParams = createReportShareEmail(to, senderName, recipientType, shareUrl);
     return sendEmail(emailParams);
   },
 

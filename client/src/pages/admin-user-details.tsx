@@ -42,6 +42,7 @@ interface AdminUserDetail {
     manualPayments: any[];
     rentLogs: any[];
     reports: any[];
+    reportShares: any[];
     securityLogs: any[];
 }
 
@@ -254,7 +255,7 @@ export default function AdminUserDetails() {
         );
     }
 
-    const { user: userData, properties, payments, manualPayments = [], rentLogs = [], reports, securityLogs } = userDetails;
+    const { user: userData, properties, payments, manualPayments = [], rentLogs = [], reports, reportShares = [], securityLogs } = userDetails;
 
     // Combine all payment transactions into one timeline
     const allPayments = [
@@ -542,6 +543,58 @@ export default function AdminUserDetails() {
                                                             <TableCell>{formatDate(report.createdAt)}</TableCell>
                                                             <TableCell className="capitalize">{report.reportData?.reportType || 'Credit Report'}</TableCell>
                                                             <TableCell className="font-mono text-xs">{report.reportId}</TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </CardContent>
+                                </Card>
+                                <Card className="mt-6">
+                                    <CardHeader>
+                                        <CardTitle>Shared Reports History</CardTitle>
+                                        <CardDescription>Reports shared with landlords/agents.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Recipient</TableHead>
+                                                    <TableHead>Type</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead>Link</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {reportShares.length === 0 ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={5} className="text-center py-4 text-gray-500">No reports shared</TableCell>
+                                                    </TableRow>
+                                                ) : (
+                                                    reportShares.map((share: any) => (
+                                                        <TableRow key={share.id}>
+                                                            <TableCell>{formatDate(share.createdAt)}</TableCell>
+                                                            <TableCell className="font-medium">{share.recipientEmail}</TableCell>
+                                                            <TableCell className="capitalize">{share.recipientType}</TableCell>
+                                                            <TableCell>
+                                                                <div className="flex flex-col gap-1">
+                                                                    <Badge variant={share.isActive ? "default" : "secondary"}>
+                                                                        {share.isActive ? 'Active' : 'Inactive'}
+                                                                    </Badge>
+                                                                    <span className="text-xs text-muted-foreground">{share.accessCount} views</span>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <a
+                                                                    href={share.shareUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 hover:underline text-xs"
+                                                                >
+                                                                    View Link
+                                                                </a>
+                                                            </TableCell>
                                                         </TableRow>
                                                     ))
                                                 )}

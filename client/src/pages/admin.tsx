@@ -799,6 +799,24 @@ export default function AdminDashboard() {
               <Button
                 variant="outline"
                 className="w-full"
+                onClick={() => setLocation('/admin/reporting')}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Partner Reporting
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setLocation('/admin/api-keys')}
+              >
+                <Key className="w-4 h-4 mr-2" />
+                API Keys
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setLocation('/admin/verifications')}
               >
                 <Check className="w-4 h-4 mr-2" />

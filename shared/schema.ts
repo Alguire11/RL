@@ -40,6 +40,7 @@ export const users = pgTable("users", {
   phone: varchar("phone"),
   businessName: varchar("business_name"), // For landlords
   isOnboarded: boolean("is_onboarded").default(false),
+  onboardingReason: varchar("onboarding_reason"), // reason for joining
   emailVerified: boolean("email_verified").default(false),
   address: jsonb("address"),
   rentInfo: jsonb("rent_info"),
@@ -767,6 +768,100 @@ export const adminActionsRelations = relations(adminActions, ({ one }) => ({
   admin: one(users, { fields: [adminActions.adminId], references: [users.id] }),
 }));
 
+
 export const pendingLandlordsRelations = relations(pendingLandlords, ({ one }) => ({
   inviter: one(users, { fields: [pendingLandlords.invitedBy], references: [users.id] }),
 }));
+
+// --- Bureau Export Pack Schema ---
+
+// Consents table
+// Consents table
+export const consents = pgTable("consents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: varchar("tenant_id").references(() => users.id).notNull(),
+  tenantRef: text("tenant_ref"), // Hashed reference for Partner API lookup
+  scope: varchar("scope", { enum: ["reporting_to_partners"] }).notNull(),
+  status: varchar("status", { enum: ["consented", "withdrawn"] }).notNull(),
+  capturedAt: timestamp("captured_at").defaultNow(),
+  withdrawnAt: timestamp("withdrawn_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("IDX_consents_tenant_id").on(table.tenantId),
+  index("IDX_consents_scope").on(table.scope),
+  index("IDX_consents_tenant_ref").on(table.tenantRef)
+]);
+
+// Reporting Batches table
+export const reportingBatches = pgTable("reporting_batches", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM
+  includeUnverified: boolean("include_unverified").default(false),
+  onlyConsented: boolean("only_consented").default(true),
+  format: varchar("format", { enum: ["csv", "json"] }).default("csv"),
+  status: varchar("status", { enum: ["queued", "generating", "ready", "failed"] }).default("queued"),
+  recordCount: integer("record_count").default(0),
+  checksumSha256: text("checksum_sha256"),
+  downloadUrl: text("download_url"),
+  createdByAdminId: varchar("created_by_admin_id").references(() => users.id),
+  failedReason: text("failed_reason"),
+  readyAt: timestamp("ready_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("IDX_reporting_batches_month").on(table.month)
+]);
+
+// Reporting Records table (Snapshot)
+export const reportingRecords = pgTable("reporting_records", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  batchId: uuid("batch_id").references(() => reportingBatches.id).notNull(),
+  tenantRef: text("tenant_ref").notNull(), // Hashed ID
+  landlordRef: text("landlord_ref"),
+  propertyRef: text("property_ref"),
+  postcodeOutward: varchar("postcode_outward"),
+  rentAmountPence: integer("rent_amount_pence"),
+  rentFrequency: varchar("rent_frequency"),
+  periodStart: date("period_start"),
+  periodEnd: date("period_end"),
+  dueDate: date("due_date"),
+  paidDate: date("paid_date"),
+  paymentStatus: varchar("payment_status"),
+  verificationStatus: varchar("verification_status"),
+  verificationMethod: varchar("verification_method"),
+  verificationTimestamp: timestamp("verification_timestamp"),
+  evidenceHashes: jsonb("evidence_hashes"), // Array of string
+  consentStatus: varchar("consent_status"),
+  consentTimestamp: timestamp("consent_timestamp"),
+  auditRef: text("audit_ref"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("IDX_reporting_records_batch_id").on(table.batchId),
+  index("IDX_reporting_records_tenant_ref").on(table.tenantRef)
+]);
+
+export const consentsRelations = relations(consents, ({ one }) => ({
+  tenant: one(users, { fields: [consents.tenantId], references: [users.id] }),
+}));
+
+export const reportingBatchesRelations = relations(reportingBatches, ({ one, many }) => ({
+  admin: one(users, { fields: [reportingBatches.createdByAdminId], references: [users.id] }),
+  records: many(reportingRecords),
+}));
+
+export const reportingRecordsRelations = relations(reportingRecords, ({ one }) => ({
+  batch: one(reportingBatches, { fields: [reportingRecords.batchId], references: [reportingBatches.id] }),
+}));
+
+export type Consent = typeof consents.$inferSelect;
+export type InsertConsent = typeof consents.$inferInsert;
+export const insertConsentSchema = createInsertSchema(consents);
+
+export type ReportingBatch = typeof reportingBatches.$inferSelect;
+export type InsertReportingBatch = typeof reportingBatches.$inferInsert;
+export const insertReportingBatchSchema = createInsertSchema(reportingBatches);
+
+export type ReportingRecord = typeof reportingRecords.$inferSelect;
+export type InsertReportingRecord = typeof reportingRecords.$inferInsert;
+export const insertReportingRecordSchema = createInsertSchema(reportingRecords);
+

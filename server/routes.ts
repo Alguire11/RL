@@ -39,6 +39,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   setupAuth(app);
 
+  // Mount Partner API Routes (V1)
+  const { default: v1Router } = await import("./routes-v1");
+  app.use("/api/v1", v1Router);
+
   // CSRF Protection
   // We use the default session-based storage.
   // We expose the token via a cookie (XSRF-TOKEN) so the client can read it
@@ -409,6 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: true,
         phone: true,
         profileImageUrl: true,
+        onboardingReason: true,
       });
 
       const updateData = updateSchema.parse(req.body);
@@ -1919,6 +1924,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
       });
 
+      // Send email notification
+      if (recipientEmail) {
+        try {
+          const sender = await storage.getUser(req.user.id);
+          await emailService.sendReportShareEmail(
+            recipientEmail,
+            `${sender?.firstName} ${sender?.lastName}`.trim() || 'A Renter',
+            recipientType,
+            shareUrl
+          );
+        } catch (emailError) {
+          console.error("Failed to send share email:", emailError);
+          // Don't fail the request if email fails, simply log it
+        }
+      }
+
       res.json(share);
     } catch (error) {
       console.error("Error sharing report:", error);
@@ -2687,6 +2708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getUserSecurityLogs(userId),
         storage.getUserManualPayments(userId),
         storage.getUserRentLogs(userId),
+        storage.getUserReportShares(userId),
       ]);
 
       res.json({
@@ -2696,7 +2718,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         reports,
         securityLogs,
         manualPayments,
-        rentLogs
+        rentLogs,
+        reportShares
       });
     } catch (error) {
       console.error('Error fetching user details:', error);
@@ -6197,6 +6220,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch support tickets" });
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // Reporting / Bureau Export Pack Routes
+  // ---------------------------------------------------------------------------
+
+  // Admin: Generate new batch
+  app.post('/api/admin/reporting/batches', requireAdmin, async (req: any, res) => {
+    try {
+      const { month, includeUnverified, onlyConsented, format } = req.body;
+      const adminId = req.user.id;
+
+      if (!month || !month.match(/^\d{4}-\d{2}$/)) {
+        return res.status(400).json({ message: 'Invalid month format (YYYY-MM)' });
+      }
+
+      // Dynamic import to avoid circular deps if any
+      const { generateBatch } = await import('./reporting');
+
+      const result = await generateBatch(month, adminId, {
+        includeUnverified: !!includeUnverified,
+        onlyConsented: onlyConsented !== false, // default true
+        format: format || 'csv'
+      });
+
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Error generating batch:', error);
+      res.status(500).json({ message: 'Failed to generate batch', error: String(error) });
+    }
+  });
+
+  // Admin: List batches
+  app.get('/api/admin/reporting/batches', requireAdmin, async (req, res) => {
+    try {
+      const batches = await storage.getReportingBatches();
+      res.json(batches);
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+      res.status(500).json({ message: 'Failed to fetch batches' });
+    }
+  });
+
+  // Admin: Get batch details
+  app.get('/api/admin/reporting/batches/:id', requireAdmin, async (req, res) => {
+    try {
+      const batch = await storage.getReportingBatch(req.params.id);
+      if (!batch) return res.status(404).json({ message: 'Batch not found' });
+      res.json(batch);
+    } catch (error) {
+      console.error('Error fetching batch:', error);
+      res.status(500).json({ message: 'Failed to fetch batch' });
+    }
+  });
+
+  // Admin: Download batch file
+  app.get('/api/admin/reporting/batches/:id/download', requireAdmin, async (req, res) => {
+    try {
+      const batch = await storage.getReportingBatch(req.params.id);
+      if (!batch) return res.status(404).json({ message: 'Batch not found' });
+      if (batch.status !== 'ready') return res.status(400).json({ message: 'Batch is not ready' });
+
+      const records = await storage.getReportingRecords(batch.id);
+
+      // Re-generate content from records (since we don't store file on disk in this V1 MVP, we regenerate on fly or store blob)
+      // Implementation Plan said: "Store result (or link to file)".
+      // server/reporting.ts generates it but doesn't return it persistence-wise except as records.
+      // So we reconstruct it here.
+
+      let content = '';
+      if (batch.format === 'csv') {
+        const { generateCSV } = await import('./reporting');
+        content = generateCSV(records);
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`rent-ledger-export-${batch.month}-${batch.id.slice(0, 8)}.csv`);
+      } else {
+        content = JSON.stringify(records, null, 2);
+        res.header('Content-Type', 'application/json');
+        res.attachment(`rent-ledger-export-${batch.month}-${batch.id.slice(0, 8)}.json`);
+      }
+
+      res.send(content);
+    } catch (error) {
+      console.error('Error downloading batch:', error);
+      res.status(500).json({ message: 'Failed to download batch' });
+    }
+  });
+
+  // Tenant: Consent Management
+  app.put('/api/user/consents', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { status } = req.body; // 'consented' | 'withdrawn'
+
+      if (!['consented', 'withdrawn'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+
+      // Compute hash for lookup
+      const { hashReference } = await import('./reporting-utils');
+      const tenantRef = hashReference(userId);
+
+      const consent = await storage.updateConsent(userId, 'reporting_to_partners', status, tenantRef);
+
+      // Audit log
+      await storage.createAuditLog({
+        userId,
+        action: 'update_consent',
+        entityType: 'consent',
+        entityId: consent.id,
+        details: { scope: 'reporting_to_partners', status, tenantRef },
+        ipAddress: req.ip
+      });
+
+      res.json(consent);
+    } catch (error) {
+      console.error('Error updating consent:', error);
+      res.status(500).json({ message: 'Failed to update consent' });
+    }
+  });
+
+  app.get('/api/user/consents', requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const consent = await storage.getConsent(userId, 'reporting_to_partners');
+      // If no record, return default "not_consented" state object (or null)
+      // UI expects { status: ... }
+      res.json(consent || { status: 'not_consented' });
+    } catch (error) {
+      console.error('Error fetching consent:', error);
+      res.status(500).json({ message: 'Failed to fetch consent' });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Admin: API Key Management
+  // ---------------------------------------------------------------------------
+
+  app.get('/api/admin/api-keys', requireAdmin, async (req, res) => {
+    try {
+      // Need a storage method to list all keys. I'll add a simple query here or storage method.
+      // Since I didn't add `getAllApiKeys` to storage interface, I'll use db directly if possible or add to storage.
+      // Best practice: Add to storage. But to save steps, I'll inline the DB call if I can, OR modify storage.
+      // I have `db` imported in `routes.ts`? No, typical pattern is logic in routes or storage.
+      // Let's modify storage first? Or check `storage.ts` imports.
+      // Wait, `routes.ts` uses `storage` instance.
+      // I can add `storage.getAllApiKeys()`? 
+      // Actually, I can query `apiKeys` table directly if `db` is available here, but `routes.ts` usually just uses `storage`.
+      // I will implement `storage.getAllApiKeys()` quickly? 
+      // No, let's use a "quick inline" approach via `import { db } from "./db";` if valid?
+      // Ah, verify imports in `server/routes.ts`.
+
+      // Assuming I can add it to storage simply.
+      // But wait, I added `getApiKey(key)` for lookup.
+      // Let's assume I will add `getAllApiKeys` to storage in next step or now.
+      // Actually, I'll add the routes assuming `storage.getAllApiKeys` exists, and then implement it.
+
+      const keys = await storage.getAllApiKeys();
+      res.json(keys);
+    } catch (error) {
+      console.error('Error fetching API keys:', error);
+      res.status(500).json({ message: 'Failed to fetch API keys' });
+    }
+  });
+
+  app.post('/api/admin/api-keys', requireAdmin, async (req: any, res) => {
+    try {
+      const { name } = req.body;
+      const adminId = req.user.id;
+
+      if (!name) return res.status(400).json({ message: 'Name is required' });
+
+      // Generate key: pk_randomHex
+      const { randomBytes } = await import('crypto');
+      const keyBuffer = randomBytes(16);
+      const key = `pk_${keyBuffer.toString('hex')}`;
+
+      const apiKey = await storage.createApiKey({
+        name,
+        key,
+        createdBy: adminId,
+        isActive: true,
+        permissions: ['reporting:read', 'consent:read'], // Default perms
+        rateLimit: 1000
+      });
+
+      res.status(201).json(apiKey);
+    } catch (error) {
+      console.error('Error creating API key:', error);
+      res.status(500).json({ message: 'Failed to create API key' });
+    }
+  });
+
+  app.delete('/api/admin/api-keys/:id', requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.revokeApiKey(id); // Need this method too
+      res.sendStatus(200);
+    } catch (error) {
+      console.error('Error revoking API key:', error);
+      res.status(500).json({ message: 'Failed to revoke API key' });
+    }
+  });
+
+  // Register V1 Partner API
+  const { default: v1Router } = await import('./routes-v1');
+  app.use('/v1', v1Router);
 
   const httpServer: Server = createServer(app);
   return httpServer;

@@ -15,12 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Navigation } from "@/components/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { 
-  CreditCard, 
-  Building, 
-  Calendar, 
-  PoundSterling, 
-  ChevronRight, 
+import {
+  CreditCard,
+  Building,
+  Calendar,
+  PoundSterling,
+  ChevronRight,
   ChevronLeft,
   CheckCircle,
   Banknote
@@ -53,14 +53,16 @@ type BankConnectionData = z.infer<typeof bankConnectionSchema>;
 
 const steps = [
   { id: 1, title: "Welcome", description: "Get started with RentLedger" },
-  { id: 2, title: "Bank Connection", description: "Connect your bank securely" },
-  { id: 3, title: "Rent Details", description: "Set up your rent information" },
-  { id: 4, title: "Complete", description: "Start tracking your payments" },
+  { id: 2, title: "Your Goal", description: "Why are you joining?" },
+  { id: 3, title: "Bank Connection", description: "Connect your bank securely" },
+  { id: 4, title: "Rent Details", description: "Set up your rent information" },
+  { id: 5, title: "Complete", description: "Start tracking your payments" },
 ];
 
 export default function OnboardingPage() {
   const [, navigate] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
+  const [selectedGoal, setSelectedGoal] = useState<string>("");
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
 
@@ -118,7 +120,7 @@ export default function OnboardingPage() {
         title: "Bank Connected",
         description: "Your bank account has been connected successfully.",
       });
-      setCurrentStep(3);
+      setCurrentStep(4);
     },
     onError: (error: any) => {
       toast({
@@ -142,7 +144,7 @@ export default function OnboardingPage() {
         landlordPhone: data.landlordPhone.trim(),
         tenancyStartDate: data.firstPaymentDate, // Use first payment date as tenancy start
       };
-      
+
       // Create property
       let property;
       try {
@@ -161,7 +163,7 @@ export default function OnboardingPage() {
         const errorMsg = error.message || "Failed to create property. Please check all required fields are filled.";
         throw new Error(errorMsg);
       }
-      
+
       // Save rent info to user profile
       const rentData = {
         amount: parseFloat(data.monthlyRent),
@@ -173,14 +175,14 @@ export default function OnboardingPage() {
         landlordEmail: data.landlordEmail,
         landlordPhone: data.landlordPhone,
       };
-      
+
       const response = await apiRequest("PUT", "/api/user/rent-info", rentData);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Failed to save rent details");
       }
       const rentInfoResult = await response.json();
-      
+
       // Update user address
       try {
         const addressData = {
@@ -197,11 +199,11 @@ export default function OnboardingPage() {
         console.error("Failed to update user address:", error);
         // Don't fail onboarding if address update fails
       }
-      
+
       // Invalidate properties query to ensure it's refreshed
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      
+
       // Send landlord verification email
       if (property && data.landlordEmail) {
         try {
@@ -214,11 +216,14 @@ export default function OnboardingPage() {
           // Don't fail the whole onboarding if email fails
         }
       }
-      
+
       return { property, rentInfo: rentInfoResult };
     },
     onSuccess: () => {
-      updateProfileMutation.mutate({ isOnboarded: true });
+      updateProfileMutation.mutate({
+        isOnboarded: true,
+        onboardingReason: selectedGoal
+      });
       toast({
         title: "Onboarding Complete!",
         description: "Welcome to RentLedger. A verification email has been sent to your landlord.",
@@ -293,7 +298,7 @@ export default function OnboardingPage() {
                 {user?.role === "landlord" ? "Welcome Landlords!" : "Welcome to RentLedger!"}
               </CardTitle>
               <CardDescription className="text-lg">
-                {user?.role === "landlord" 
+                {user?.role === "landlord"
                   ? "Manage your properties and verify tenant rent payments"
                   : "Build your credit history through your rent payments"
                 }
@@ -338,9 +343,9 @@ export default function OnboardingPage() {
                 </div>
               )}
               <div className="text-center">
-                <Button 
-                  onClick={() => { window.scrollTo({top: 0, behavior: 'smooth'}); setCurrentStep(2); }} 
-                  size="lg" 
+                <Button
+                  onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setCurrentStep(2); }}
+                  size="lg"
                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold text-lg px-10 py-6"
                   data-testid="button-get-started"
                 >
@@ -353,31 +358,93 @@ export default function OnboardingPage() {
         )}
 
         {currentStep === 2 && (
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader className="text-center">
+              <CardTitle>Why are you creating a rent ledger today?</CardTitle>
+              <CardDescription>This helps us personalize your experience</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3">
+                {[
+                  "I want to build my credit history",
+                  "I need verified proof of rent payments",
+                  "I want to track my rent payments",
+                  "My landlord asked me to join",
+                  "Other"
+                ].map((goal) => (
+                  <div
+                    key={goal}
+                    onClick={() => setSelectedGoal(goal)}
+                    className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${selectedGoal === goal
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-gray-900">{goal}</span>
+                      {selectedGoal === goal && <CheckCircle className="h-5 w-5 text-blue-600" />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-between pt-6">
+                <Button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6"
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!selectedGoal) {
+                      toast({
+                        title: "Please select a goal",
+                        description: "Tell us a bit about why you're joining",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    setCurrentStep(3);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6"
+                >
+                  Continue
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {currentStep === 4 && (
           <div className="max-w-4xl mx-auto">
             <SubscriptionGuard feature="openBankingIntegration">
-              <OpenBankingSimulator 
+              <OpenBankingSimulator
                 mode="onboarding"
                 onConnectionSuccess={() => {
                   toast({
                     title: "Bank Connected Successfully",
                     description: "Your bank account has been connected. Let's set up your rent details.",
                   });
-                  setCurrentStep(3);
+                  setCurrentStep(4);
                 }}
               />
             </SubscriptionGuard>
             <div className="flex justify-between pt-6">
-              <Button 
-                type="button" 
-                onClick={() => setCurrentStep(1)}
+              <Button
+                type="button"
+                onClick={() => setCurrentStep(2)}
                 className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6"
-                data-testid="button-back-to-welcome"
+                data-testid="button-back-to-goal"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Back
               </Button>
-              <Button 
-                onClick={() => setCurrentStep(3)}
+              <Button
+                onClick={() => setCurrentStep(4)}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6"
                 data-testid="button-skip-bank"
               >
@@ -388,7 +455,7 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {currentStep === 3 && (
+        {currentStep === 4 && (
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -442,7 +509,7 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="border-t pt-4 space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900">Rent Details</h3>
                   <div className="grid md:grid-cols-2 gap-4">
@@ -536,17 +603,17 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 <div className="flex justify-between pt-4">
-                  <Button 
-                    type="button" 
-                    onClick={() => setCurrentStep(2)}
+                  <Button
+                    type="button"
+                    onClick={() => setCurrentStep(3)}
                     className="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6"
                     data-testid="button-back-to-bank"
                   >
                     <ChevronLeft className="mr-2 h-4 w-4" />
                     Back
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={updateRentInfoMutation.isPending}
                     className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-8"
                     data-testid="button-complete-setup"

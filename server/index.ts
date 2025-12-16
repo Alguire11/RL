@@ -41,7 +41,9 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: process.env.NODE_ENV === "production" ? false : true, // Strict origin in prod (configure as needed)
+  origin: process.env.NODE_ENV === "production"
+    ? [/\.rentledger\.co\.uk$/, "https://rentledger.co.uk"]
+    : true,
   credentials: true,
 }));
 
