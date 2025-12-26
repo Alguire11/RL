@@ -179,7 +179,7 @@ export default function LandlordVerify() {
                 <div className="flex items-center space-x-2">
                   <MapPin className="h-4 w-4 text-gray-400" />
                   <p className="text-gray-900">
-                    {verificationData.property.address}, {verificationData.property.city}, {verificationData.property.postcode}
+                    {verificationData.property?.address}, {verificationData.property?.city}, {verificationData.property?.postcode}
                   </p>
                 </div>
               </div>
@@ -188,7 +188,7 @@ export default function LandlordVerify() {
                 <div className="flex items-center space-x-2">
                   <PoundSterling className="h-4 w-4 text-gray-400" />
                   <p className="text-gray-900 font-semibold">
-                    {formatCurrency(verificationData.property.monthlyRent)}
+                    {formatCurrency(verificationData.property?.monthlyRent || '0')}
                   </p>
                 </div>
               </div>

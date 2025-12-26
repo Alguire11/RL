@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
-import { CheckCircle, Plus, Trash2, Building, CreditCard, User, Bell, Shield, Download, Send, ArrowLeft } from "lucide-react";
+import { CheckCircle, Plus, Trash2, Building, CreditCard, User, Users, Bell, Shield, Download, Send, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { NotificationCenter } from "@/components/notification-system";
 import { UserPreferences } from "@/components/settings/preferences";
@@ -33,7 +33,7 @@ export default function Settings() {
   const [, setLocation] = useLocation();
 
   // Consent Logic
-  const { data: consent, isLoading: isLoadingConsent } = useQuery({
+  const { data: consent, isLoading: isLoadingConsent } = useQuery<any>({
     queryKey: ["/api/user/consents"],
   });
 
@@ -61,11 +61,45 @@ export default function Settings() {
     }
   });
 
+  const { data: tenancyData, isLoading: isLoadingTenancy } = useQuery<TenancySettingsResponse>({
+    queryKey: ["/api/user/tenancy"],
+  });
+
+  const updateTenancyMutation = useMutation({
+    mutationFn: async (data: { jointIndicator: boolean, jointTenancyCount?: number }) => {
+      const res = await apiRequest("PUT", "/api/user/tenancy", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/tenancy"] });
+      toast({
+        title: "Tenancy Updated",
+        description: "Your tenancy details have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update tenancy details.",
+        variant: "destructive",
+      });
+    }
+  });
+
   interface ProfileFormState {
     firstName: string;
     lastName: string;
     email: string;
     phone: string;
+  }
+
+  interface TenancySettingsResponse {
+    hasTenancy: boolean;
+    id?: string;
+    jointIndicator?: boolean;
+    jointTenancyCount?: number;
+    status?: string;
+    [key: string]: any;
   }
 
   const [profileData, setProfileData] = useState<ProfileFormState>({
@@ -74,6 +108,8 @@ export default function Settings() {
     email: '',
     phone: '',
   });
+
+
   const [notifications, setNotifications] = useState({
     paymentReminders: true,
     creditReports: true,
@@ -355,6 +391,77 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Tenancy Details (Experian Shared Tenancy) */}
+          {tenancyData?.hasTenancy && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold flex items-center">
+                  <Users className="w-5 h-5 mr-2 text-primary" />
+                  Tenancy Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label htmlFor="joint-tenancy" className="font-medium">Shared Tenancy</Label>
+                      <p className="text-sm text-gray-600">
+                        Do you share this property with other tenants (e.g. joint tenancy, student housing)?
+                      </p>
+                    </div>
+                    <Switch
+                      id="joint-tenancy"
+                      checked={tenancyData.jointIndicator}
+                      onCheckedChange={(checked) => updateTenancyMutation.mutate({
+                        jointIndicator: checked,
+                        // If switching OFF, maybe reset count to 1? Or keep as is.
+                        // If switching ON, keep count or default to 2 if 1.
+                        jointTenancyCount: checked && tenancyData.jointTenancyCount === 1 ? 2 : tenancyData.jointTenancyCount
+                      })}
+                      disabled={updateTenancyMutation.isPending}
+                    />
+                  </div>
+
+                  {tenancyData.jointIndicator && (
+                    <div className="space-y-2 border-l-2 border-primary/20 pl-4 py-2">
+                      <Label htmlFor="tenant-count">Number of Tenants</Label>
+                      <p className="text-xs text-gray-500 mb-2">Total number of people on the tenancy agreement.</p>
+                      <div className="flex items-center space-x-2 w-32">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            const newCount = Math.max(1, (tenancyData.jointTenancyCount || 1) - 1);
+                            updateTenancyMutation.mutate({ jointIndicator: true, jointTenancyCount: newCount });
+                          }}
+                          disabled={updateTenancyMutation.isPending || (tenancyData.jointTenancyCount ?? 1) <= 1}
+                        >
+                          -
+                        </Button>
+                        <div className="flex-1 text-center font-medium">
+                          {tenancyData.jointTenancyCount || 1}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            const newCount = (tenancyData.jointTenancyCount || 1) + 1;
+                            updateTenancyMutation.mutate({ jointIndicator: true, jointTenancyCount: newCount });
+                          }}
+                          disabled={updateTenancyMutation.isPending}
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Bank Connections */}
           <Card>

@@ -102,6 +102,9 @@ import {
   rentScoreHistory,
   type RentScoreHistory,
   type InsertRentScoreHistory,
+  experianAuditLogs,
+  type ExperianAuditLog,
+  type InsertExperianAuditLog,
   consents,
   type Consent,
   type InsertConsent,
@@ -111,6 +114,15 @@ import {
   reportingRecords,
   type ReportingRecord,
   type InsertReportingRecord,
+  tenancies,
+  type Tenancy,
+  type InsertTenancy,
+  tenancyTenants,
+  type TenancyTenant,
+  type InsertTenancyTenant,
+  tenantProfiles,
+  type TenantProfile,
+  type InsertTenantProfile,
 } from "@shared/schema";
 import type { DashboardStats } from "@shared/dashboard";
 import { computeDashboardStats } from "./dashboardStats";
@@ -134,6 +146,14 @@ export interface IStorage {
   getUserProperties(userId: string): Promise<Property[]>;
   updateProperty(id: number, property: Partial<InsertProperty>): Promise<Property>;
   deleteProperty(id: number): Promise<void>;
+
+  // Tenancy operations
+  getTenancy(id: string): Promise<Tenancy | undefined>;
+  createTenancy(tenancy: InsertTenancy): Promise<Tenancy>;
+  updateTenancy(id: string, updates: Partial<InsertTenancy>): Promise<Tenancy>;
+  getUserTenancies(userId: string): Promise<Tenancy[]>;
+  createTenancyTenant(record: InsertTenancyTenant): Promise<TenancyTenant>;
+  updateTenancyTenant(tenancyId: string, tenantId: string, updates: Partial<InsertTenancyTenant>): Promise<TenancyTenant>;
 
   // Rent payment operations
   createRentPayment(payment: InsertRentPayment): Promise<RentPayment>;
@@ -206,6 +226,7 @@ export interface IStorage {
   createSecurityLog(log: InsertSecurityLog): Promise<SecurityLog>;
   getSecurityLogs(filters?: { userId?: string; limit?: number }): Promise<SecurityLog[]>;
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  createExperianAuditLog(log: InsertExperianAuditLog): Promise<ExperianAuditLog>;
 
   // Admin operations
   createAdminUser(adminUser: InsertAdminUser): Promise<AdminUser>;
@@ -388,6 +409,22 @@ export interface IStorage {
   getAllApiKeys(): Promise<ApiKey[]>;
   revokeApiKey(id: number): Promise<void>;
   logApiKeyUsage(id: number): Promise<void>;
+
+  // Tenancy operations
+  createTenancy(tenancy: InsertTenancy): Promise<Tenancy>;
+  getTenancy(id: string): Promise<Tenancy | undefined>;
+  getTenancyByRef(ref: string): Promise<Tenancy | undefined>;
+  getTenancyByPropertyAndUser(propertyId: number, userId: string): Promise<Tenancy | undefined>;
+  updateTenancy(id: string, updates: Partial<InsertTenancy>): Promise<Tenancy>;
+
+  createTenancyTenant(link: InsertTenancyTenant): Promise<TenancyTenant>;
+  getTenancyTenants(tenancyId: string): Promise<TenancyTenant[]>;
+  getUserTenancies(userId: string): Promise<Tenancy[]>;
+
+  // Tenant Profile operations
+  createTenantProfile(profile: InsertTenantProfile): Promise<TenantProfile>;
+  getTenantProfile(userId: string): Promise<TenantProfile | undefined>;
+  updateTenantProfile(userId: string, updates: Partial<InsertTenantProfile>): Promise<TenantProfile>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1170,6 +1207,11 @@ export class DatabaseStorage implements IStorage {
     return newLog;
   }
 
+  async createExperianAuditLog(log: InsertExperianAuditLog): Promise<ExperianAuditLog> {
+    const [entry] = await db.insert(experianAuditLogs).values(log).returning();
+    return entry;
+  }
+
   // Rent Score History
   async createRentScoreSnapshot(userId: string, score: number, change: number): Promise<RentScoreHistory> {
     const [snapshot] = await db
@@ -1470,10 +1512,23 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(manualPayments.paymentDate));
   }
 
-  async getAllManualPayments(): Promise<ManualPayment[]> {
+  async getAllManualPayments(): Promise<any[]> {
     return await db
       .select({
-        ...manualPayments,
+        id: manualPayments.id,
+        userId: manualPayments.userId,
+        amount: manualPayments.amount,
+        paymentDate: manualPayments.paymentDate,
+        paymentMethod: manualPayments.paymentMethod,
+        verificationStatus: sql<string>`CASE WHEN ${manualPayments.needsVerification} THEN 'pending' ELSE 'verified' END`,
+        verificationToken: manualPayments.verificationToken,
+        notes: manualPayments.description,
+        createdAt: manualPayments.createdAt,
+        updatedAt: manualPayments.updatedAt,
+        receiptUrl: manualPayments.receiptUrl,
+        landlordEmail: manualPayments.landlordEmail,
+        landlordPhone: manualPayments.landlordPhone,
+        verifiedBy: manualPayments.verifiedBy,
         tenantName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
         tenantEmail: users.email
       })
@@ -1973,7 +2028,7 @@ export class DatabaseStorage implements IStorage {
     const [consent] = await db
       .select()
       .from(consents)
-      .where(and(eq(consents.tenantId, tenantId), eq(consents.scope, scope)));
+      .where(and(eq(consents.tenantId, tenantId), eq(consents.scope, scope as any)));
     return consent;
   }
 
@@ -2000,8 +2055,8 @@ export class DatabaseStorage implements IStorage {
         .insert(consents)
         .values({
           tenantId,
-          scope,
-          status,
+          scope: scope as "reporting_to_partners",
+          status: status as "consented" | "withdrawn",
           tenantRef: tenantRef || null,
           capturedAt: new Date(),
           withdrawnAt: status === 'withdrawn' ? new Date() : null,
@@ -2064,10 +2119,12 @@ export class DatabaseStorage implements IStorage {
     if (batchIds.length === 0) return { items: [], total: 0 };
 
     // 2. Build query
-    let conditions = inArray(reportingRecords.batchId, batchIds);
+    // 2. Build query
+    const conditionList = [inArray(reportingRecords.batchId, batchIds)];
     if (options.verificationStatus) {
-      conditions = and(conditions, eq(reportingRecords.verificationStatus, options.verificationStatus));
+      conditionList.push(eq(reportingRecords.verificationStatus, options.verificationStatus));
     }
+    const conditions = and(...conditionList);
 
     const records = await db.select()
       .from(reportingRecords)
@@ -2084,17 +2141,14 @@ export class DatabaseStorage implements IStorage {
     return { items: records, total: Number(countRes?.count || 0) };
   }
 
-  // Partners
-  async getApiKey(key: string): Promise<ApiKey | undefined> {
-    const [apiKey] = await db.select().from(apiKeys).where(and(eq(apiKeys.key, key), eq(apiKeys.isActive, true)));
-    return apiKey;
+
+  async logApiKeyUsage(id: number): Promise<void> {
+    await db.update(apiKeys)
+      .set({ lastUsedAt: new Date(), usageCount: sql`${apiKeys.usageCount} + 1` })
+      .where(eq(apiKeys.id, id));
   }
 
-  async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {
-    const [created] = await db.insert(apiKeys).values(apiKey).returning();
-    return created;
-  }
-
+  // Tenancy operations
   async getAllApiKeys(): Promise<ApiKey[]> {
     return await db.select().from(apiKeys).orderBy(desc(apiKeys.createdAt));
   }
@@ -2102,11 +2156,104 @@ export class DatabaseStorage implements IStorage {
   async revokeApiKey(id: number): Promise<void> {
     await db.update(apiKeys).set({ isActive: false }).where(eq(apiKeys.id, id));
   }
+  async createTenancy(tenancy: InsertTenancy): Promise<Tenancy> {
+    const [created] = await db.insert(tenancies).values(tenancy).returning();
+    return created;
+  }
 
-  async logApiKeyUsage(id: number): Promise<void> {
-    await db.update(apiKeys)
-      .set({ lastUsedAt: new Date(), usageCount: sql`${apiKeys.usageCount} + 1` })
-      .where(eq(apiKeys.id, id));
+  async getTenancy(id: string): Promise<Tenancy | undefined> {
+    const [tenancy] = await db.select().from(tenancies).where(eq(tenancies.id, id));
+    return tenancy;
+  }
+
+  async getTenancyByRef(ref: string): Promise<Tenancy | undefined> {
+    const [tenancy] = await db.select().from(tenancies).where(eq(tenancies.tenancyRef, ref));
+    return tenancy;
+  }
+
+  async getTenancyByPropertyAndUser(propertyId: number, userId: string): Promise<Tenancy | undefined> {
+    // Find active tenancy for this property and user
+    const result = await db
+      .select({ tenancy: tenancies })
+      .from(tenancies)
+      .innerJoin(tenancyTenants, eq(tenancies.id, tenancyTenants.tenancyId))
+      .where(and(
+        eq(tenancies.propertyId, propertyId),
+        eq(tenancyTenants.tenantId, userId),
+        eq(tenancies.status, 'active')
+      ))
+      .limit(1);
+
+    return result[0]?.tenancy;
+  }
+
+  async updateTenancy(id: string, updates: Partial<InsertTenancy>): Promise<Tenancy> {
+    const [updated] = await db
+      .update(tenancies)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tenancies.id, id))
+      .returning();
+    return updated;
+  }
+
+  async updateTenancyTenant(tenancyId: string, tenantId: string, updates: Partial<InsertTenancyTenant>): Promise<TenancyTenant> {
+    const [updated] = await db
+      .update(tenancyTenants)
+      .set(updates)
+      .where(and(
+        eq(tenancyTenants.tenancyId, tenancyId),
+        eq(tenancyTenants.tenantId, tenantId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async createTenancyTenant(link: InsertTenancyTenant): Promise<TenancyTenant> {
+    const [created] = await db.insert(tenancyTenants).values(link).returning();
+    return created;
+  }
+
+  async getTenancyTenants(tenancyId: string): Promise<TenancyTenant[]> {
+    return await db.select().from(tenancyTenants).where(eq(tenancyTenants.tenancyId, tenancyId));
+  }
+
+  async getUserTenancies(userId: string): Promise<Tenancy[]> {
+    const records = await db
+      .select({ tenancy: tenancies })
+      .from(tenancies)
+      .innerJoin(tenancyTenants, eq(tenancies.id, tenancyTenants.tenancyId))
+      .where(eq(tenancyTenants.tenantId, userId));
+    return records.map(r => r.tenancy);
+  }
+
+  // Tenant Profile operations
+  async createTenantProfile(profile: InsertTenantProfile): Promise<TenantProfile> {
+    const [created] = await db.insert(tenantProfiles).values(profile).returning();
+    return created;
+  }
+
+  async getTenantProfile(userId: string): Promise<TenantProfile | undefined> {
+    const [profile] = await db.select().from(tenantProfiles).where(eq(tenantProfiles.userId, userId));
+    return profile;
+  }
+
+  async updateTenantProfile(userId: string, updates: Partial<InsertTenantProfile>): Promise<TenantProfile> {
+    const existing = await this.getTenantProfile(userId);
+    if (existing) {
+      const [updated] = await db
+        .update(tenantProfiles)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(tenantProfiles.id, existing.id)) // Use PK for update
+        .returning();
+      return updated;
+    } else {
+      // Create if not exists (upsert logic for profile)
+      const [created] = await db
+        .insert(tenantProfiles)
+        .values({ userId, ...updates } as any) // Safety cast, assuming userId is in updates or handled
+        .returning();
+      return created;
+    }
   }
 }
 

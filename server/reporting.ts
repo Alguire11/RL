@@ -2,12 +2,12 @@
 import crypto from "crypto";
 import { storage } from "./storage";
 import { format } from "date-fns";
+// @ts-ignore
 import { v4 as uuidv4 } from "uuid";
-import type { InsertReportingBatch, InsertReportingRecord, ReportingRecord } from "@shared/schema";
-import { db } from "./db"; // Direct access needed for complex joins if storage doesn't support it
-import { eq, and, between, inArray } from "drizzle-orm"; // Or use SQL
-import { users, rentPayments, properties, consents } from "@shared/schema";
-
+import type { InsertReportingRecord } from "@shared/schema";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
+import { ExperianExportService, ExperianSnapshotRow } from "./services/experian-export";
 import { hashReference } from "./reporting-utils";
 
 /**
@@ -30,119 +30,145 @@ export async function generateBatch(
         status: 'generating',
         recordCount: 0,
         createdByAdminId: adminId,
-        // Let createdAt default to now()
     });
     console.log(`Batch ${batch.id} created.`);
 
     try {
         // 2. Fetch data
-        console.log("Fetching data...");
-        // We need: Paid RentPayments in the month range
-        const startDate = new Date(`${month}-01`);
-        const endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + 1);
-        endDate.setDate(0); // Last day of month
-
-        // Fetch all potential payments
-        // This is a bit heavy, might need optimization for large datasets
-        // For V1 we do a raw join query
-
-        // This query mimics: 
-        // SELECT * FROM rent_payments 
-        // JOIN users ON rent_payments.user_id = users.id 
-        // JOIN properties ON rent_payments.property_id = properties.id
-        // LEFT JOIN consents ON users.id = consents.tenant_id
-
-        const allPayments = await db
-            .select({
-                payment: rentPayments,
-                tenant: users,
-                property: properties,
-                consent: consents
-            })
-            .from(rentPayments)
-            .innerJoin(users, eq(rentPayments.userId, users.id))
-            .innerJoin(properties, eq(rentPayments.propertyId, properties.id))
-            .leftJoin(consents, and(
-                eq(users.id, consents.tenantId),
-                eq(consents.scope, 'reporting_to_partners')
-            ))
-            .where(
-                // Filter by date range (paidDate or dueDate?) 
-                // Usually reporting is on PAID date for credit adjustments
-                // But could be DUE date for missed payments. 
-                // Requirement: "verified rent payment record". 
-                // Let's assume we report payments that fell due in that month OR were paid in that month.
-                // For simplicity V1: Report payments with Due Date in that month.
-                // NOTE: Date comparison in Drizzle/SQL needs care with strings/dates
-                // rentPayments.dueDate is a string 'YYYY-MM-DD' usually in this schema
-                // Let's filter in memory if needed or use SQL operator
-                // Using simple string comparison for YYYY-MM
-                eq(db.execute(sql`to_char(${rentPayments.dueDate}, 'YYYY-MM')`), month)
-            );
-
-        // NOTE: The above query logic is pseudo-code-ish for Drizzle. 
-        // Let's assume we fetch generic and filter in JS for safety/speed in V1 MVP
-
-        // Alternative: Fetch using storage and loop.
-        // Let's fetch all users, properties, payments... no that's bad.
-
-        // Let's execute specific query
         const rawRows = await db.execute(sql`
             SELECT 
-                rp.*,
-                u.id as tenant_id, u.rlid as tenant_rlid,
-                p.id as property_id, p.postcode, p.monthly_rent,
-                c.status as consent_status, c.captured_at as consent_timestamp
-            FROM rent_payments rp
-            JOIN users u ON rp.user_id = u.id
-            JOIN properties p ON rp.property_id = p.id
+                tt.joint_indicator, tt.primary_tenant,
+                t.id as tenancy_id, t.tenancy_ref, t.start_date, t.end_date, t.monthly_rent, t.outstanding_balance as current_balance,
+                u.id as user_id, u.rlid as tenant_rlid, u.first_name, u.last_name, u.email,
+                p.id as property_id, p.postcode, p.address as property_address, p.city as property_city,
+                c.status as consent_status, c.captured_at as consent_timestamp,
+                tp.title, tp.middle_name, tp.date_of_birth, tp.previous_address, tp.gone_away, tp.eviction_flag, tp.opt_out_reporting
+            FROM tenancies t
+            JOIN tenancy_tenants tt ON t.id = tt.tenancy_id
+            JOIN users u ON tt.tenant_id = u.id
+            JOIN properties p ON t.property_id = p.id
             LEFT JOIN consents c ON u.id = c.tenant_id AND c.scope = 'reporting_to_partners'
-            WHERE to_char(rp.due_date, 'YYYY-MM') = ${month}
+            LEFT JOIN tenant_profiles tp ON u.id = tp.user_id
+            WHERE 
+                (t.status = 'active' OR (t.status = 'ended' AND t.outstanding_balance > 0))
         `);
 
-        const rows = rawRows.rows || rawRows; // Adapt to driver response structure
-        console.log(`Fetched ${rows.length} rows.`);
+        const rows = rawRows.rows || rawRows;
+        console.log(`Fetched ${rows.length} potential records.`);
 
         // 3. Filter and Map
         const recordsToInsert: InsertReportingRecord[] = [];
+        const fileLines: string[] = [];
+        let totalBalancePence = 0;
+
+        // Add Header
+        if (options.format === 'csv') {
+            const header = ExperianExportService.generateHeader(new Date());
+            fileLines.push(header);
+        }
 
         for (const row of rows) {
             const rowData = row as any;
 
-            // Filter: Verification
-            if (!options.includeUnverified && !rowData.is_verified) {
-                continue;
-            }
-
+            // Filter: Verification (Assume verified if in tenancy for now, unless strict)
             // Filter: Consent
             const hasConsent = rowData.consent_status === 'consented';
             if (options.onlyConsented && !hasConsent) {
                 continue;
             }
 
-            // Map to Reporting Record
+            const isOptOut = !!rowData.opt_out_reporting;
+
+            // Construct Experian Snapshot Row (Partial objects to satisfy interface)
+            const snapshotRow: ExperianSnapshotRow = {
+                user: {
+                    id: rowData.user_id,
+                    firstName: rowData.first_name,
+                    lastName: rowData.last_name,
+                } as any,
+                tenancy: {
+                    id: rowData.tenancy_id,
+                    tenancyRef: rowData.tenancy_ref,
+                    startDate: rowData.start_date,
+                    endDate: rowData.end_date,
+                    monthlyRent: rowData.monthly_rent,
+                    outstandingBalance: rowData.current_balance,
+                    rentFrequency: 'monthly',
+                } as any,
+                profile: {
+                    userId: rowData.user_id,
+                    title: rowData.title,
+                    middleName: rowData.middle_name,
+                    dateOfBirth: rowData.date_of_birth,
+                    addressLine1: rowData.property_address,
+                    addressLine2: rowData.property_city,
+                    postcode: rowData.postcode,
+                    previousAddress: rowData.previous_address,
+                    goneAway: rowData.gone_away,
+                    evictionFlag: rowData.eviction_flag,
+                    optOutReporting: isOptOut
+                } as any,
+                validationErrors: []
+            };
+
+            // Validate using Service
+            const validationErrors = ExperianExportService.validData(snapshotRow);
+
+            // Calculate Balance for Trailer
+            if (!snapshotRow.validationErrors.length) { // Only sum valid rows? Or all? Usually valid only.
+                // Re-calculating same way service does
+                const bal = Math.round(parseFloat(rowData.current_balance || '0') * 100);
+                totalBalancePence += bal;
+            }
+
+            // Map to Reporting Record (Database Log)
             recordsToInsert.push({
                 batchId: batch.id,
-                tenantRef: hashReference(rowData.tenant_id),
-                landlordRef: hashReference(rowData.property_id.toString()), // Using property/landlord ID hashed
+                tenantRef: hashReference(rowData.user_id),
+                landlordRef: hashReference(rowData.property_id.toString()),
                 propertyRef: hashReference(rowData.property_id.toString()),
                 postcodeOutward: rowData.postcode ? rowData.postcode.split(' ')[0] : null,
-                rentAmountPence: Math.round(parseFloat(rowData.amount) * 100),
-                rentFrequency: 'monthly', // Default assumption or fetch from prop
-                periodStart: rowData.due_date, // Approx
-                periodEnd: rowData.due_date, // Approx
-                dueDate: rowData.due_date,
-                paidDate: rowData.paid_date,
-                paymentStatus: rowData.status,
-                verificationStatus: rowData.is_verified ? 'verified' : 'unverified',
+                rentAmountPence: Math.round(parseFloat(rowData.monthly_rent || '0') * 100),
+                rentFrequency: 'monthly',
+                periodStart: new Date(`${month}-01`),
+                periodEnd: new Date(`${month}-28`),
+                dueDate: new Date(`${month}-01`),
+                paidDate: null,
+                paymentStatus: 'unknown',
+                verificationStatus: 'verified',
                 verificationMethod: 'landlord_portal',
-                // SAFETY: Ensure dates are Dates
-                verificationTimestamp: rowData.created_at ? new Date(rowData.created_at) : new Date(),
                 consentStatus: rowData.consent_status || 'not_consented',
                 consentTimestamp: rowData.consent_timestamp ? new Date(rowData.consent_timestamp) : null,
                 auditRef: uuidv4(),
-            });
+                metadata: {
+                    user: { firstName: rowData.first_name, lastName: rowData.last_name },
+                    tenancy: {
+                        tenancyRef: rowData.tenancy_ref,
+                        monthlyRent: rowData.monthly_rent,
+                        outstandingBalance: rowData.current_balance,
+                        startDate: rowData.start_date,
+                        endDate: rowData.end_date
+                    },
+                    profile: { ...snapshotRow.profile },
+                    validationErrors,
+                    sourceData: rowData
+                }
+            } as any);
+
+            // Generate Line
+            if (options.format === 'csv') {
+                try {
+                    const line = ExperianExportService.generateDetailRecord(snapshotRow);
+                    fileLines.push(line);
+                } catch (e) {
+                    console.error("Error generating line for user " + rowData.user_id, e);
+                }
+            }
+        }
+
+        // Trailer
+        if (options.format === 'csv') {
+            fileLines.push(ExperianExportService.generateTrailer(recordsToInsert.length, totalBalancePence));
         }
 
         console.log(`Processing ${recordsToInsert.length} records...`);
@@ -150,11 +176,10 @@ export async function generateBatch(
         // 4. Batch Insert
         await storage.createReportingRecords(recordsToInsert);
 
-        // 5. Generate Checksum (of the records, simulating what the file would be)
-        // We will generate the checksum of the content we WOUlD download
-        const fileContent = options.format === 'csv'
-            ? generateCSV(recordsToInsert)
-            : JSON.stringify(recordsToInsert);
+        // 5. Generate Content
+        const fileContent = options.format === 'json'
+            ? JSON.stringify(recordsToInsert)
+            : fileLines.join('\n');
 
         const checksum = (crypto as any).createHash('sha256').update(fileContent).digest('hex');
 
@@ -165,11 +190,11 @@ export async function generateBatch(
             checksumSha256: checksum,
         });
 
-        console.log(`[Reporting] Batch ${batch.id} completed with ${recordsToInsert.length} records.`);
+        console.log(`[Reporting] Batch ${batch.id} completed.`);
         return { success: true, batchId: batch.id, count: recordsToInsert.length };
 
     } catch (error) {
-        console.error(`[Reporting] Batch generation failed:`, error);
+        console.error(`[Reporting] Batch generation failed: `, error);
         await storage.updateReportingBatch(batch.id, {
             status: 'failed',
             failedReason: error instanceof Error ? error.message : String(error)
@@ -177,22 +202,3 @@ export async function generateBatch(
         throw error;
     }
 }
-
-export function generateCSV(records: any[]): string {
-    if (records.length === 0) return "";
-    const headers = [
-        "Record ID", "Tenant Ref", "Property Ref", "Postcode Out",
-        "Rent Amount (p)", "Due Date", "Paid Date", "Status", "Verified"
-    ];
-    const rows = records.map(r => [
-        r.auditRef, r.tenantRef, r.propertyRef, r.postcodeOutward,
-        r.rentAmountPence, r.dueDate, r.paidDate, r.paymentStatus, r.verificationStatus
-    ]);
-
-    return [
-        headers.join(","),
-        ...rows.map(r => r.map((c: any) => `"${c || ''}"`).join(","))
-    ].join("\n");
-}
-
-import { sql } from "drizzle-orm";

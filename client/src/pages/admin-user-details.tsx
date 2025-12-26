@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Mail, Phone, Calendar, Shield, CreditCard, Building, FileText, Activity, AlertTriangle, Check, X, User, MoreVertical, CheckCircle, XCircle, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -44,6 +45,9 @@ interface AdminUserDetail {
     reports: any[];
     reportShares: any[];
     securityLogs: any[];
+    tenantProfile?: any;
+    tenancies?: any[];
+    tenancyLinks?: any[]; // Added
 }
 
 export default function AdminUserDetails() {
@@ -202,15 +206,37 @@ export default function AdminUserDetails() {
                 lastName: userDetails.user.lastName,
                 email: userDetails.user.email,
                 businessName: userDetails.user.businessName,
+
                 subscriptionPlan: userDetails.user.subscriptionPlan,
-                role: userDetails.user.role
+                role: userDetails.user.role,
+                // Flatten tenant profile into edit form
+                tenantProfile: userDetails.tenantProfile || {
+                    title: '',
+                    firstName: userDetails.user.firstName,
+                    lastName: userDetails.user.lastName,
+                    dateOfBirth: '',
+                    previous_address: '',
+                    goneAway: false,
+                    evictionFlag: false
+                }
             });
             setShowEditDialog(true);
         }
     };
 
-    const handleInputChange = (field: string, value: string) => {
-        setEditFormData((prev: any) => ({ ...prev, [field]: value }));
+    const handleInputChange = (field: string, value: any) => {
+        if (field.startsWith('profile.')) {
+            const profileField = field.split('.')[1];
+            setEditFormData((prev: any) => ({
+                ...prev,
+                tenantProfile: {
+                    ...prev.tenantProfile,
+                    [profileField]: value
+                }
+            }));
+        } else {
+            setEditFormData((prev: any) => ({ ...prev, [field]: value }));
+        }
     };
 
     const formatDate = (dateString: string | null) => {
@@ -384,6 +410,7 @@ export default function AdminUserDetails() {
                                 <TabsTrigger value="properties">Properties</TabsTrigger>
                                 <TabsTrigger value="reports">Reports</TabsTrigger>
                                 <TabsTrigger value="logs">Logs</TabsTrigger>
+                                <TabsTrigger value="experian">Experian Profile</TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="payments" className="mt-4">
@@ -640,6 +667,99 @@ export default function AdminUserDetails() {
                                     </CardContent>
                                 </Card>
                             </TabsContent>
+
+                            <TabsContent value="experian" className="mt-4">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Experian Tenant Profile</CardTitle>
+                                        <CardDescription>Sensitive data used for Experian Rental Exchange reporting.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        {!userDetails.tenantProfile ? (
+                                            <div className="text-center py-6">
+                                                <p className="text-gray-500 mb-4">No profile data found.</p>
+                                                <Button variant="outline" onClick={handleEditClick}>Create Profile</Button>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label className="text-gray-500">Title & Name</Label>
+                                                    <div className="font-medium mt-1">
+                                                        {userDetails.tenantProfile.title} {userDetails.tenantProfile.firstName} {userDetails.tenantProfile.middleName} {userDetails.tenantProfile.lastName}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <Label className="text-gray-500">Date of Birth</Label>
+                                                    <div className="font-medium mt-1">
+                                                        {userDetails.tenantProfile.dateOfBirth ? format(new Date(userDetails.tenantProfile.dateOfBirth), 'dd MMM yyyy') : 'N/A'}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <Label className="text-gray-500">Previous Address</Label>
+                                                    <div className="font-medium mt-1 text-sm">
+                                                        {userDetails.tenantProfile.previousAddress || 'N/A'}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <Label className="text-gray-500">Flags</Label>
+                                                    <div className="flex gap-2 mt-1">
+                                                        {userDetails.tenantProfile.goneAway && <Badge variant="destructive">Gone Away</Badge>}
+                                                        {userDetails.tenantProfile.evictionFlag && <Badge variant="destructive">Eviction</Badge>}
+                                                        {!userDetails.tenantProfile.goneAway && !userDetails.tenantProfile.evictionFlag && <span className="text-sm text-gray-500">None</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="mt-6">
+                                    <CardHeader>
+                                        <CardTitle>Active Tenancies</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {!userDetails.tenancies || userDetails.tenancies.length === 0 ? (
+                                            <p className="text-gray-500 text-center py-4">No active tenancies</p>
+                                        ) : (
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Ref</TableHead>
+                                                        <TableHead>Start Date</TableHead>
+                                                        <TableHead>Rent</TableHead>
+                                                        <TableHead>Balance</TableHead>
+                                                        <TableHead>Joint Information</TableHead>
+                                                        <TableHead>Status</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {userDetails.tenancies.map((t: any) => {
+                                                        const link = userDetails.tenancyLinks?.find((l: any) => l.tenancyId === t.id);
+                                                        return (
+                                                            <TableRow key={t.id}>
+                                                                <TableCell className="font-mono">{t.tenancyRef}</TableCell>
+                                                                <TableCell>{t.startDate ? format(new Date(t.startDate), 'dd MMM yyyy') : 'N/A'}</TableCell>
+                                                                <TableCell>£{t.monthlyRent}</TableCell>
+                                                                <TableCell className={t.outstandingBalance > 0 ? 'text-red-600 font-bold' : 'text-green-600'}>
+                                                                    £{t.outstandingBalance}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div className="flex flex-col text-xs">
+                                                                        <span>Type: {link?.jointIndicator ? 'Joint' : 'Sole'}</span>
+                                                                        {link?.jointIndicator && <span>Tenants: {t.jointTenancyCount}</span>}
+                                                                        {link?.jointIndicator && <span>Primary: {link?.primaryTenant ? 'Yes' : 'No'}</span>}
+                                                                    </div>
+                                                                </TableCell>
+                                                                <TableCell><Badge variant="outline">{t.status}</Badge></TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
+                                                </TableBody>
+                                            </Table>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
                         </Tabs>
                     </div>
 
@@ -771,6 +891,70 @@ export default function AdminUserDetails() {
                             </div>
                         </div>
                     </div>
+
+                    {editFormData.role === 'user' && (
+                        <>
+                            <Separator className="my-4" />
+                            <div className="space-y-4">
+                                <h4 className="font-medium text-sm text-gray-900">Experian Profile</h4>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="col-span-1">
+                                        <Label htmlFor="profile.title">Title</Label>
+                                        <Input
+                                            id="profile.title"
+                                            value={editFormData.tenantProfile?.title || ''}
+                                            onChange={(e) => handleInputChange('profile.title', e.target.value)}
+                                            placeholder="Mr/Mrs"
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label htmlFor="profile.middleName">Middle Name</Label>
+                                        <Input
+                                            id="profile.middleName"
+                                            value={editFormData.tenantProfile?.middleName || ''}
+                                            onChange={(e) => handleInputChange('profile.middleName', e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label htmlFor="profile.dateOfBirth">Date of Birth</Label>
+                                    <Input
+                                        id="profile.dateOfBirth"
+                                        type="date"
+                                        value={editFormData.tenantProfile?.dateOfBirth ? editFormData.tenantProfile.dateOfBirth.split('T')[0] : ''}
+                                        onChange={(e) => handleInputChange('profile.dateOfBirth', e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="profile.previousAddress">Previous Address</Label>
+                                    <Input
+                                        id="profile.previousAddress"
+                                        value={editFormData.tenantProfile?.previousAddress || ''}
+                                        onChange={(e) => handleInputChange('profile.previousAddress', e.target.value)}
+                                    />
+                                </div>
+                                <div className="flex gap-4">
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="profile.goneAway"
+                                            checked={editFormData.tenantProfile?.goneAway || false}
+                                            onCheckedChange={(checked: any) => handleInputChange('profile.goneAway', checked)}
+                                        />
+                                        <Label htmlFor="profile.goneAway">Gone Away</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id="profile.evictionFlag"
+                                            checked={editFormData.tenantProfile?.evictionFlag || false}
+                                            onCheckedChange={(checked: any) => handleInputChange('profile.evictionFlag', checked)}
+                                        />
+                                        <Label htmlFor="profile.evictionFlag">Eviction Flag</Label>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
                     <div className="flex justify-end space-x-2">
                         <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
                         <Button onClick={() => {
@@ -779,7 +963,7 @@ export default function AdminUserDetails() {
                     </div>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }
 

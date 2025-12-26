@@ -4,6 +4,9 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import passport from "passport";
 import { emailService } from "./emailService";
+import { ExperianExportService } from "./services/experian-export";
+import { experianAuditLogs } from "@shared/schema";
+import { updateTenancyBalance } from "./balance-engine";
 import QRCode from "qrcode";
 import { z } from "zod";
 import {
@@ -19,6 +22,7 @@ import {
   insertUserSchema,
   insertMaintenanceRequestSchema,
   rentLogs,
+  tenancyTenants,
 } from "@shared/schema";
 import { nanoid } from "nanoid";
 import { generateLedgerPDF } from "./ledgerPdfGenerator";
@@ -27,7 +31,7 @@ import { hashPassword } from "./passwords";
 import { registerSubscriptionRoutes } from "./subscriptionRoutes";
 import { getSubscriptionLimits, normalizePlanName, requireSubscription } from "./middleware/subscription";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { computeDashboardStats } from "./dashboardStats";
 
 // Helper function to generate unique RLID (RentLedger ID)
@@ -416,9 +420,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onboardingReason: true,
       });
 
-      const updateData = updateSchema.parse(req.body);
+      // Parse user fields
+      const userFields = updateSchema.parse(req.body);
 
-      const user = await storage.updateUser(userId, updateData);
+      // Update User
+      const user = await storage.updateUser(userId, userFields);
+
+      // Handle Tenant Profile fields (DOB, Consent)
+      if (req.body.dateOfBirth || req.body.experianConsent !== undefined) {
+        const tenantUpdates: any = {};
+        if (req.body.dateOfBirth) tenantUpdates.dateOfBirth = req.body.dateOfBirth;
+        if (req.body.experianConsent !== undefined) {
+          // Consent = true means optOut = false
+          tenantUpdates.optOutReporting = !req.body.experianConsent;
+        }
+        await storage.updateTenantProfile(userId, tenantUpdates);
+      }
 
       res.json(user);
     } catch (error) {
@@ -436,16 +453,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
 
       const addressSchema = z.object({
-        street: z.string().min(1, "Street is required"),
-        city: z.string().min(1, "City is required"),
+        addressLine1: z.string().min(1,),
+        addressLine2: z.string().optional().nullable(),
+        addressLine3: z.string().optional().nullable(),
+        addressLine4: z.string().optional().nullable(),
         postcode: z.string().min(1, "Postcode is required"),
+        // Allow legacy fields for transition, but prefer new ones
+        street: z.string().optional(),
+        city: z.string().optional(),
         country: z.string().default("UK"),
       });
 
-      const { street, city, postcode, country } = addressSchema.parse(req.body);
+      const body = addressSchema.parse(req.body);
 
+      // 1. Update User (Legacy JSON + Granular)
+      // We map granular back to legacy street/city loosely if needed, or just store all
       const user = await storage.updateUserAddress(userId, {
-        street, city, postcode, country
+        ...req.user.address, // merge
+        street: body.addressLine1, // Use Line 1 as street for simple display
+        city: body.addressLine3 || body.addressLine4 || body.city || "", // Attempt to find a city
+        postcode: body.postcode,
+        country: body.country,
+        addressLine1: body.addressLine1,
+        addressLine2: body.addressLine2,
+        addressLine3: body.addressLine3,
+        addressLine4: body.addressLine4,
+      });
+
+      // 2. Update Tenant Profile (Experian columns)
+      // Check if profile exists, if not create? updateTenantProfile handles upsert logic?
+      // storage.ts implementation of updateTenantProfile handles upsert.
+      await storage.updateTenantProfile(userId, {
+        addressLine1: body.addressLine1,
+        addressLine2: body.addressLine2,
+        addressLine3: body.addressLine3,
+        addressLine4: body.addressLine4,
+        postcode: body.postcode
       });
 
       res.json({
@@ -532,6 +575,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting API key:', error);
       res.status(500).json({ message: 'Failed to delete API key' });
+    }
+  });
+
+  // Experian Reporting Routes (Superadmin only)
+  app.get('/api/superadmin/experian/preview', requireRole(['superadmin']), async (req, res) => {
+    try {
+      const { month } = req.query;
+      const date = month ? new Date(String(month)) : new Date();
+
+      const rows = await ExperianExportService.getSnapshotData(date);
+
+      // Log preview access
+      await storage.createExperianAuditLog({
+        userId: req.user!.id,
+        action: 'preview',
+        metadata: { month: String(month), recordCount: rows.length }
+      });
+
+      res.json(rows);
+    } catch (error) {
+      console.error('Error in experian preview:', error);
+      res.status(500).json({ message: 'Failed to generate preview' });
+    }
+  });
+
+  app.post('/api/superadmin/experian/export', requireRole(['superadmin']), async (req, res) => {
+    try {
+      const { month } = req.body;
+      const date = month ? new Date(String(month)) : new Date();
+
+      const rows = await ExperianExportService.getSnapshotData(date);
+      const fileContent = ExperianExportService.generateExportContent(rows, date);
+
+      // Log export
+      await storage.createExperianAuditLog({
+        userId: req.user!.id,
+        action: 'export',
+        metadata: { month: String(month), recordCount: rows.length }
+      });
+
+      res.setHeader('Content-Type', 'text/plain');
+      res.setHeader('Content-Disposition', `attachment; filename=rentledger_experian_${format(date, 'yyyyMM')}.txt`);
+      res.send(fileContent);
+    } catch (error) {
+      console.error('Error in experian export:', error);
+      res.status(500).json({ message: 'Failed to generate export file' });
     }
   });
 
@@ -818,6 +907,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const property = await storage.createProperty(propertyDataWithToken);
+
+      // Create linked Tenancy for Experian tracking
+      // We map the Property data to a Tenancy record
+      // Frequency mapping: weekly->W, fortnightly->F, monthly->M
+      const freqMap: Record<string, string> = { 'weekly': 'W', 'fortnightly': 'F', 'monthly': 'M' };
+      const frequency = freqMap[req.body.rentFrequency] || 'M';
+
+      if (property.tenancyStartDate && property.monthlyRent) {
+        try {
+          const tenancyRef = `T${nanoid(10)}`; // Short Ref
+          const tenancy = await storage.createTenancy({
+            tenancyRef,
+            propertyId: property.id,
+            startDate: property.tenancyStartDate,
+            endDate: property.tenancyEndDate || null,
+            monthlyRent: property.monthlyRent,
+            rentFrequency: frequency,
+            status: 'active',
+            jointTenancyCount: 1,
+            outstandingBalance: "0"
+          } as any); // Type assertion if schema is strict on optional fields
+
+          await storage.createTenancyTenant({
+            tenancyId: tenancy.id,
+            tenantId: userId,
+            primaryTenant: true,
+            jointIndicator: false
+          } as any);
+
+          console.log(`Created tenancy ${tenancy.id} for property ${property.id}`);
+        } catch (err) {
+          console.error("Failed to create automatic tenancy record:", err);
+          // Don't fail the property creation, but log error
+        }
+      }
 
       // Send verification email to landlord if email is provided
       // This is the ONLY place where property verification emails are sent
@@ -1147,6 +1271,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // 3b. Update Tenancy Balance if exists
+      if (payment.propertyId) {
+        try {
+          const tenancy = await storage.getTenancyByPropertyAndUser(payment.propertyId, userId);
+          if (tenancy) {
+            await updateTenancyBalance(tenancy.id);
+          }
+        } catch (err) {
+          console.error("Failed to update tenancy balance after payment creation:", err);
+        }
+      }
+
       res.json(payment);
     } catch (error) {
       console.error("Error creating rent payment:", error);
@@ -1185,6 +1321,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = updateSchema.parse(req.body);
 
       const payment = await storage.updateRentPayment(paymentId, updateData);
+
+      // Update Tenancy Balance
+      if (payment.propertyId && payment.userId) {
+        try {
+          const tenancy = await storage.getTenancyByPropertyAndUser(payment.propertyId, payment.userId);
+          if (tenancy) {
+            await updateTenancyBalance(tenancy.id);
+          }
+        } catch (err) {
+          console.error("Failed to update tenancy balance after payment update:", err);
+        }
+      }
+
       res.json(payment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2701,7 +2850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Fetch related data
-      const [properties, payments, reports, securityLogs, manualPayments, rentLogs] = await Promise.all([
+      const [properties, payments, reports, securityLogs, manualPayments, rentLogs, reportShares, tenantProfile, tenancies, tenancyLinks] = await Promise.all([
         storage.getUserProperties(userId),
         storage.getUserRentPayments(userId),
         storage.getUserCreditReports(userId),
@@ -2709,6 +2858,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getUserManualPayments(userId),
         storage.getUserRentLogs(userId),
         storage.getUserReportShares(userId),
+        storage.getTenantProfile(userId),
+        storage.getUserTenancies(userId),
+        db.select().from(tenancyTenants).where(eq(tenancyTenants.tenantId, userId)),
       ]);
 
       res.json({
@@ -2719,7 +2871,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         securityLogs,
         manualPayments,
         rentLogs,
-        reportShares
+        reportShares,
+        tenantProfile,
+        tenancies,
+        tenancyLinks
       });
     } catch (error) {
       console.error('Error fetching user details:', error);
@@ -2763,6 +2918,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedUser = await storage.updateUser(userId, allowedUpdates);
+
+      // Handle Tenant Profile Updates
+      if (updates.tenantProfile) {
+        await storage.updateTenantProfile(userId, updates.tenantProfile);
+      }
 
       await logSecurityEvent(req, 'admin_user_updated', {
         adminId: (req as any).user.id,
@@ -6290,10 +6450,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let content = '';
       if (batch.format === 'csv') {
-        const { generateCSV } = await import('./reporting');
-        content = generateCSV(records);
-        res.header('Content-Type', 'text/csv');
-        res.attachment(`rent-ledger-export-${batch.month}-${batch.id.slice(0, 8)}.csv`);
+        const { ExperianExportService } = await import('./services/experian-export');
+
+        const date = new Date(batch.month + '-01'); // Ensure date object
+        const lines = [ExperianExportService.generateHeader(date)];
+
+        for (const record of records) {
+          // Use metadata if available (Phase 2), fallback to record fields or error
+          const meta = record.metadata as any;
+
+          if (meta && meta.user && meta.tenancy) {
+            // Adapt legacy call to new signature
+            // New signature expects ExperianSnapshotRow
+            const row = {
+              user: meta.user,
+              tenancy: meta.tenancy,
+              profile: meta.profile || null,
+              validationErrors: [] // Legacy records assumed valid or validated elsewhere
+            };
+            lines.push(ExperianExportService.generateDetailRecord(row));
+          } else {
+            console.warn(`Record ${record.id} missing metadata for export re-generation.`);
+          }
+        }
+
+        content = lines.join('\n');
+
+        res.header('Content-Type', 'text/plain');
+        res.attachment(`rent-ledger-export-${batch.month}-${batch.id.slice(0, 8)}.txt`);
       } else {
         content = JSON.stringify(records, null, 2);
         res.header('Content-Type', 'application/json');
@@ -6350,6 +6534,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching consent:', error);
       res.status(500).json({ message: 'Failed to fetch consent' });
+    }
+  });
+
+  // Tenant: Shared Tenancy Settings
+  app.get('/api/user/tenancy', requireAuth, async (req: any, res) => {
+    try {
+      const tenancies = await storage.getUserTenancies(req.user.id);
+      const activeTenancy = tenancies.find(t => t.status === 'active');
+
+      if (!activeTenancy) {
+        return res.json({ message: 'No active tenancy found', hasTenancy: false });
+      }
+
+      // Fetch joint details from tenancyTenants link table
+      // We need to access the link table which isn't directly exposed by getUserTenancies (it maps to Tenancy objects)
+      // Using a direct query here for expediency in this V1.
+      // Ideally storage should provide `getUserTenancyDetails` returning enriched objects.
+
+      const links = await db.select().from(tenancyTenants).where(and(
+        eq(tenancyTenants.tenancyId, activeTenancy.id),
+        eq(tenancyTenants.tenantId, req.user.id)
+      ));
+      const link = links[0];
+
+      res.json({
+        hasTenancy: true,
+        ...activeTenancy,
+        jointIndicator: link?.jointIndicator || false,
+        isPrimary: link?.primaryTenant || false,
+        jointTenancyCount: activeTenancy.jointTenancyCount // Ensure this is passed
+      });
+    } catch (error) {
+      console.error('Error fetching user tenancy:', error);
+      res.status(500).json({ message: 'Failed to fetch tenancy' });
+    }
+  });
+
+  app.put('/api/user/tenancy', requireAuth, async (req: any, res) => {
+    try {
+      const { jointIndicator, jointTenancyCount } = req.body;
+      const tenancies = await storage.getUserTenancies(req.user.id);
+      const activeTenancy = tenancies.find(t => t.status === 'active');
+
+      if (!activeTenancy) {
+        return res.status(404).json({ message: 'No active tenancy to update' });
+      }
+
+      // Update Link (Joint Indicator)
+      await storage.updateTenancyTenant(activeTenancy.id, req.user.id, {
+        jointIndicator: !!jointIndicator
+      });
+
+      // Update Tenancy (Count) - CAREFUL: This affects all tenants on this tenancy.
+      if (jointTenancyCount !== undefined) {
+        await storage.updateTenancy(activeTenancy.id, {
+          jointTenancyCount: parseInt(jointTenancyCount)
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating tenancy settings:', error);
+      res.status(500).json({ message: 'Failed to update tenancy settings' });
     }
   });
 
@@ -6423,11 +6670,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Register V1 Partner API
-  const { default: v1Router } = await import('./routes-v1');
-  app.use('/v1', v1Router);
+
+
+
+  // ---------------------------------------------------------------------------
+  // SuperAdmin: Admin Management
+  // ---------------------------------------------------------------------------
+
+  const requireSuperAdmin: RequestHandler = async (req: any, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    const adminRec = await storage.getAdminUser(req.user.id);
+    if (!adminRec || adminRec.role !== 'superadmin') {
+      return res.status(403).json({ message: "SuperAdmin access required" });
+    }
+    next();
+  };
+
+  app.get('/api/superadmin/admins', requireSuperAdmin, async (req, res) => {
+    try {
+      const { adminUsers, users } = await import("@shared/schema");
+      // Join admin_users and users
+      const admins = await db.select({
+        userId: adminUsers.userId,
+        role: adminUsers.role,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        isActive: adminUsers.isActive,
+        permissions: adminUsers.permissions
+      })
+        .from(adminUsers)
+        .innerJoin(users, eq(adminUsers.userId, users.id))
+        .where(eq(adminUsers.isActive, true));
+
+      res.json(admins);
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+      res.status(500).json({ message: 'Failed to fetch admins' });
+    }
+  });
+
+  app.post('/api/superadmin/admins/invite', requireSuperAdmin, async (req, res) => {
+    try {
+      const { email, role } = req.body; // role: 'admin' | 'superadmin' | 'moderator'
+      if (!email || !role) return res.status(400).json({ message: "Email and Role required" });
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ message: "User not found. Invite them to RentLedger first." });
+      }
+
+      const existingAdmin = await storage.getAdminUser(user.id);
+      if (existingAdmin) {
+        return res.status(400).json({ message: "User is already an admin" });
+      }
+
+      await storage.createAdminUser({
+        userId: user.id,
+        role: role,
+        permissions: ['all'], // Default to all for simple admin, fine-tune later
+        isActive: true
+      });
+
+      res.status(201).json({ message: "Admin added successfully" });
+    } catch (error) {
+      console.error('Error adding admin:', error);
+      res.status(500).json({ message: "Failed to add admin" });
+    }
+  });
+
+  app.put('/api/superadmin/admins/:userId/role', requireSuperAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!['admin', 'superadmin', 'moderator', 'viewer'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      await storage.updateAdminUser(userId, { role });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating admin role:', error);
+      res.status(500).json({ message: "Failed to update role" });
+    }
+  });
 
   const httpServer: Server = createServer(app);
+
   return httpServer;
 }
 

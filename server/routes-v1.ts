@@ -57,7 +57,7 @@ router.post('/reporting/batches', async (req, res) => {
 
         // Use a system admin ID or the API key owner ID if linked for 'created_by'
         // For now, we'll store 'api_key_user' as placeholder if valid ID not avail
-        const creatorId = req.apiKey?.createdBy || 'system';
+        const creatorId = (req as any).apiKey?.createdBy || 'system';
 
         const result = await generateBatch(month, creatorId, {
             includeUnverified: !!include_unverified,
@@ -92,10 +92,22 @@ router.get('/reporting/batches/:id/download', async (req, res) => {
 
         let content = '';
         if (batch.format === 'csv') {
-            const { generateCSV } = await import('./reporting');
-            content = generateCSV(records);
-            res.header('Content-Type', 'text/csv');
-            res.attachment(`rent-ledger-export-${batch.month}-${batch.id.slice(0, 8)}.csv`);
+            const { generateHeader, generateDetailRecord, generateTrailer } = await import('./services/experian-export');
+
+            const adminId = batch.createdByAdminId || 'SYSTEM';
+            const lines = [generateHeader(batch.month, adminId)];
+
+            for (const record of records) {
+                const meta = record.metadata as any;
+                if (meta && meta.user && meta.tenancy) {
+                    lines.push(generateDetailRecord(meta.user, meta.tenancy, meta.profile, meta.profile?.optOut));
+                }
+            }
+            lines.push(generateTrailer(records.length));
+            content = lines.join('\n');
+
+            res.header('Content-Type', 'text/plain');
+            res.attachment(`rent-ledger-export-${batch.month}-${batch.id.slice(0, 8)}.txt`);
         } else {
             content = JSON.stringify(records, null, 2);
             res.header('Content-Type', 'application/json');

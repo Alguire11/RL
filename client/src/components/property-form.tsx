@@ -23,6 +23,7 @@ const propertySchema = z.object({
   landlordEmail: z.string().email("Please enter a valid email address"),
   landlordPhone: z.string().optional(),
   monthlyRent: z.string().min(1, "Monthly rent is required"),
+  rentFrequency: z.enum(["weekly", "fortnightly", "monthly"]).default("monthly"),
   leaseStartDate: z.string().min(1, "Lease start date is required"),
   leaseType: z.string().min(1, "Lease type is required"),
   contractDuration: z.string().min(1, "Contract duration is required"),
@@ -59,6 +60,7 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
       landlordEmail: "",
       landlordPhone: "",
       monthlyRent: "",
+      rentFrequency: "monthly",
       leaseStartDate: "",
       leaseType: "",
       contractDuration: "",
@@ -282,14 +284,31 @@ export function PropertyForm({ onPropertyAdded }: PropertyFormProps) {
             </div>
 
             <div>
-              <Label htmlFor="monthlyRent">Monthly Rent (£)</Label>
-              <Input
-                id="monthlyRent"
-                type="number"
-                step="0.01"
-                placeholder="1200.00"
-                {...form.register("monthlyRent")}
-              />
+              <Label htmlFor="monthlyRent">Rent Amount (£)</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="monthlyRent"
+                  type="number"
+                  step="0.01"
+                  placeholder="1200.00"
+                  {...form.register("monthlyRent")}
+                  className="flex-1"
+                />
+                <Select
+                  defaultValue="monthly"
+                  onValueChange={(val) => form.setValue("rentFrequency", val as any)}
+                  value={form.watch("rentFrequency")}
+                >
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="fortnightly">Fortnightly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {form.formState.errors.monthlyRent && (
                 <p className="text-sm text-red-500">{form.formState.errors.monthlyRent.message}</p>
               )}

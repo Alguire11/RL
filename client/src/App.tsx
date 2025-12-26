@@ -61,6 +61,8 @@ const AdminManualVerification = lazy(() => import("@/pages/admin-manual-verifica
 const AdminApiKeys = lazy(() => import("@/pages/admin-api-keys"));
 const AdminReporting = lazy(() => import("@/pages/admin-reporting"));
 const Disputes = lazy(() => import("@/pages/disputes"));
+const AdminExperianPreview = lazy(() => import("@/pages/admin/experian-preview"));
+const AdminManageAdmins = lazy(() => import("@/pages/admin/manage-admins"));
 
 import { useDomainType, getAppUrl, getAdminUrl } from "./lib/domain-router";
 import { useEffect } from "react";
@@ -162,6 +164,16 @@ function Router() {
         <Route path="/admin/audit-logs" component={() => (
           <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
             <AdminAuditLogs />
+          </Suspense>
+        )} />
+        <Route path="/admin/experian-preview" component={() => (
+          <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+            <AdminExperianPreview />
+          </Suspense>
+        )} />
+        <Route path="/admin/manage-admins" component={() => (
+          <Suspense fallback={<div className="min-h-screen bg-light-gray flex items-center justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>}>
+            <AdminManageAdmins />
           </Suspense>
         )} />
         <Route path="/disputes" component={() => (

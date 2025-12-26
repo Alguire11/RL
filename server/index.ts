@@ -8,6 +8,7 @@ import { registerWebhookRoutes } from "./routes/webhooks";
 import { setupVite, serveStatic, log } from "./vite";
 import { printEnvironmentStatus, validateEnvironment } from "./env-validation";
 import { startScheduler } from "./services/scheduler";
+import { setupCronJobs } from "./cron";
 
 // Validate environment variables before starting
 const envValidation = printEnvironmentStatus();
@@ -102,6 +103,7 @@ export { authLimiter };
 
 (async () => {
   startScheduler();
+  setupCronJobs();
 
   // Register webhook routes BEFORE CSRF protection (webhooks don't use CSRF)
   registerWebhookRoutes(app);

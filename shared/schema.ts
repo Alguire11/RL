@@ -259,7 +259,7 @@ export const auditLogs = pgTable("audit_logs", {
 export const adminUsers = pgTable("admin_users", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  role: varchar("role", { enum: ["admin", "moderator", "viewer"] }).default("viewer"),
+  role: varchar("role", { enum: ["admin", "moderator", "viewer", "superadmin"] }).default("viewer"),
   permissions: text("permissions").array(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -642,6 +642,20 @@ export type SupportTicket = typeof supportTickets.$inferSelect;
 export type InsertSupportTicket = typeof supportTickets.$inferInsert;
 export const insertSupportTicketSchema = createInsertSchema(supportTickets);
 
+// Experian Audit Logs
+export const experianAuditLogs = pgTable("experian_audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).notNull(), // Who performed the action (must be superadmin)
+  action: varchar("action", { enum: ["preview", "export", "download"] }).notNull(),
+  batchId: varchar("batch_id"), // Optional ID to group actions (e.g. for a specific export run)
+  metadata: jsonb("metadata"), // Store details like month, record count, filename
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [index("IDX_experian_audit_logs_user_id").on(table.userId)]);
+
+export type ExperianAuditLog = typeof experianAuditLogs.$inferSelect;
+export type InsertExperianAuditLog = typeof experianAuditLogs.$inferInsert;
+export const insertExperianAuditLogSchema = createInsertSchema(experianAuditLogs);
+
 // API keys table
 export const apiKeys = pgTable("api_keys", {
   id: serial("id").primaryKey(),
@@ -661,9 +675,103 @@ export type ApiKey = typeof apiKeys.$inferSelect;
 export type InsertApiKey = typeof apiKeys.$inferInsert;
 export const insertApiKeySchema = createInsertSchema(apiKeys);
 
+// Tenancies table for tracking tenancy agreement details
+export const tenancies = pgTable("tenancies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenancyRef: varchar("tenancy_ref").unique().notNull(), // Stable unique ID
+  propertyId: integer("property_id").references(() => properties.id).notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  status: varchar("status", { enum: ["active", "ended", "pending"] }).default("active"),
+  monthlyRent: decimal("monthly_rent", { precision: 10, scale: 2 }).notNull(),
+  rentFrequency: varchar("rent_frequency").default("M"), // M=Monthly, W=Weekly, etc. Default to Monthly for now
+  outstandingBalance: decimal("outstanding_balance", { precision: 10, scale: 2 }).default("0"),
+  jointTenancyCount: integer("joint_tenancy_count").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("IDX_tenancies_property_id").on(table.propertyId),
+  index("IDX_tenancies_ref").on(table.tenancyRef)
+]);
+
+// Link table between tenancies and tenants
+export const tenancyTenants = pgTable("tenancy_tenants", {
+  id: serial("id").primaryKey(),
+  tenancyId: uuid("tenancy_id").references(() => tenancies.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => users.id).notNull(),
+  jointIndicator: boolean("joint_indicator").default(false),
+  primaryTenant: boolean("primary_tenant").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("IDX_tenancy_tenants_tenancy_id").on(table.tenancyId),
+  index("IDX_tenancy_tenants_tenant_id").on(table.tenantId)
+]);
+
+// Tenant profiles with extra data for Experian
+export const tenantProfiles = pgTable("tenant_profiles", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id).unique().notNull(),
+  title: varchar("title"),
+  middleName: varchar("middle_name"),
+  dateOfBirth: date("date_of_birth"),
+
+  // Specific address fields for Experian strict compliance
+  addressLine1: varchar("address_line_1", { length: 30 }),
+  addressLine2: varchar("address_line_2", { length: 30 }),
+  addressLine3: varchar("address_line_3", { length: 30 }),
+  addressLine4: varchar("address_line_4", { length: 30 }),
+  postcode: varchar("postcode", { length: 8 }),
+
+  previousAddress: jsonb("previous_address"),
+  optOutReporting: boolean("opt_out_reporting").default(false),
+
+  // Flags
+  goneAway: boolean("gone_away").default(false),
+  arrangementToPay: boolean("arrangement_to_pay").default(false), // Payment plan
+  query: boolean("query").default(false), // Dispute/Query
+  deceased: boolean("deceased").default(false),
+  thirdPartyPaid: boolean("third_party_paid").default(false),
+
+  evictionFlag: boolean("eviction_flag").default(false),
+  evictionDate: date("eviction_date"),
+
+  housingBenefitAmount: decimal("housing_benefit_amount", { precision: 10, scale: 2 }),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("IDX_tenant_profiles_user_id").on(table.userId)
+]);
+
+export type Tenancy = typeof tenancies.$inferSelect;
+export type InsertTenancy = typeof tenancies.$inferInsert;
+export const insertTenancySchema = createInsertSchema(tenancies);
+
+export type TenancyTenant = typeof tenancyTenants.$inferSelect;
+export type InsertTenancyTenant = typeof tenancyTenants.$inferInsert;
+export const insertTenancyTenantSchema = createInsertSchema(tenancyTenants);
+
+export type TenantProfile = typeof tenantProfiles.$inferSelect;
+export type InsertTenantProfile = typeof tenantProfiles.$inferInsert;
+export const insertTenantProfileSchema = createInsertSchema(tenantProfiles);
+
 export const maintenanceRequestsRelations = relations(maintenanceRequests, ({ one }) => ({
   tenant: one(users, { fields: [maintenanceRequests.tenantId], references: [users.id] }),
   property: one(properties, { fields: [maintenanceRequests.propertyId], references: [properties.id] }),
+}));
+
+export const tenanciesRelations = relations(tenancies, ({ one, many }) => ({
+  property: one(properties, { fields: [tenancies.propertyId], references: [properties.id] }),
+  tenants: many(tenancyTenants),
+}));
+
+export const tenancyTenantsRelations = relations(tenancyTenants, ({ one }) => ({
+  tenancy: one(tenancies, { fields: [tenancyTenants.tenancyId], references: [tenancies.id] }),
+  tenant: one(users, { fields: [tenancyTenants.tenantId], references: [users.id] }),
+}));
+
+export const tenantProfilesRelations = relations(tenantProfiles, ({ one }) => ({
+  user: one(users, { fields: [tenantProfiles.userId], references: [users.id] }),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -674,12 +782,20 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   landlordVerifications: many(landlordVerifications),
   notifications: many(notifications),
   preferences: one(userPreferences),
+  userPreferences: one(userPreferences),
   securityLogs: many(securityLogs),
-  adminUser: one(adminUsers),
+  auditLogs: many(auditLogs),
+  adminUsers: many(adminUsers),
   dataExportRequests: many(dataExportRequests),
   badges: many(userBadges),
   certificationPortfolios: many(certificationPortfolios),
+  rentLogs: many(rentLogs),
+  landlordTenantLinks: many(landlordTenantLinks),
+  adminActions: many(adminActions),
+  pendingLandlords: many(pendingLandlords),
   maintenanceRequests: many(maintenanceRequests),
+  tenancies: many(tenancyTenants),
+  experianAuditLogs: many(experianAuditLogs),
 }));
 
 export const propertiesRelations = relations(properties, ({ one, many }) => ({
@@ -688,6 +804,7 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   creditReports: many(creditReports),
   landlordVerifications: many(landlordVerifications),
   maintenanceRequests: many(maintenanceRequests),
+  tenancies: many(tenancies),
 }));
 
 export const rentPaymentsRelations = relations(rentPayments, ({ one }) => ({
@@ -831,9 +948,10 @@ export const reportingRecords = pgTable("reporting_records", {
   verificationMethod: varchar("verification_method"),
   verificationTimestamp: timestamp("verification_timestamp"),
   evidenceHashes: jsonb("evidence_hashes"), // Array of string
-  consentStatus: varchar("consent_status"),
+  consentStatus: varchar("consent_status", { enum: ["consented", "withdrawn", "not_consented"] }).notNull(),
   consentTimestamp: timestamp("consent_timestamp"),
   auditRef: text("audit_ref"),
+  metadata: jsonb("metadata"), // Added for storing source data (Experian fields) for re-generation
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("IDX_reporting_records_batch_id").on(table.batchId),

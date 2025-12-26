@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -39,6 +40,8 @@ const rentDetailsSchema = z.object({
   landlordEmail: z.string().email("Valid landlord/agent email is required"),
   landlordPhone: z.string().min(10, "Landlord/Agent phone number is required"),
   firstPaymentDate: z.string().min(1, "First payment date is required"),
+  dateOfBirth: z.string().min(1, "Date of Birth is required"),
+  experianConsent: z.boolean().default(false).refine(val => val === true, "You must consent to credit reporting"),
 });
 
 const bankConnectionSchema = z.object({
@@ -78,6 +81,8 @@ export default function OnboardingPage() {
       landlordEmail: "",
       landlordPhone: "",
       firstPaymentDate: "",
+      dateOfBirth: "",
+      experianConsent: false,
     },
   });
 
@@ -183,20 +188,22 @@ export default function OnboardingPage() {
       }
       const rentInfoResult = await response.json();
 
-      // Update user address
+      // Update user address and profile details (DOB, Consent)
       try {
-        const addressData = {
+        const profileUpdates = {
           address: {
             street: data.address.trim(),
             city: data.city.trim(),
             postcode: data.postcode.trim(),
-          }
+          },
+          dateOfBirth: data.dateOfBirth,
+          experianConsent: data.experianConsent
         };
-        await apiRequest("PATCH", "/api/user/profile", addressData);
+        await apiRequest("PATCH", "/api/user/profile", profileUpdates);
         // Invalidate user query to refresh address
         queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       } catch (error) {
-        console.error("Failed to update user address:", error);
+        console.error("Failed to update user profile/address:", error);
         // Don't fail onboarding if address update fails
       }
 
@@ -469,6 +476,22 @@ export default function OnboardingPage() {
             <CardContent>
               <form onSubmit={rentForm.handleSubmit(onRentDetails)} className="space-y-4">
                 <div className="space-y-4">
+
+                  <h3 className="text-lg font-semibold text-gray-900">Personal Details</h3>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dateOfBirth">Date of Birth <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="dateOfBirth"
+                        type="date"
+                        {...rentForm.register("dateOfBirth")}
+                      />
+                      {rentForm.formState.errors.dateOfBirth && (
+                        <p className="text-sm text-red-600">{rentForm.formState.errors.dateOfBirth.message}</p>
+                      )}
+                    </div>
+                  </div>
+
                   <h3 className="text-lg font-semibold text-gray-900">Property Address</h3>
                   <div className="space-y-2">
                     <Label htmlFor="address">Street Address <span className="text-red-500">*</span></Label>
@@ -601,7 +624,32 @@ export default function OnboardingPage() {
                       <strong>Why we need this:</strong> We'll send a verification email to your landlord/agent to confirm your rent payment history.
                     </p>
                   </div>
+
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-start space-x-2">
+                      <Checkbox
+                        id="experianConsent"
+                        checked={rentForm.watch("experianConsent")}
+                        onCheckedChange={(checked) => rentForm.setValue("experianConsent", checked as boolean)}
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <Label
+                          htmlFor="experianConsent"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          I consent to sharing my rental payment data with Experian.
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          This allows us to help build your credit history. You can opt-out at any time in settings.
+                        </p>
+                        {rentForm.formState.errors.experianConsent && (
+                          <p className="text-sm text-red-600">{rentForm.formState.errors.experianConsent.message}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
                 <div className="flex justify-between pt-4">
                   <Button
                     type="button"
